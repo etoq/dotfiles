@@ -192,8 +192,8 @@ if [ "$DO_PKGS" = "1" ]; then
         optimus-manager
         happ bluetuith impala neohtop rmtrash ptpython hyx snapper-rollback btrfs-assistant
         dracula-gtk-theme dracula-icons-git ttf-material-symbols-variable-git ttf-symbola
-        i3lock-color rofi-greenclip apparmor.d-git
-        ayugram-desktop librewolf-bin simplex-desktop otter-launcher lazydocker termdown light
+        i3lock-color rofi-greenclip-bin apparmor.d-git
+        ayugram-desktop-bin librewolf-bin simplex-desktop otter-launcher lazydocker-bin termdown light
         woff2-font-awesome
     )
 
