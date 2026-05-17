@@ -316,9 +316,12 @@ fi
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_SERVICES" = "1" ]; then
     step "СИСТЕМНЫЕ НАСТРОЙКИ И БЕЗОПАСНОСТЬ"
-
+    
     # 1. Настройка пользователя (Группы)
     info "Добавляю $USER в нужные группы..."
+    for g in wheel audio video storage optical libvirt kvm; do
+        sudo groupadd -f "$g" 2>/dev/null || true
+    done
     sudo usermod -aG wheel,audio,video,storage,optical,libvirt,kvm "$USER"
     ok "Права пользователя обновлены"
 
