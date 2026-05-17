@@ -1,0 +1,17 @@
+#!/bin/bash
+# ~/.local/bin/clean-meta
+DIR="${1:-.}"
+if ! command -v exiftool &>/dev/null; then
+    echo "exiftool not found."
+    echo "Install: sudo pacman -S perl-image-exiftool"
+    exit 1
+fi
+echo "  Cleaning metadata from: $DIR"
+count=0
+while IFS= read -r -d '' f; do
+    exiftool -all= -overwrite_original "$f" 2>/dev/null && count=$((count+1))
+done < <(find "$DIR" -type f \
+    \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \
+    -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.tiff" \) \
+    -print0 2>/dev/null)
+echo "  Cleaned: $count files"

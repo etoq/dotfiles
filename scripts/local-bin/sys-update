@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+echo -e "\n\033[1;35m[*] 1. Создаю pre-update снапшот...\033[0m"
+sudo snapper -c root create --description "pre-update-$(date +%Y%m%d-%H%M)"
+echo -e "\033[1;32m[✓] Снапшот создан.\033[0m"
+
+echo -e "\n\033[1;35m[*] 2. Запускаю обновление системы (pacman + AUR)...\033[0m"
+yay -Syu
+
+echo -e "\n\033[1;35m[*] 3. Проверка модулей NVIDIA (DKMS)...\033[0m"
+dkms_out=$(dkms status)
+echo "$dkms_out"
+
+if echo "$dkms_out" | grep -qi "broken"; then
+    echo -e "\n\033[1;31m[!] ВНИМАНИЕ: Обнаружены сломанные (broken) модули DKMS!\033[0m"
+    echo -e "\033[1;33m[*] Пытаюсь пересобрать автоматически...\033[0m"
+    sudo dkms autoinstall
+else
+    echo -e "\n\033[1;32m[✓] DKMS в порядке! Модули installed.\033[0m"
+fi
+
+echo -e "\n\033[1;32m[✓] Обновление завершено безопасно!\033[0m"

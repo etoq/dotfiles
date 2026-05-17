@@ -1,0 +1,46 @@
+[Default Applications]
+# 🌐 Web / Интернет (LibreWolf как основной)
+text/html=librewolf.desktop
+x-scheme-handler/http=librewolf.desktop
+x-scheme-handler/https=librewolf.desktop
+x-scheme-handler/about=librewolf.desktop
+x-scheme-handler/unknown=librewolf.desktop
+x-scheme-handler/chrome=firefox.desktop
+
+# 📄 Документы (PDF и книги)
+application/pdf=org.pwmt.zathura.desktop
+application/epub+zip=org.pwmt.zathura.desktop
+
+# 📝 Тексты и код (Neovim)
+text/plain=nvim.desktop
+text/markdown=nvim.desktop
+text/x-python=nvim.desktop
+application/x-shellscript=nvim.desktop
+application/json=nvim.desktop
+application/x-zerosize=nvim.desktop
+
+# 🖼️ Картинки (Feh)
+image/jpeg=feh.desktop
+image/png=feh.desktop
+image/gif=feh.desktop
+image/webp=feh.desktop
+
+# 🎬 Медиа (MPV)
+video/mp4=mpv.desktop
+video/mkv=mpv.desktop
+audio/mpeg=mpv.desktop
+audio/x-wav=mpv.desktop
+
+# 📦 Архивы (Xarchiver)
+application/zip=xarchiver.desktop
+application/x-rar=xarchiver.desktop
+application/x-7z-compressed=xarchiver.desktop
+application/x-tar=xarchiver.desktop
+application/x-raw-disk-image-xz-compressed=xarchiver.desktop
+
+# 🗄️ Базы данных
+application/sql=sqlitebrowser.desktop
+application/vnd.sqlite3=sqlitebrowser.desktop
+
+# 📂 Директории
+inode/directory=yazi.desktop

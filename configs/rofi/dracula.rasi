@@ -1,0 +1,34 @@
+* {
+bg: #0D1117;
+bg2: #1A1A2E;
+sel: #44475A;
+fg: #F8F8F2;
+purple: #BD93F9;
+pink: #FF79C6;
+cyan: #8BE9FD;
+border-colour: @purple;
+handle-colour: @purple;
+background-colour: @bg;
+foreground-colour: @fg;
+alternate-background: @bg2;
+normal-background: @bg;
+normal-foreground: @fg;
+urgent-background: @bg;
+urgent-foreground: @pink;
+active-background: @bg2;
+active-foreground: @purple;
+selected-normal-background: @sel;
+selected-normal-foreground: @fg;
+selected-urgent-background: @pink;
+selected-active-background: @purple;
+}
+window {
+width: 35%;
+border: 2px;
+border-radius: 10px;
+border-colour: @border-colour;
+background-color: @background-colour;
+}
+inputbar { padding: 12px; border-radius: 8px 8px 0 0; }
+listview { lines: 10; padding: 8px; }
+element { padding: 8px 12px; border-radius: 6px; }

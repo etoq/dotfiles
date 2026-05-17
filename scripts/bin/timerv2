@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Запрашиваем время у пользователя
+echo "Time"
+read timer_speed
+
+# Запускаем arttime с введенным значением
+arttime --nolearn \
+        -a colorowl2 \
+        -b colorowl3 \
+        -t "We don't Owls" \
+        -o "$timer_speed" \
+        -i

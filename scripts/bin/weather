@@ -1,0 +1,4 @@
+#!/bin/bash
+# ~/bin/weather — погода Екатеринбург
+curl -s "wttr.in/Ekaterinburg?lang=ru" 2>/dev/null \
+  || echo "Нет соединения"

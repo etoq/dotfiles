@@ -1,0 +1,703 @@
+# ╔═══════════════════════════════════════════════════════════════╗
+# ║   otter-launcher · Dracula · zer0@p50 · offensive workstation ║
+# ╚═══════════════════════════════════════════════════════════════╝
+
+[general]
+default_module    = "gg"
+empty_module      = "app"
+exec_cmd = "bash -c"
+vi_mode           = true
+esc_to_abort      = true
+cheatsheet_entry  = "?"
+cheatsheet_viewer = "less -R; clear"
+clear_screen_after_execution = false
+loop_mode         = false
+external_editor   = "nvim"
+delay_startup     = 25
+callback          = ""
+
+# ── OVERLAY — картинка по центру ─────────────────────────────────────────────
+[overlay]
+# Увеличили размер картинки с 36x10 до 65x14 (сделали её широкой панорамой)
+overlay_cmd = "chafa -s 46x14 --colors=full \"$HOME/.config/otter-launcher/image.png\""
+overlay_trimmed_lines = 0
+overlay_height        = 14
+move_overlay_right    = 2   
+move_overlay_down     = 0
+
+# ── INTERFACE ─────────────────────────────────────────────────────────────────
+[interface]
+# Удлинили линии ────, чтобы они соответствовали широкой картинке
+header = "  \u001B[38;2;98;114;164m──────────────────────────────────────────────\n\u001B[38;2;189;147;249m\u001B[1m  󱢴 ZER0\n   \u001B[38;2;241;250;140m$(uptime -p | sed 's/up //')\n\u001B[38;2;98;114;164m  ──────────────────────────────────────────────\n\u001B[38;2;189;147;249m\u001B[1m  󱎘 \u001B[0;1m"
+place_holder       = "\u001B[38;2;98;114;164mtype and search...\u001B[0m"
+suggestion_mode    = "list"
+suggestion_lines   = 3
+prefix_padding     = 5
+list_prefix        = "  \u001B[38;2;98;114;164m│  \u001B[0m"
+selection_prefix   = "  \u001B[38;2;189;147;249m\u001B[1m▌  \u001B[0m"
+customized_list_order = true
+# Удлинили линию сепаратора
+separator = """\u001B[38;2;98;114;164m  ──────────────────────────────────────────────\u001B[0m"""
+footer    = ""
+default_module_message = "  \u001B[38;2;98;114;164m│  \u001B[38;2;189;147;249m \u001B[0m google search"
+empty_module_message   = "  \u001B[38;2;98;114;164m│  \u001B[38;2;189;147;249m \u001B[0m app launcher"
+indicator_with_arg_module = "\u001B[38;2;189;147;249m❯\u001B[0m"
+indicator_no_arg_module   = "\u001B[38;2;98;114;164m○\u001B[0m"
+prefix_color       = "\u001B[38;2;189;147;249m\u001B[1m"
+description_color  = "\u001B[38;2;98;114;164m"
+place_holder_color = "\u001B[38;2;98;114;164m"
+hint_color         = "\u001B[38;2;98;114;164m"
+move_interface_right = 0
+# Опустили текст ниже, так как картинка теперь высотой 14 строк
+move_interface_down  = 10 # ══════════════════════════════════════════════════════════════════════════════
+
+# ── WEB ───────────────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "google search"
+prefix = "gg"
+cmd = "xdg-open 'https://www.google.com/search?q={}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "search archwiki"
+prefix = "aw"
+cmd = "xdg-open 'https://wiki.archlinux.org/index.php?search={}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "search AUR"
+prefix = "aur"
+cmd = "xdg-open 'https://aur.archlinux.org/packages?K={}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "search Arch packages"
+prefix = "pac"
+cmd = "xdg-open 'https://archlinux.org/packages/?q={}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "GitHub search"
+prefix = "gh"
+cmd = "xdg-open 'https://github.com/search?q={}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "YouTube search"
+prefix = "yt"
+cmd = "xdg-open 'https://www.youtube.com/results?search_query={}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "translate EN→RU (deepl)"
+prefix = "tr"
+cmd = "xdg-open 'https://www.deepl.com/translator#en/ru/{}' >/dev/null 2>&1 & disown"
+with_argument = true
+url_encode = true
+unbind_proc = true
+
+[[modules]]
+description = "Claude AI"
+prefix = "cai"
+cmd = "xdg-open 'https://claude.ai' >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Google AI free"
+prefix = "gai"
+cmd = "xdg-open 'https://www.google.com/search?udm=50&mtid=GWMIasbCILKK9u8PkZiaaA' >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Arena AI"
+prefix = "aai"
+cmd = "xdg-open https://arena.ai/ >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+# ── APPLICATIONS ──────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "desktop app launcher (fzf)"
+prefix = "app"
+cmd = '''
+selected="$(find /usr/share/applications "$HOME/.local/share/applications" \
+  -name '*.desktop' 2>/dev/null \
+  | xargs -I{} basename {} .desktop \
+  | sort -u \
+  | fzf \
+    --no-info \
+    --cycle \
+    --gutter ' ' \
+    --pointer '▌' \
+    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,fg+:#F8F8F2,hl:#BD93F9,hl+:#FF79C6,pointer:#BD93F9' \
+    --prompt '  ')"
+[ -z "$selected" ] && exit 0
+setsid -f gtk-launch "$selected" >/dev/null 2>&1
+'''
+
+[[modules]]
+description = "open directory (yazi + fd)"
+prefix = "yz"
+cmd = """
+d="$(fd --type d --hidden --exclude .git --exclude .cache . "$HOME" 2>/dev/null \
+  | fzf \
+    --cycle --gutter ' ' --pointer '▌' \
+    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#BD93F9,pointer:#BD93F9' \
+    --prompt '  Dir > ')"
+if [ -n "$d" ]; then
+    kitty -e yazi "$d" >/dev/null 2>&1 & disown
+fi
+exit 0
+"""
+unbind_proc = true
+
+[[modules]]
+description = "open file (fzf + fd)"
+prefix = "fo"
+cmd = """
+f="$(fd --type f --hidden --exclude .git --exclude .cache . "$HOME" 2>/dev/null \
+  | fzf \
+    --cycle --gutter ' ' --pointer '▌' \
+    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#BD93F9,pointer:#BD93F9' \
+    --prompt '  File > ' \
+    --preview 'bat --color=always --style=numbers {} 2>/dev/null || cat {}' \
+    --preview-window=right:50%:wrap)"
+if [ -n "$f" ]; then
+    xdg-open "$f" >/dev/null 2>&1 & disown
+fi
+exit 0
+"""
+unbind_proc = true
+
+[[modules]]
+description = "kill process (fzf)"
+prefix = "kill"
+cmd = """
+while true; do
+  pid="$(ps -A -o pid,comm,pcpu,pmem --sort=-pcpu | awk 'NR==1; NR>1' \
+    | fzf \
+      --header-lines=1 \
+      --cycle --gutter ' ' --pointer '▌' \
+      --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555' \
+      --prompt '  Kill (ESC to exit) > ' \
+    | awk '{print $1}')"
+  
+  if [ -z "$pid" ]; then
+    break
+  fi
+  
+  kill -9 "$pid" && notify-send "System" "Process $pid killed"
+done
+"""
+
+[[modules]]
+description = "uninstall arch packages (fzf)"
+prefix = "rm"
+cmd = """
+setsid -f kitty --class pkg-manager --override window_padding_width=10 -e bash -c '
+  echo "  📦 Выбери пакеты для удаления (TAB - выделить несколько):"
+  echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  pkgs="$(pacman -Qeq | fzf -m \
+    --cycle --gutter " " --pointer "▌" \
+    --color "bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555" \
+    --prompt "  Delete > " \
+    --preview "pacman -Qi {}" \
+    --preview-window=right:50%)"
+  
+  if [ -n "$pkgs" ]; then
+    echo "Удаляем: $pkgs"
+    sudo pacman -Rns $pkgs
+  fi
+  read -p "  Press Enter to exit..."
+' >/dev/null 2>&1 &
+"""
+unbind_proc = true
+
+# ── PRODUCTIVITY ──────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "browser (librewolf)"
+prefix = "br"
+cmd = "librewolf >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "browser incognito"
+prefix = "bri"
+cmd = "librewolf --private-window >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Telegram (AyuGram)"
+prefix = "tg"
+cmd = "AyuGram >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "calendar (calcurse)"
+prefix = "cal"
+cmd = "kitty --class calendar -e calcurse >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "rednotes manage"
+prefix = "rn"
+cmd = "kitty --class rednotes-float -e rednotes manage >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "rednotes add note"
+prefix = "rna"
+cmd = "kitty --class rednotes-float -e rednotes add >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "rednotes set target"
+prefix = "rnt"
+cmd = "kitty --class rednotes-float -e bash -c 'rednotes set {}; read -p \"Target set. Enter...\"' >/dev/null 2>&1 & disown"
+with_argument = true
+unbind_proc = true
+
+[[modules]]
+description = "KeePassXC"
+prefix = "kp"
+cmd = "keepassxc >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Obsidian"
+prefix = "obs"
+cmd = "obsidian >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "scratch note (nvim)"
+prefix = "note"
+cmd = "kitty -e nvim ~/notes/scratch.md >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+# ── SYSTEM ────────────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "power menu"
+prefix = "po"
+cmd = """
+choice="$(printf '  reboot\n  poweroff\n  suspend\n  lock\n  logout' \
+  | fzf --no-sort \
+    --cycle --gutter ' ' --pointer '▌' \
+    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555' \
+    --prompt '  ')"
+case "$choice" in
+  *reboot)   systemctl reboot ;;
+  *poweroff) systemctl poweroff ;;
+  *suspend)  systemctl suspend ;;
+  *lock)     "$HOME/.local/bin/lock" >/dev/null 2>&1 & disown ;;
+  *logout)   bspc quit ;;
+esac
+"""
+
+[[modules]]
+description = "system health"
+prefix = "sys"
+cmd = "kitty --class syshealth -e ~/.local/bin/syshealth >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "thermal paste check"
+prefix = "temp"
+cmd = """
+kitty -e bash -c '
+echo "  THERMAL PASTE ADVISOR — ThinkPad P50"
+echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t1=$(cat /sys/class/hwmon/hwmon7/temp1_input 2>/dev/null || echo 0)
+t2=$(cat /sys/class/hwmon/hwmon7/temp2_input 2>/dev/null || echo 0)
+ec=$(cat /sys/class/hwmon/hwmon4/temp1_input 2>/dev/null || echo 0)
+cpu=$((t1/1000)); pkg=$((t2/1000)); ec_c=$((ec/1000))
+echo "  CPU Core:  ${cpu}°C"
+echo "  Package:   ${pkg}°C"
+echo "  EC sensor: ${ec_c}°C"
+echo "  Delta:     $((pkg - ec_c))°C"
+echo ""
+score=0
+[ $pkg -ge 90 ] && score=$((score+4))
+[ $pkg -ge 80 ] && [ $pkg -lt 90 ] && score=$((score+3))
+[ $pkg -ge 70 ] && [ $pkg -lt 80 ] && score=$((score+1))
+[ $cpu -ge 85 ] && score=$((score+2))
+[ $((pkg - ec_c)) -ge 25 ] && score=$((score+2))
+[ $((pkg - ec_c)) -ge 15 ] && score=$((score+1))
+echo "  Score: $score / 9"
+echo ""
+if [ $score -ge 7 ]; then
+  echo "  ▓ ТОЧНО ДА — меняй прямо сейчас!"
+elif [ $score -ge 5 ]; then
+  echo "  ▒ ДА — замена нужна"
+elif [ $score -ge 3 ]; then
+  echo "  ░ ЖЕЛАТЕЛЬНО — скоро"
+elif [ $score -ge 1 ]; then
+  echo "  · СКОРО — следи за температурой"
+else
+  echo "  ✓ НЕТ — всё в порядке"
+fi
+echo ""
+echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+read -p "  Press Enter..."
+' >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "btop monitor"
+prefix = "top"
+cmd = """
+bspc desktop -f '^4'
+sleep 0.2
+kitty -e btop >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "s-tui CPU stress"
+prefix = "cpu"
+cmd = """
+bspc desktop -f '^4'
+sleep 0.2
+kitty -e s-tui >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "disk usage (duf)"
+prefix = "dsk"
+cmd = """
+bspc desktop -f '^4'
+sleep 0.2
+kitty -e bash -c 'duf; read -p "Press Enter..."' >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "htop"
+prefix = "ht"
+cmd = """
+bspc desktop -f '^4'
+sleep 0.2
+kitty -e htop >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "neohtop"
+prefix = "nht"
+cmd = """
+bspc desktop -f '^4'
+sleep 0.2
+kitty -e neohtop >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "journal errors"
+prefix = "log"
+cmd = "kitty -e bash -c 'journalctl -p err -b --no-pager | bat --color=always --paging=always' >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "update system"
+prefix = "upd"
+cmd = "kitty -e bash -c 'sudo pacman -Syu; read -p \"Done. Press Enter...\"' >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "snapshots (snapper)"
+prefix = "snap"
+cmd = "kitty -e bash -c 'sudo snapper -c root list; read -p \"Press Enter...\"' >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+# ── NETWORK ───────────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "bluetooth (bluetuith)"
+prefix = "bt"
+cmd = """
+if command -v bluetuith &>/dev/null; then
+  kitty \
+    --override background=#282A36 \
+    --override foreground=#F8F8F2 \
+    --class bluetooth \
+    -e bluetuith >/dev/null 2>&1 & disown
+else
+  kitty \
+    --override background=#282A36 \
+    --override foreground=#F8F8F2 \
+    -e bluetoothctl >/dev/null 2>&1 & disown
+fi
+"""
+unbind_proc = true
+
+[[modules]]
+description = "audio (pulsemixer)"
+prefix = "vol"
+cmd = """
+kitty \
+  --override background=#282A36 \
+  --override foreground=#F8F8F2 \
+  -e pulsemixer >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "wifi TUI (impala/nmtui)"
+prefix = "wifi"
+cmd = """
+if command -v impala &>/dev/null; then
+  kitty --override background=#282A36 -e impala >/dev/null 2>&1 & disown
+else
+  kitty --override background=#282A36 --override foreground=#F8F8F2 -e nmtui >/dev/null 2>&1 & disown
+fi
+"""
+unbind_proc = true
+
+[[modules]]
+description = "IP addresses"
+prefix = "ip"
+cmd = '''
+kitty -e bash -c '
+echo "  LOCAL:"
+ip -4 addr | grep inet | grep -v 127 | awk "{print \"  \" \$2}"
+echo ""
+echo "  EXTERNAL:"
+curl -s https://ipinfo.io/ip && echo
+echo ""
+read -p "  Press Enter..."
+' >/dev/null 2>&1 & disown
+'''
+unbind_proc = true
+
+[[modules]]
+description = "open ports (ss)"
+prefix = "ports"
+cmd = "kitty -e bash -c 'ss -tulpn; read -p \"Press Enter...\"' >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "nmap scan"
+prefix = "nm"
+cmd = """
+kitty -e bash -c '
+target="{}"
+echo "  Scanning: $target"
+echo " ━━━━━━━━━━━━━━━━━━━━━━━━━"
+nmap -T4 -F "$target" 2>&1
+echo ""
+read -p "  Done. Press Enter..."
+' >/dev/null 2>&1 & disown
+"""
+with_argument = true
+unbind_proc = true
+
+[[modules]]
+description = "wavemon wifi"
+prefix = "wvm"
+cmd = "kitty -e wavemon >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "weather (Екатеринбург)"
+prefix = "wtr"
+cmd = """
+kitty -e bash -c '
+if [ -f ~/bin/weather2 ]; then
+  bash ~/bin/weather2
+elif [ -f ~/bin/weather ]; then
+  bash ~/bin/weather
+else
+  curl -s "wttr.in/Ekaterinburg?lang=ru"
+fi
+echo ""
+read -p "  Press Enter..."
+' >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+# ── VMs ───────────────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "virt-manager"
+prefix = "vm"
+cmd = "virt-manager >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "VM control (fzf)"
+prefix = "vms"
+cmd = """
+vm="$(virsh list --all --name 2>/dev/null | grep -v '^$' \
+  | fzf \
+    --cycle --gutter ' ' --pointer '▌' \
+    --color 'bg:#0D1117,bg+:#1F2937,fg:#F8F8F2,hl:#8BE9FD,pointer:#8BE9FD' \
+    --prompt '  VM > ' \
+    --preview 'virsh dominfo {} 2>/dev/null' \
+    --preview-window=right:40%)"
+[ -z "$vm" ] && exit 0
+state="$(virsh domstate "$vm" 2>/dev/null)"
+action="$(printf '  start\n  shutdown\n  reboot\n  force-off\n  snapshot' \
+  | fzf --prompt "  $vm [$state] > " \
+    --color 'bg:#0D1117,bg+:#1F2937,fg:#F8F8F2,hl:#8BE9FD,pointer:#8BE9FD')"
+case "$action" in
+  *start)     virsh start "$vm" && notify-send "VM" "Starting $vm" ;;
+  *shutdown)  virsh shutdown "$vm" ;;
+  *reboot)    virsh reboot "$vm" ;;
+  *force-off) virsh destroy "$vm" ;;
+  *snapshot)  virsh snapshot-create-as "$vm" "snap-$(date +%Y%m%d-%H%M)" \
+              && notify-send "VM" "Snapshot created" ;;
+esac
+"""
+
+# ── SECURITY ──────────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "Burp Suite"
+prefix = "burp"
+cmd = "burpsuite >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Burp Suite Pro"
+prefix = "bpro"
+cmd = "burpsuitepro >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Wireshark"
+prefix = "wsh"
+cmd = "wireshark >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "Metasploit"
+prefix = "msf"
+cmd = "kitty -e msfconsole >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "BloodHound"
+prefix = "bh"
+cmd = "bloodhound >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "clean image metadata"
+prefix = "meta"
+cmd = """
+kitty -e bash -c '
+dir="${1:-$HOME/Pictures}"
+echo "  Cleaning metadata: $dir"
+~/.local/bin/clean-meta "$dir"
+read -p "  Done. Press Enter..."
+' _ "{}" >/dev/null 2>&1 & disown
+"""
+with_argument = true
+unbind_proc = true
+
+# ── DEV TOOLS ─────────────────────────────────────────────────────────────────
+
+[[modules]]
+description = "lazygit"
+prefix = "lg"
+cmd = "kitty --override background=#0D1117 -e lazygit >/dev/null 2>&1 & disown"
+unbind_proc = true
+
+[[modules]]
+description = "lazydocker"
+prefix = "ldk"
+cmd = """
+kitty --override background=#0D1117 -e lazydocker 2>/dev/null \
+  || kitty -e bash -c 'echo "lazydocker not installed. yay -S lazydocker"; read' >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+[[modules]]
+description = "jq interactive"
+prefix = "jq"
+cmd = """
+kitty -e bash -c '
+echo "  jq interactive — paste JSON below, Ctrl+D when done:"
+echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+json="$(cat)"
+echo ""
+echo "  Result:"
+echo "$json" | jq . 2>&1
+echo ""
+read -p "  Press Enter..."
+' >/dev/null 2>&1 & disown
+"""
+unbind_proc = true
+
+# ── POMODORO / TOMATO TIMERS ──────────────────────────────────────────────────
+# ── POMODORO / TOMATO TIMERS ──────────────────────────────────────────────────
+
+[[modules]]
+description = "Work: 2 hours (notifies at 1h and 2h)"
+prefix = "t2"
+cmd = """
+bspc desktop -f '^7'
+setsid -f kitty --start-as=fullscreen --class tomato-timer --override background=#1E1E2F --override foreground=#BD93F9 -e bash -c '
+  (
+    sleep 1h
+    notify-send -u normal "⏳ Прогресс (Tomato)" "Прошел 1 час работы. Остался еще 1!"
+    sleep 1h
+    notify-send -u critical "🛑 Отличная работа!" "Прошло 2 часа. Закрывай таймер и запускай отдых (t30)!"
+  ) &
+  pid=$!
+  termdown 2h --blink
+  kill $pid 2>/dev/null
+' >/dev/null 2>&1
+"""
+unbind_proc = true
+
+[[modules]]
+description = "Work: 1 hour (notifies at 1h)"
+prefix = "t1"
+cmd = """
+bspc desktop -f '^7'
+setsid -f kitty --start-as=fullscreen --class tomato-timer --override background=#1E1E2F --override foreground=#BD93F9 -e bash -c '
+  (
+    sleep 1h
+    notify-send -u critical "🛑 Отличная работа!" "Прошел 1 час. Время сделать перерыв!"
+  ) &
+  pid=$!
+  termdown 1h --blink
+  kill $pid 2>/dev/null
+' >/dev/null 2>&1
+"""
+unbind_proc = true
+
+[[modules]]
+description = "Rest: 30 minutes (notifies at 30m)"
+prefix = "t30"
+cmd = """
+bspc desktop -f '^7'
+setsid -f kitty --start-as=fullscreen --class tomato-timer --override background=#1E1E2F --override foreground=#BD93F9 -e bash -c '
+  (
+    sleep 30m
+    notify-send -u critical "☕ Отдых окончен" "Прошло 30 минут. Пора возвращаться за работу!"
+  ) &
+  pid=$!
+  termdown 30m --blink
+  kill $pid 2>/dev/null
+' >/dev/null 2>&1
+"""
+unbind_proc = true

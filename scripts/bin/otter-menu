@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+kitty \
+  --class otter-launcher \
+  --override background_opacity=0.97 \
+  --config ~/.config/kitty/otter.conf \
+  sh -c '
+    clear
+    otter-launcher
+  '

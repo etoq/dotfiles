@@ -1,0 +1,30 @@
+#!/bin/bash
+# ~/.local/bin/syshealth
+echo "  SYSTEM HEALTH — $(hostname)"
+echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  CPU"
+cpu=$(top -bn1 | grep "Cpu" | awk '{print int($2)}' 2>/dev/null || echo "?")
+echo "  Load:  ${cpu}%"
+t=$(cat /sys/class/hwmon/hwmon7/temp1_input 2>/dev/null || echo 0)
+echo "  Temp:  $((t/1000))°C"
+echo ""
+echo "  MEMORY"
+free -h | grep Mem | awk '{print "  Used: " $3 " / " $2}'
+echo ""
+echo "  DISK"
+df -h / | tail -1 | awk '{print "  Root: " $3 " / " $2 " (" $5 " used)"}'
+df -h /vms 2>/dev/null | tail -1 | awk '{print "  VMs:  " $3 " / " $2 " (" $5 " used)"}'
+echo ""
+echo "  NETWORK"
+ip -4 addr show | grep inet | grep -v 127 | awk '{print "  " $2}'
+echo ""
+echo "  SERVICES"
+for svc in libvirtd apparmor auditd thinkfan bluetooth; do
+  st=$(systemctl is-active $svc 2>/dev/null)
+  [ "$st" = "active" ] && ic=" " || ic=" "
+  echo "  $ic $svc: $st"
+done
+echo ""
+echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+read -p "  Press Enter to close..."

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# ~/.local/bin/cheat-sxhkd
+# Cheat sheet: все биндинги sxhkd — красивый вывод в терминале
+
+# Dracula цвета через ANSI
+R='\033[0m'
+PUR='\033[38;2;189;147;249m'   # #BD93F9
+PNK='\033[38;2;255;121;198m'   # #FF79C6
+CYN='\033[38;2;139;233;253m'   # #8BE9FD
+GRN='\033[38;2;80;250;123m'    # #50FA7B
+YLW='\033[38;2;241;250;140m'   # #F1FA8C
+RED='\033[38;2;255;85;85m'     # #FF5555
+ORG='\033[38;2;255;184;108m'   # #FFB86C
+DIM='\033[38;2;98;114;164m'    # #6272A4
+FG='\033[38;2;248;248;242m'    # #F8F8F2
+BOLD='\033[1m'
+BG_HDR='\033[48;2;22;27;34m'   # #161B22
+
+# Ширина терминала
+W=$(tput cols 2>/dev/null || echo 120)
+
+# Функции рендера
+header() {
+    local text="$1"
+    printf "\n${BG_HDR}${PUR}${BOLD}"
+    printf "%-${W}s" "  ▍ ${text}"
+    printf "${R}\n"
+}
+
+row() {
+    local label="$1"
+    local key="$2"
+    local color="${3:-$PUR}"
+    local pad=$((W - ${#label} - ${#key} - 8))
+    [ $pad -lt 1 ] && pad=1
+    printf "  ${FG}%-35s${DIM}%*s${R}  ${color}${BOLD}[${key}]${R}\n" \
+        "$label" "$pad" ""
+}
+
+clear
+printf "${BG_HDR}${PUR}${BOLD}"
+printf "%-${W}s" ""
+printf "${R}\n"
+printf "${BG_HDR}${PUR}${BOLD}"
+printf "%-${W}s" "    ██████╗██╗  ██╗███████╗ █████╗ ████████╗    ███████╗██╗  ██╗██╗  ██╗██╗  ██╗██████╗"
+printf "${R}\n"
+printf "${BG_HDR}${PNK}${BOLD}"
+printf "%-${W}s" "    BSPWM · sxhkd  keybindings  ·  zer0@p50  ·  Dracula"
+printf "${R}\n"
+printf "${BG_HDR}${DIM}"
+printf "%-${W}s" "    q — выйти   /   f — fish cheat sheet"
+printf "${R}\n"
+printf "${DIM}%-${W}s${R}\n" ""
+
+# ── SYSTEM ────────────────────────────────────────────────────────
+header "SYSTEM"
+row "Перезагрузить sxhkd"          "super + Esc + r"    "$DIM"
+row "Перезапустить bspwm"          "ctrl + shift + r"   "$DIM"
+row "Выйти из bspwm"               "ctrl + shift + q"   "$RED"
+row "Терминал (kitty)"             "super + Enter"      "$PUR"
+row "Rofi — launcher"              "super + d"          "$PUR"
+row "Power menu (выкл/ребут)"      "super + x"          "$RED"
+row "Toggle polybar"               "super + p"          "$DIM"
+row "Случайные обои"               "super + w"          "$DIM"
+row "Скриншот (flameshot gui)"     "Print"              "$CYN"
+row "Переключить раскладку RU/EN"  "Alt + Shift"        "$YLW"
+
+# ── ПРИЛОЖЕНИЯ ────────────────────────────────────────────────────
+header "ПРИЛОЖЕНИЯ  [ super + shift + ... ]"
+row "Librewolf"                    "super + shift + f"  "$PNK"
+row "Файловый менеджер"            "super + shift + n"  "$PNK"
+row "PulseAudio (pavucontrol)"     "super + shift + p"  "$PNK"
+row "Telegram (AyuGram)"           "super + shift + t"  "$PNK"
+row "Калькулятор"                  "super + shift + c"  "$PNK"
+row "virt-manager"                 "super + shift + v"  "$PNK"
+row "Пипетка цвета (xcolor)"       "super + shift + x"  "$PNK"
+row "Календарь (calcurse)"         "super + shift + k"  "$PNK"
+row "Блокировка экрана"            "super + shift + l"  "$PNK"
+row "Emoji picker (rofi)"          "super + shift + e"  "$PNK"
+row "Таймер"                       "super + shift + s"  "$PNK"
+
+# ── ОКНА ──────────────────────────────────────────────────────────
+header "ОКНА · СОСТОЯНИЕ"
+row "Закрыть окно"                 "super + c"          "$RED"
+row "Tiled режим"                  "super + t"          "$DIM"
+row "Pseudo tiled"                 "super + ctrl + t"   "$DIM"
+row "Fullscreen"                   "super + f"          "$CYN"
+row "Floating / tiled toggle"      "super + space"      "$PUR"
+row "Следующее окно"               "alt + Tab"          "$DIM"
+row "Предыдущее окно"              "alt + shift + Tab"  "$DIM"
+row "Последний desktop / окно"     "super + Tab / \`"   "$DIM"
+row "Переключить desktop"          "super + 1–9"        "$PUR"
+row "Перенести окно на desktop"    "super + shift + 1–9" "$PUR"
+
+# ── ФОКУС / ПЕРЕМЕЩЕНИЕ ───────────────────────────────────────────
+header "ФОКУС / SWAP / RESIZE"
+row "Фокус запад/юг/север/вост"   "super + h/j/k/l"   "$GRN"
+row "Swap окон (направление)"      "super + alt + h/j/k/l" "$GRN"
+row "Swap с biggest окном"         "super + g"          "$GRN"
+row "Расширить окно"               "super + ctrl + h/j/k/l" "$DIM"
+
+# ── PRESELECT / ФЛАГИ ────────────────────────────────────────────
+header "PRESELECT · ФЛАГИ ОКНА"
+row "Preselect соотношение (1–9)"  "super + ctrl + 1–9" "$DIM"
+row "Отмена preselect"             "super + ctrl + space" "$DIM"
+row "Mark (отметить)"              "super + ctrl + m"   "$YLW"
+row "Locked (заблокировать)"       "super + ctrl + x"   "$RED"
+row "Sticky (на всех desktop)"     "super + ctrl + y"   "$ORG"
+row "Private (не скринить)"        "super + ctrl + z"   "$DIM"
+
+# ── МЕДИА ────────────────────────────────────────────────────────
+header "МЕДИА"
+row "Громкость вверх"              "XF86AudioRaiseVolume" "$GRN"
+row "Громкость вниз"               "XF86AudioLowerVolume" "$GRN"
+row "Mute / Unmute"                "XF86AudioMute"      "$RED"
+row "Яркость вверх"                "XF86MonBrightnessUp" "$YLW"
+row "Яркость вниз"                 "XF86MonBrightnessDown" "$YLW"
+
+printf "\n${DIM}%*s${R}\n" "$W" ""
+
+# Обработка ввода
+while IFS= read -rsn1 key; do
+    case "$key" in
+        q|Q) clear; exit 0 ;;
+        f|F) clear; exec ~/.local/bin/cheat-fish ;;
+    esac
+done

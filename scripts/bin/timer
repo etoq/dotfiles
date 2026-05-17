@@ -1,0 +1,3 @@
+#!/bin/bash
+
+arttime --nolearn -a colorowl2 -b colorowl3 -t "We don't Owls"

@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# ~/.local/bin/cheat-fish
+# Cheat sheet: все команды Fish shell — красивый вывод в терминале
+
+R='\033[0m'
+PUR='\033[38;2;189;147;249m'
+PNK='\033[38;2;255;121;198m'
+CYN='\033[38;2;139;233;253m'
+GRN='\033[38;2;80;250;123m'
+YLW='\033[38;2;241;250;140m'
+RED='\033[38;2;255;85;85m'
+ORG='\033[38;2;255;184;108m'
+DIM='\033[38;2;98;114;164m'
+FG='\033[38;2;248;248;242m'
+BOLD='\033[1m'
+BG_HDR='\033[48;2;22;27;34m'
+
+W=$(tput cols 2>/dev/null || echo 120)
+
+header() {
+    printf "\n${BG_HDR}${CYN}${BOLD}"
+    printf "%-${W}s" "  ▍ $1"
+    printf "${R}\n"
+}
+
+# alias строка: команда → описание
+arow() {
+    local cmd="$1"
+    local desc="$2"
+    local color="${3:-$CYN}"
+    local pad=$((W - ${#cmd} - ${#desc} - 8))
+    [ $pad -lt 1 ] && pad=1
+    printf "  ${color}${BOLD}%-20s${R}  ${DIM}%*s${R}  ${FG}%s${R}\n" \
+        "$cmd" "$pad" "" "$desc"
+}
+
+clear
+printf "${BG_HDR}${CYN}${BOLD}"
+printf "%-${W}s" ""
+printf "${R}\n"
+printf "${BG_HDR}${CYN}${BOLD}"
+printf "%-${W}s" "    FISH  SHELL  ·  CHEAT  SHEET  ·  zer0@p50  ·  Dracula"
+printf "${R}\n"
+printf "${BG_HDR}${DIM}"
+printf "%-${W}s" "    q — выйти   /   s — sxhkd cheat sheet"
+printf "${R}\n"
+printf "${DIM}%-${W}s${R}\n" ""
+
+# ── ЗАМЕНЫ КОМАНД ────────────────────────────────────────────────
+header "ЗАМЕНЫ КОМАНД"
+arow "ls"          "lsd — список файлов с иконками"         "$PUR"
+arow "ll"          "lsd -la — подробный список"             "$PUR"
+arow "la"          "lsd -A — все включая скрытые"           "$PUR"
+arow "lt"          "lsd --tree — дерево файлов"             "$PUR"
+arow "cat"         "bat — просмотр с подсветкой синтаксиса" "$CYN"
+arow "catp"        "bat -p — без рамок (plain)"             "$CYN"
+arow "find"        "fd — быстрый поиск файлов"              "$GRN"
+arow "rm"          "rmtrash — удаление в корзину"           "$YLW"
+arow "rmf"         "/usr/bin/rm -rf — настоящее удаление"   "$RED"
+arow "df"          "duf — красивый вывод дисков"            "$ORG"
+arow "top"         "btop — мониторинг ресурсов"             "$PNK"
+arow "htop"        "neohtop — альтернативный мониторинг"    "$PNK"
+arow "feh <файл>"  "feh --scale-down — просмотр изображения" "$DIM"
+arow "n <файл>"    "nvim — открыть в neovim"                "$GRN"
+arow "m <файл>"    "micro — открыть в micro editor"         "$GRN"
+arow "g <cmd>"     "git — сокращение"                       "$DIM"
+
+# ── НАВИГАЦИЯ ────────────────────────────────────────────────────
+header "НАВИГАЦИЯ"
+arow ".."          "cd .. — на уровень вверх"               "$PUR"
+arow "..."         "cd ../.. — два уровня"                  "$PUR"
+arow "...."        "cd ../../.. — три уровня"               "$PUR"
+arow "h"           "cd ~ — домой"                           "$PUR"
+arow "z <папка>"   "zoxide — умный cd по истории"           "$CYN"
+arow "zi"          "zoxide interactive — выбор через fzf"   "$CYN"
+printf "  ${YLW}${BOLD}%-20s${R}  ${DIM}%*s${R}  ${FG}%s${R}\n" \
+    "Ctrl+R" "$((W-50))" "" "история команд через fzf"
+printf "  ${YLW}${BOLD}%-20s${R}  ${DIM}%*s${R}  ${FG}%s${R}\n" \
+    "Ctrl+T" "$((W-50))" "" "поиск файлов через fzf"
+printf "  ${YLW}${BOLD}%-20s${R}  ${DIM}%*s${R}  ${FG}%s${R}\n" \
+    "Tab" "$((W-50))" "" "автодополнение (fish умный)"
+printf "  ${YLW}${BOLD}%-20s${R}  ${DIM}%*s${R}  ${FG}%s${R}\n" \
+    "→ / Ctrl+F" "$((W-50))" "" "принять autosuggestion"
+
+# ── PACMAN / ARCH ────────────────────────────────────────────────
+header "PACMAN / ARCH"
+arow "update"      "sudo pacman -Syu"                       "$GRN"
+arow "install <pkg>" "sudo pacman -S"                       "$GRN"
+arow "search <имя>" "pacman -Ss"                            "$GRN"
+arow "remove <pkg>" "sudo pacman -Rns"                      "$RED"
+arow "orphans"     "pacman -Qqdt — пакеты-сироты"           "$YLW"
+arow "clean"       "paccache -r + pacman -Sc"               "$YLW"
+arow "mirrors"     "reflector — обновить зеркала"           "$DIM"
+arow "snaps"       "snapper -c root list"                   "$DIM"
+arow "dkms-check"  "dkms status — статус модулей"           "$DIM"
+
+# ── SECURITY / PENTEST ───────────────────────────────────────────
+header "SECURITY / PENTEST / СЕТЬ"
+arow "ports"       "ss -tulpn — все открытые порты"         "$RED"
+arow "listening"   "ss -tlnp — слушающие порты"             "$RED"
+arow "myip"        "curl ipinfo.io/ip — внешний IP"         "$CYN"
+arow "localip"     "ip -4 addr — локальный IP"              "$CYN"
+arow "scan <цель>" "nmap -sV -sC — полный скан"             "$PNK"
+arow "scanfast <цель>" "nmap -T4 -F — быстрый скан"        "$PNK"
+arow "syslog"      "dmesg --level=err,warn"                 "$YLW"
+arow "syslog_emerg" "dmesg --level=emerg,alert,crit"       "$RED"
+arow "xlog"        "ошибки из Xorg.0.log"                   "$YLW"
+arow "vacuum"      "journalctl --vacuum-size=100M"           "$DIM"
+arow "vacuum_time" "journalctl --vacuum-time=2weeks"         "$DIM"
+
+# ── GIT ──────────────────────────────────────────────────────────
+header "GIT"
+arow "gs"          "git status"                             "$GRN"
+arow "ga <файл>"   "git add"                                "$GRN"
+arow "gc \"msg\""  "git commit -m"                          "$GRN"
+arow "gp"          "git push"                               "$GRN"
+arow "gl"          "git log --oneline --graph --color"      "$GRN"
+
+# ── VM / СИСТЕМА ─────────────────────────────────────────────────
+header "VM / СИСТЕМА / MISC"
+arow "vms"         "virsh list --all"                       "$CYN"
+arow "vmstart <имя>" "virsh start"                          "$GRN"
+arow "vmstop <имя>" "virsh shutdown"                        "$YLW"
+arow "vmkill <имя>" "virsh destroy"                        "$RED"
+arow "weather"     "погода через wttr.in"                   "$CYN"
+arow "syshealth"   "статус системы (CPU/RAM/диск/сервисы)"  "$PUR"
+arow "battery"     "заряд и время работы батареи"           "$GRN"
+arow "lock"        "i3lock-color — блокировка экрана"       "$PNK"
+arow "reload"      "source ~/.config/fish/config.fish"      "$DIM"
+arow "cls"         "clear"                                  "$DIM"
+arow "q"           "exit"                                   "$DIM"
+
+printf "\n${DIM}%*s${R}\n" "$W" ""
+
+while IFS= read -rsn1 key; do
+    case "$key" in
+        q|Q) clear; exit 0 ;;
+        s|S) clear; exec ~/.local/bin/cheat-sxhkd ;;
+    esac
+done

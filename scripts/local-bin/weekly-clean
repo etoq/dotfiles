@@ -1,0 +1,35 @@
+#!/bin/bash
+PUR='\033[38;2;189;147;249m'
+GRN='\033[38;2;80;250;123m'
+YLW='\033[38;2;241;250;140m'
+R='\033[0m'
+
+echo -e "${PUR}=== Weekly Clean ===${R}\n"
+
+echo -e "${YLW}Pacman cache...${R}"
+sudo paccache -rvk2
+sudo paccache -rvuk0
+
+echo -e "\n${YLW}Orphans...${R}"
+orphans=$(pacman -Qqdt 2>/dev/null)
+if [ -n "$orphans" ]; then
+    echo "$orphans"
+    read -p "Удалить? [y/N] " ans
+    [ "$ans" = "y" ] && echo "$orphans" | xargs sudo pacman -Rns --
+else
+    echo -e "${GRN}Сирот нет${R}"
+fi
+
+echo -e "\n${YLW}Journal vacuum...${R}"
+sudo journalctl --vacuum-time=2weeks
+
+echo -e "\n${YLW}Thumbnails...${R}"
+rm -rf ~/.cache/thumbnails/*
+
+echo -e "\n${YLW}Disk usage...${R}"
+df -h / /vms 2>/dev/null
+
+echo -e "\n${YLW}Top snapshots...${R}"
+snapper -c root list | tail -5
+
+echo -e "\n${GRN}Done.${R}"
