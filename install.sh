@@ -157,14 +157,14 @@ if [ "$DO_PKGS" = "1" ]; then
         xorg-server xorg-xinit xorg-xrandr xorg-xsetroot xdotool
         xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs
         bspwm sxhkd picom polybar feh flameshot dunst libnotify playerctl
-        kitty fish zoxide fzf bat lsd fd duf rmtrash
+        kitty fish zoxide fzf bat lsd fd duf
         ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-fira-code ttf-iosevka-nerd ttf-dejavu
         noto-fonts noto-fonts-cjk noto-fonts-emoji terminus-font
         nvidia-prime vulkan-intel lib32-vulkan-intel mesa-utils
         pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer
         networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils blueman bolt
         dnsmasq bridge-utils openresolv
-        htop btop s-tui fastfetch cpufetch tlp tlp-rdw thinkfan brightnessctl acpilight
+        htop btop s-tui fastfetch cpufetch tlp tlp-rdw brightnessctl
         apparmor chrony nftables reflector
         qemu-full libvirt virt-manager virt-viewer swtpm
         nmap masscan rustscan wireshark-qt tcpdump metasploit sqlmap hydra john hashcat
@@ -172,28 +172,27 @@ if [ "$DO_PKGS" = "1" ]; then
         aircrack-ng radare2 ghidra gdb pwndbg binwalk foremost volatility3 autopsy
         exploitdb bloodhound proxychains-ng python-pwntools python-scapy
         neovim python-pip python-pipx python-pynvim git lazygit tmux shellcheck jq clang gdb luarocks
-        keepassxc obsidian rofi librewolf-bin chromium torbrowser-launcher
+        keepassxc obsidian rofi chromium torbrowser-launcher
         qbittorrent mpv kdenlive libreoffice-fresh evince zathura zathura-pdf-mupdf
         signal-desktop calcurse veracrypt mat2 bleachbit
         yazi ffmpegthumbnailer poppler unzip zip wimlib 7zip imagemagick gparted gnome-disk-utility
         xclip xsel xcolor gpick chafa screenkey scrot yt-dlp tldr tree perl-image-exiftool
-        pacman-contrib snapd kernel-modules-hook zram-generator
+        pacman-contrib kernel-modules-hook zram-generator
     )
 
     info "Устанавливаю pacman пакеты..."
-    sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}" 2>/dev/null || \
-        warn "Некоторые пакеты не найдены — продолжаем"
+        sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}" || { err "ОШИБКА: Пакеты не найдены! Установка прервана."; exit 1; }
     ok "Pacman пакеты установлены"
 
     step "ПАКЕТЫ AUR"
     AUR_PKGS=(
         nvidia-470xx-dkms nvidia-470xx-utils nvidia-470xx-settings
         lib32-nvidia-470xx-utils lib32-opencl-nvidia-470xx opencl-nvidia-470xx
-        optimus-manager
-        happ bluetuith impala neohtop rmtrash ptpython hyx snapper-rollback btrfs-assistant
+        optimus-manager-git optimus-manager-qt acpilight thinkfan
+        happ-desktop-bin bluetuith impala neohtop rmtrash ptpython hyx snapper-rollback btrfs-assistant
         dracula-gtk-theme dracula-icons-git ttf-material-symbols-variable-git ttf-symbola
-        i3lock-color rofi-greenclip-bin apparmor.d-git
-        ayugram-desktop-bin librewolf-bin simplex-desktop otter-launcher lazydocker-bin termdown light
+        i3lock-color rofi-greenclip apparmor.d-git
+        ayugram-desktop-bin librewolf-bin otter-launcher lazydocker-bin termdown light 
         woff2-font-awesome
     )
 
