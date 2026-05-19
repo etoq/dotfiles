@@ -1,15 +1,14 @@
 #!/bin/env bash
-choice=$(printf "Lock\nLogout\nSuspend\nReboot\nShutdown" | rofi -m -1 -dmenu -p "Система:")
+choice="$(printf '  reboot\n  poweroff\n  suspend\n  lock\n  logout' \
+  | fzf --no-sort \
+    --cycle --gutter ' ' --pointer '▌' \
+    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555' \
+    --prompt '  ')"
 
 case "$choice" in
-  Lock) 
-    betterlockscreen -l dimblur ;;
-  Logout) 
-    i3-msg exit ;; # Если используешь bspwm, замени на bspc quit
-  Suspend) 
-    betterlockscreen -l dimblur --suspend ;; # Сначала блок, потом сон
-  Reboot) 
-    systemctl reboot ;;
-  Shutdown) 
-    systemctl poweroff ;;
+  *reboot)   systemctl reboot ;;
+  *poweroff) systemctl poweroff ;;
+  *suspend)  systemctl suspend ;;
+  *lock)     betterlockscreen -l dimblur;;
+  *logout)   bspc quit ;;
 esac

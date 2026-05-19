@@ -193,7 +193,7 @@ if [ "$DO_PKGS" = "1" ]; then
         dracula-gtk-theme dracula-icons-git ttf-material-symbols-variable-git ttf-symbola
         i3lock-color rofi-greenclip apparmor.d-git
         ayugram-desktop-bin librewolf-bin otter-launcher lazydocker-bin termdown light 
-        woff2-font-awesome
+        woff2-font-awesome betterlockscreen
     )
 
     info "Устанавливаю AUR пакеты..."
