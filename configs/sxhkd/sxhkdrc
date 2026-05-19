@@ -35,7 +35,7 @@ super + shift + {f,o,h,n,p,t,c,v,x,k,l,e,s}
 	virt-manager, \
 	sh $HOME/bin/xcolor-pick, \
 	kitty -e calcurse, \
-	sh $HOME/bin/screen-lock, \
+    betterlockscreen -l dimblur, \
 	setxkbmap -layout us; rofi -modi emoji -m -1 -show emoji, \
 	setxkbmap -layout us; alacritty -e sh $HOME/bin/timer}
 

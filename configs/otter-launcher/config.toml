@@ -304,7 +304,7 @@ case "$choice" in
   *reboot)   systemctl reboot ;;
   *poweroff) systemctl poweroff ;;
   *suspend)  systemctl suspend ;;
-  *lock)     "$HOME/.local/bin/lock" >/dev/null 2>&1 & disown ;;
+  *lock)     betterlockscreen -l dimblur;;
   *logout)   bspc quit ;;
 esac
 """
