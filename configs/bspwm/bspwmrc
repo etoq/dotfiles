@@ -42,6 +42,9 @@ bspc config pointer_action1        move
 bspc config pointer_action2        resize_side
 bspc config pointer_action3        resize_corner
 
+# ── Лок скрин ────────────────────────────────────────────────────
+xss-lock -- betterlockscreen -l dimblur &
+
 # ── Правила для приложений ────────────────────────────────────────────────────
 bspc rule -a kitty:calendar state=floating rectangle=800x500+0+0 center=true
 bspc rule -a "otter" state=floating center=true rectangle=500x420+0+0 focus=on 
@@ -64,9 +67,6 @@ sh $HOME/bin/random_wallpaper &
 
 # Compositor
 picom --config $HOME/.config/bspwm/picom_configurations/1.conf &
-
-# Уведомления
-dunst -config $HOME/.config/dunst/dunstrc &
 
 # Скриншоты
 pkill flameshot; flameshot &

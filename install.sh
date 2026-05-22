@@ -163,9 +163,9 @@ if [ "$DO_PKGS" = "1" ]; then
         nvidia-prime vulkan-intel lib32-vulkan-intel mesa-utils
         pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer
         networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils blueman bolt
-        dnsmasq bridge-utils openresolv
+        dnsmasq openresolv
         htop btop s-tui fastfetch cpufetch tlp tlp-rdw brightnessctl
-        apparmor chrony nftables reflector
+        apparmor chrony nftables reflector xss-lock
         qemu-full libvirt virt-manager virt-viewer swtpm
         nmap masscan rustscan wireshark-qt tcpdump metasploit sqlmap hydra john hashcat
         nikto feroxbuster ffuf nuclei subfinder amass netexec impacket evil-winrm
@@ -188,7 +188,7 @@ if [ "$DO_PKGS" = "1" ]; then
     AUR_PKGS=(
         nvidia-470xx-dkms nvidia-470xx-utils nvidia-470xx-settings
         lib32-nvidia-470xx-utils lib32-opencl-nvidia-470xx opencl-nvidia-470xx
-        optimus-manager-git optimus-manager-qt acpilight thinkfan
+        acpilight thinkfan
         happ-desktop-bin bluetuith impala neohtop rmtrash ptpython hyx snapper-rollback btrfs-assistant
         dracula-gtk-theme dracula-icons-git ttf-material-symbols-variable-git ttf-symbola
         i3lock-color rofi-greenclip apparmor.d-git
@@ -344,6 +344,17 @@ if [ "$DO_SERVICES" = "1" ]; then
         ok "Snapper структура создана"
     fi
 
+    # 1. Жестко блокируем службы сна NVIDIA (чтобы обновления их не воскресили)
+    sudo systemctl mask nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service
+
+    # 2. Настраиваем реакцию на закрытие крышки (Блокировка вместо сна)
+    # Создаем drop-in директорию (это чище, чем править сам logind.conf)
+    sudo mkdir -p /etc/systemd/logind.conf.d/
+    echo "[Login]
+    HandleLidSwitch=lock
+    HandleLidSwitchExternalPower=lock
+    HandleLidSwitchDocked=ignore" | sudo tee /etc/systemd/logind.conf.d/99-lid-lock.conf > /dev/null
+    
     # 6. Создание Pacman хука для копирования ядра в EFI
     info "Создание Pacman hooks (Kernel to EFI)..."
     sudo mkdir -p /etc/pacman.d/hooks/
@@ -385,8 +396,7 @@ EOF
     step "SYSTEMD СЕРВИСЫ"
     SYSTEM_SERVICES=(
         NetworkManager bluetooth apparmor auditd chronyd nftables libvirtd
-        virtnetworkd thinkfan tlp grub-btrfsd optimus-manager
-        nvidia-suspend nvidia-resume nvidia-hibernate
+        virtnetworkd thinkfan tlp grub-btrfsd 
     )
 
     for svc in "${SYSTEM_SERVICES[@]}"; do
