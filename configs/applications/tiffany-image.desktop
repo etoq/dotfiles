@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Image Viewer (Feh)
+Comment=Open images in a separate window
+Exec=feh --scale-down -- %F
+Terminal=false
+Icon=feh
+Categories=Graphics;Viewer;
+MimeType=image/png;image/jpeg;image/gif;image/webp;image/bmp;image/tiff;image/avif;image/heic;image/svg+xml;

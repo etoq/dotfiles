@@ -1,0 +1,18 @@
+# Generated files
+__pycache__/
+*.py[cod]
+.cache/
+node_modules/
+*.pkg.tar.*
+*.log
+.DS_Store
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+credentials.json
+secrets.json

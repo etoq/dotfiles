@@ -1,9 +1,9 @@
 # ╔═══════════════════════════════════════════════════════════════╗
-# ║   otter-launcher · Dracula · zer0@p50 · offensive workstation ║
+# ║   otter-launcher · Black Tiffany · zer0@p50 · reverse engineering / malware analysis ║
 # ╚═══════════════════════════════════════════════════════════════╝
 
 [general]
-default_module    = "gg"
+default_module    = "__search"
 empty_module      = "app"
 exec_cmd = "bash -c"
 vi_mode           = true
@@ -22,682 +22,463 @@ callback          = ""
 overlay_cmd = "chafa -s 46x14 --colors=full \"$HOME/.config/otter-launcher/image.png\""
 overlay_trimmed_lines = 0
 overlay_height        = 14
-move_overlay_right    = 2   
+move_overlay_right    = 2
 move_overlay_down     = 0
 
 # ── INTERFACE ─────────────────────────────────────────────────────────────────
 [interface]
 # Удлинили линии ────, чтобы они соответствовали широкой картинке
-header = "  \u001B[38;2;98;114;164m──────────────────────────────────────────────\n\u001B[38;2;189;147;249m\u001B[1m  󱢴 ZER0\n   \u001B[38;2;241;250;140m$(uptime -p | sed 's/up //')\n\u001B[38;2;98;114;164m  ──────────────────────────────────────────────\n\u001B[38;2;189;147;249m\u001B[1m  󱎘 \u001B[0;1m"
-place_holder       = "\u001B[38;2;98;114;164mtype and search...\u001B[0m"
+header = "  \u001B[38;2;126;153;159m──────────────────────────────────────────────\n\u001B[38;2;10;186;181m\u001B[1m  󱢴 ZER0\n   \u001B[38;2;216;183;123m$(uptime -p | sed 's/up //')\n\u001B[38;2;126;153;159m  ──────────────────────────────────────────────\n\u001B[38;2;10;186;181m\u001B[1m  󱎘 \u001B[0;1m"
+place_holder = ""
 suggestion_mode    = "list"
-suggestion_lines   = 3
+suggestion_lines = 2
 prefix_padding     = 5
-list_prefix        = "  \u001B[38;2;98;114;164m│  \u001B[0m"
-selection_prefix   = "  \u001B[38;2;189;147;249m\u001B[1m▌  \u001B[0m"
+list_prefix        = "  \u001B[38;2;126;153;159m│  \u001B[0m"
+selection_prefix   = "  \u001B[38;2;10;186;181m\u001B[1m▌  \u001B[0m"
 customized_list_order = true
 # Удлинили линию сепаратора
-separator = """\u001B[38;2;98;114;164m  ──────────────────────────────────────────────\u001B[0m"""
+separator = """\u001B[38;2;126;153;159m  ──────────────────────────────────────────────\u001B[0m"""
 footer    = ""
-default_module_message = "  \u001B[38;2;98;114;164m│  \u001B[38;2;189;147;249m \u001B[0m google search"
-empty_module_message   = "  \u001B[38;2;98;114;164m│  \u001B[38;2;189;147;249m \u001B[0m app launcher"
-indicator_with_arg_module = "\u001B[38;2;189;147;249m❯\u001B[0m"
-indicator_no_arg_module   = "\u001B[38;2;98;114;164m○\u001B[0m"
-prefix_color       = "\u001B[38;2;189;147;249m\u001B[1m"
-description_color  = "\u001B[38;2;98;114;164m"
-place_holder_color = "\u001B[38;2;98;114;164m"
-hint_color         = "\u001B[38;2;98;114;164m"
+default_module_message = "  \u001B[38;2;126;153;159m│  \u001B[38;2;10;186;181m \u001B[0m google search"
+empty_module_message   = "  \u001B[38;2;126;153;159m│  \u001B[38;2;10;186;181m \u001B[0m app launcher"
+indicator_with_arg_module = "\u001B[38;2;10;186;181m❯\u001B[0m"
+indicator_no_arg_module   = "\u001B[38;2;126;153;159m○\u001B[0m"
+prefix_color       = "\u001B[38;2;10;186;181m\u001B[1m"
+description_color  = "\u001B[38;2;126;153;159m"
+place_holder_color = "\u001B[38;2;126;153;159m"
+hint_color         = "\u001B[38;2;126;153;159m"
 move_interface_right = 0
 # Опустили текст ниже, так как картинка теперь высотой 14 строк
 move_interface_down  = 10 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── WEB ───────────────────────────────────────────────────────────────────────
 
 [[modules]]
-description = "google search"
-prefix = "gg"
-cmd = "xdg-open 'https://www.google.com/search?q={}' >/dev/null 2>&1 & disown"
+description = "Приложения · выбрать"
+prefix = "app"
+cmd = 'exec "$HOME/.local/bin/otter-apps"'
+
+[[modules]]
+description = "Файлы · найти и открыть"
+prefix = "fo"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module fo"
+unbind_proc = false
+
+[[modules]]
+description = "Папки · открыть в Yazi"
+prefix = "yz"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module yz"
+unbind_proc = false
+
+[[modules]]
+description = "Новая заметка · nvim"
+prefix = "note"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module note"
+unbind_proc = false
+
+[[modules]]
+description = "Заметки · последние"
+prefix = "recent"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module recent"
+unbind_proc = false
+
+[[modules]]
+description = "Календарь · calcurse"
+prefix = "cal"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module cal"
+unbind_proc = false
+
+[[modules]]
+description = "Калькулятор · выражения и hex/dec"
+prefix = "calc"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module calc --argument '{}'"
+unbind_proc = false
 with_argument = true
 url_encode = true
-unbind_proc = true
 
 [[modules]]
-description = "search archwiki"
-prefix = "aw"
-cmd = "xdg-open 'https://wiki.archlinux.org/index.php?search={}' >/dev/null 2>&1 & disown"
-with_argument = true
-url_encode = true
-unbind_proc = true
+description = "Пароли · KeePassXC"
+prefix = "kp"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module kp"
+unbind_proc = false
 
 [[modules]]
-description = "search AUR"
-prefix = "aur"
-cmd = "xdg-open 'https://aur.archlinux.org/packages?K={}' >/dev/null 2>&1 & disown"
-with_argument = true
-url_encode = true
-unbind_proc = true
+description = "Заметки · Obsidian"
+prefix = "obs"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module obs"
+unbind_proc = false
 
 [[modules]]
-description = "search Arch packages"
-prefix = "pac"
-cmd = "xdg-open 'https://archlinux.org/packages/?q={}' >/dev/null 2>&1 & disown"
-with_argument = true
-url_encode = true
-unbind_proc = true
+description = "Музыка · Яндекс"
+prefix = "music"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module music"
+unbind_proc = false
 
 [[modules]]
-description = "GitHub search"
-prefix = "gh"
-cmd = "xdg-open 'https://github.com/search?q={}' >/dev/null 2>&1 & disown"
-with_argument = true
-url_encode = true
-unbind_proc = true
+description = "Discord · приложение"
+prefix = "ds"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ds"
+unbind_proc = false
 
 [[modules]]
-description = "YouTube search"
-prefix = "yt"
-cmd = "xdg-open 'https://www.youtube.com/results?search_query={}' >/dev/null 2>&1 & disown"
-with_argument = true
-url_encode = true
-unbind_proc = true
+description = "Wispr Flow · голосовой ввод"
+prefix = "wf"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module wf"
+unbind_proc = false
+
+# ── Веб и помощники ──────────────────────────────────────────────
 
 [[modules]]
-description = "translate EN→RU (deepl)"
-prefix = "tr"
-cmd = "xdg-open 'https://www.deepl.com/translator#en/ru/{}' >/dev/null 2>&1 & disown"
-with_argument = true
-url_encode = true
-unbind_proc = true
+description = "ChatGPT · сайт"
+prefix = "pai"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module pai"
+unbind_proc = false
 
 [[modules]]
-description = "Claude AI"
-prefix = "cai"
-cmd = "xdg-open 'https://claude.ai' >/dev/null 2>&1 & disown"
-unbind_proc = true
+description = "Codex · терминал"
+prefix = "cx"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module cx"
+unbind_proc = false
 
 [[modules]]
-description = "Google AI free"
+description = "Google AI"
 prefix = "gai"
-cmd = "xdg-open 'https://www.google.com/search?udm=50&mtid=GWMIasbCILKK9u8PkZiaaA' >/dev/null 2>&1 & disown"
-unbind_proc = true
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module gai"
+unbind_proc = false
 
 [[modules]]
 description = "Arena AI"
 prefix = "aai"
-cmd = "xdg-open https://arena.ai/ >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-# ── APPLICATIONS ──────────────────────────────────────────────────────────────
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module aai"
+unbind_proc = false
 
 [[modules]]
-description = "desktop app launcher (fzf)"
-prefix = "app"
-cmd = '''
-selected="$(find /usr/share/applications "$HOME/.local/share/applications" \
-  -name '*.desktop' 2>/dev/null \
-  | xargs -I{} basename {} .desktop \
-  | sort -u \
-  | fzf \
-    --no-info \
-    --cycle \
-    --gutter ' ' \
-    --pointer '▌' \
-    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,fg+:#F8F8F2,hl:#BD93F9,hl+:#FF79C6,pointer:#BD93F9' \
-    --prompt '  ')"
-[ -z "$selected" ] && exit 0
-setsid -f gtk-launch "$selected" >/dev/null 2>&1
-'''
-
-[[modules]]
-description = "open directory (yazi + fd)"
-prefix = "yz"
-cmd = """
-d="$(fd --type d --hidden --exclude .git --exclude .cache . "$HOME" 2>/dev/null \
-  | fzf \
-    --cycle --gutter ' ' --pointer '▌' \
-    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#BD93F9,pointer:#BD93F9' \
-    --prompt '  Dir > ')"
-if [ -n "$d" ]; then
-    kitty -e yazi "$d" >/dev/null 2>&1 & disown
-fi
-exit 0
-"""
-unbind_proc = true
-
-[[modules]]
-description = "open file (fzf + fd)"
-prefix = "fo"
-cmd = """
-f="$(fd --type f --hidden --exclude .git --exclude .cache . "$HOME" 2>/dev/null \
-  | fzf \
-    --cycle --gutter ' ' --pointer '▌' \
-    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#BD93F9,pointer:#BD93F9' \
-    --prompt '  File > ' \
-    --preview 'bat --color=always --style=numbers {} 2>/dev/null || cat {}' \
-    --preview-window=right:50%:wrap)"
-if [ -n "$f" ]; then
-    xdg-open "$f" >/dev/null 2>&1 & disown
-fi
-exit 0
-"""
-unbind_proc = true
-
-[[modules]]
-description = "kill process (fzf)"
-prefix = "kill"
-cmd = """
-while true; do
-  pid="$(ps -A -o pid,comm,pcpu,pmem --sort=-pcpu | awk 'NR==1; NR>1' \
-    | fzf \
-      --header-lines=1 \
-      --cycle --gutter ' ' --pointer '▌' \
-      --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555' \
-      --prompt '  Kill (ESC to exit) > ' \
-    | awk '{print $1}')"
-  
-  if [ -z "$pid" ]; then
-    break
-  fi
-  
-  kill -9 "$pid" && notify-send "System" "Process $pid killed"
-done
-"""
-
-[[modules]]
-description = "uninstall arch packages (fzf)"
-prefix = "rm"
-cmd = """
-setsid -f kitty --class pkg-manager --override window_padding_width=10 -e bash -c '
-  echo "  📦 Выбери пакеты для удаления (TAB - выделить несколько):"
-  echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  pkgs="$(pacman -Qeq | fzf -m \
-    --cycle --gutter " " --pointer "▌" \
-    --color "bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555" \
-    --prompt "  Delete > " \
-    --preview "pacman -Qi {}" \
-    --preview-window=right:50%)"
-  
-  if [ -n "$pkgs" ]; then
-    echo "Удаляем: $pkgs"
-    sudo pacman -Rns $pkgs
-  fi
-  read -p "  Press Enter to exit..."
-' >/dev/null 2>&1 &
-"""
-unbind_proc = true
-
-# ── PRODUCTIVITY ──────────────────────────────────────────────────────────────
-
-[[modules]]
-description = "browser (librewolf)"
-prefix = "br"
-cmd = "librewolf >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "browser incognito"
-prefix = "bri"
-cmd = "librewolf --private-window >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "Telegram (AyuGram)"
-prefix = "tg"
-cmd = "AyuGram >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "calendar (calcurse)"
-prefix = "cal"
-cmd = "kitty --class calendar -e calcurse >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "rednotes manage"
-prefix = "rn"
-cmd = "kitty --class rednotes-float -e rednotes manage >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "rednotes add note"
-prefix = "rna"
-cmd = "kitty --class rednotes-float -e rednotes add >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "rednotes set target"
-prefix = "rnt"
-cmd = "kitty --class rednotes-float -e bash -c 'rednotes set {}; read -p \"Target set. Enter...\"' >/dev/null 2>&1 & disown"
+description = "RemNote"
+prefix = "rem"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module rem --argument '{}'"
 with_argument = true
-unbind_proc = true
+url_encode = true
+unbind_proc = false
 
 [[modules]]
-description = "KeePassXC"
-prefix = "kp"
-cmd = "keepassxc >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "Obsidian"
-prefix = "obs"
-cmd = "obsidian >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "scratch note (nvim)"
-prefix = "note"
-cmd = "kitty -e nvim ~/notes/scratch.md >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-# ── SYSTEM ────────────────────────────────────────────────────────────────────
-
-[[modules]]
-description = "power menu"
-prefix = "po"
-cmd = """
-choice="$(printf '  reboot\n  poweroff\n  suspend\n  lock\n  logout' \
-  | fzf --no-sort \
-    --cycle --gutter ' ' --pointer '▌' \
-    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555' \
-    --prompt '  ')"
-case "$choice" in
-  *reboot)   systemctl reboot ;;
-  *poweroff) systemctl poweroff ;;
-  *suspend)  systemctl suspend ;;
-  *lock)     betterlockscreen -l dimblur;;
-  *logout)   bspc quit ;;
-esac
-"""
-
-[[modules]]
-description = "system health"
-prefix = "sys"
-cmd = "kitty --class syshealth -e ~/.local/bin/syshealth >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "thermal paste check"
-prefix = "temp"
-cmd = """
-kitty -e bash -c '
-echo "  THERMAL PASTE ADVISOR — ThinkPad P50"
-echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-t1=$(cat /sys/class/hwmon/hwmon7/temp1_input 2>/dev/null || echo 0)
-t2=$(cat /sys/class/hwmon/hwmon7/temp2_input 2>/dev/null || echo 0)
-ec=$(cat /sys/class/hwmon/hwmon4/temp1_input 2>/dev/null || echo 0)
-cpu=$((t1/1000)); pkg=$((t2/1000)); ec_c=$((ec/1000))
-echo "  CPU Core:  ${cpu}°C"
-echo "  Package:   ${pkg}°C"
-echo "  EC sensor: ${ec_c}°C"
-echo "  Delta:     $((pkg - ec_c))°C"
-echo ""
-score=0
-[ $pkg -ge 90 ] && score=$((score+4))
-[ $pkg -ge 80 ] && [ $pkg -lt 90 ] && score=$((score+3))
-[ $pkg -ge 70 ] && [ $pkg -lt 80 ] && score=$((score+1))
-[ $cpu -ge 85 ] && score=$((score+2))
-[ $((pkg - ec_c)) -ge 25 ] && score=$((score+2))
-[ $((pkg - ec_c)) -ge 15 ] && score=$((score+1))
-echo "  Score: $score / 9"
-echo ""
-if [ $score -ge 7 ]; then
-  echo "  ▓ ТОЧНО ДА — меняй прямо сейчас!"
-elif [ $score -ge 5 ]; then
-  echo "  ▒ ДА — замена нужна"
-elif [ $score -ge 3 ]; then
-  echo "  ░ ЖЕЛАТЕЛЬНО — скоро"
-elif [ $score -ge 1 ]; then
-  echo "  · СКОРО — следи за температурой"
-else
-  echo "  ✓ НЕТ — всё в порядке"
-fi
-echo ""
-echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-read -p "  Press Enter..."
-' >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "btop monitor"
-prefix = "top"
-cmd = """
-bspc desktop -f '^4'
-sleep 0.2
-kitty -e btop >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "s-tui CPU stress"
-prefix = "cpu"
-cmd = """
-bspc desktop -f '^4'
-sleep 0.2
-kitty -e s-tui >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "disk usage (duf)"
-prefix = "dsk"
-cmd = """
-bspc desktop -f '^4'
-sleep 0.2
-kitty -e bash -c 'duf; read -p "Press Enter..."' >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "htop"
-prefix = "ht"
-cmd = """
-bspc desktop -f '^4'
-sleep 0.2
-kitty -e htop >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "neohtop"
-prefix = "nht"
-cmd = """
-bspc desktop -f '^4'
-sleep 0.2
-kitty -e neohtop >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "journal errors"
-prefix = "log"
-cmd = "kitty -e bash -c 'journalctl -p err -b --no-pager | bat --color=always --paging=always' >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "update system"
-prefix = "upd"
-cmd = "kitty -e bash -c 'sudo pacman -Syu; read -p \"Done. Press Enter...\"' >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "snapshots (snapper)"
-prefix = "snap"
-cmd = "kitty -e bash -c 'sudo snapper -c root list; read -p \"Press Enter...\"' >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-# ── NETWORK ───────────────────────────────────────────────────────────────────
-
-[[modules]]
-description = "bluetooth (bluetuith)"
-prefix = "bt"
-cmd = """
-if command -v bluetuith &>/dev/null; then
-  kitty \
-    --override background=#282A36 \
-    --override foreground=#F8F8F2 \
-    --class bluetooth \
-    -e bluetuith >/dev/null 2>&1 & disown
-else
-  kitty \
-    --override background=#282A36 \
-    --override foreground=#F8F8F2 \
-    -e bluetoothctl >/dev/null 2>&1 & disown
-fi
-"""
-unbind_proc = true
-
-[[modules]]
-description = "audio (pulsemixer)"
-prefix = "vol"
-cmd = """
-kitty \
-  --override background=#282A36 \
-  --override foreground=#F8F8F2 \
-  -e pulsemixer >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-[[modules]]
-description = "wifi TUI (impala/nmtui)"
-prefix = "wifi"
-cmd = """
-if command -v impala &>/dev/null; then
-  kitty --override background=#282A36 -e impala >/dev/null 2>&1 & disown
-else
-  kitty --override background=#282A36 --override foreground=#F8F8F2 -e nmtui >/dev/null 2>&1 & disown
-fi
-"""
-unbind_proc = true
-
-[[modules]]
-description = "IP addresses"
-prefix = "ip"
-cmd = '''
-kitty -e bash -c '
-echo "  LOCAL:"
-ip -4 addr | grep inet | grep -v 127 | awk "{print \"  \" \$2}"
-echo ""
-echo "  EXTERNAL:"
-curl -s https://ipinfo.io/ip && echo
-echo ""
-read -p "  Press Enter..."
-' >/dev/null 2>&1 & disown
-'''
-unbind_proc = true
-
-[[modules]]
-description = "open ports (ss)"
-prefix = "ports"
-cmd = "kitty -e bash -c 'ss -tulpn; read -p \"Press Enter...\"' >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "nmap scan"
-prefix = "nm"
-cmd = """
-kitty -e bash -c '
-target="{}"
-echo "  Scanning: $target"
-echo " ━━━━━━━━━━━━━━━━━━━━━━━━━"
-nmap -T4 -F "$target" 2>&1
-echo ""
-read -p "  Done. Press Enter..."
-' >/dev/null 2>&1 & disown
-"""
+description = "Поиск · ArchWiki"
+prefix = "aw"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module aw --argument '{}'"
 with_argument = true
-unbind_proc = true
+url_encode = true
+unbind_proc = false
 
 [[modules]]
-description = "wavemon wifi"
-prefix = "wvm"
-cmd = "kitty -e wavemon >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "weather (Екатеринбург)"
-prefix = "wtr"
-cmd = """
-kitty -e bash -c '
-if [ -f ~/bin/weather2 ]; then
-  bash ~/bin/weather2
-elif [ -f ~/bin/weather ]; then
-  bash ~/bin/weather
-else
-  curl -s "wttr.in/Ekaterinburg?lang=ru"
-fi
-echo ""
-read -p "  Press Enter..."
-' >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-# ── VMs ───────────────────────────────────────────────────────────────────────
-
-[[modules]]
-description = "virt-manager"
-prefix = "vm"
-cmd = "virt-manager >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "VM control (fzf)"
-prefix = "vms"
-cmd = """
-vm="$(virsh list --all --name 2>/dev/null | grep -v '^$' \
-  | fzf \
-    --cycle --gutter ' ' --pointer '▌' \
-    --color 'bg:#0D1117,bg+:#1F2937,fg:#F8F8F2,hl:#8BE9FD,pointer:#8BE9FD' \
-    --prompt '  VM > ' \
-    --preview 'virsh dominfo {} 2>/dev/null' \
-    --preview-window=right:40%)"
-[ -z "$vm" ] && exit 0
-state="$(virsh domstate "$vm" 2>/dev/null)"
-action="$(printf '  start\n  shutdown\n  reboot\n  force-off\n  snapshot' \
-  | fzf --prompt "  $vm [$state] > " \
-    --color 'bg:#0D1117,bg+:#1F2937,fg:#F8F8F2,hl:#8BE9FD,pointer:#8BE9FD')"
-case "$action" in
-  *start)     virsh start "$vm" && notify-send "VM" "Starting $vm" ;;
-  *shutdown)  virsh shutdown "$vm" ;;
-  *reboot)    virsh reboot "$vm" ;;
-  *force-off) virsh destroy "$vm" ;;
-  *snapshot)  virsh snapshot-create-as "$vm" "snap-$(date +%Y%m%d-%H%M)" \
-              && notify-send "VM" "Snapshot created" ;;
-esac
-"""
-
-# ── SECURITY ──────────────────────────────────────────────────────────────────
-
-[[modules]]
-description = "Burp Suite"
-prefix = "burp"
-cmd = "burpsuite >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "Burp Suite Pro"
-prefix = "bpro"
-cmd = "burpsuitepro >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "Wireshark"
-prefix = "wsh"
-cmd = "wireshark >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "Metasploit"
-prefix = "msf"
-cmd = "kitty -e msfconsole >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "BloodHound"
-prefix = "bh"
-cmd = "bloodhound >/dev/null 2>&1 & disown"
-unbind_proc = true
-
-[[modules]]
-description = "clean image metadata"
-prefix = "meta"
-cmd = """
-kitty -e bash -c '
-dir="${1:-$HOME/Pictures}"
-echo "  Cleaning metadata: $dir"
-~/.local/bin/clean-meta "$dir"
-read -p "  Done. Press Enter..."
-' _ "{}" >/dev/null 2>&1 & disown
-"""
+description = "Поиск · AUR"
+prefix = "aur"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module aur --argument '{}'"
 with_argument = true
-unbind_proc = true
-
-# ── DEV TOOLS ─────────────────────────────────────────────────────────────────
+url_encode = true
+unbind_proc = false
 
 [[modules]]
-description = "lazygit"
+description = "Поиск · пакеты Arch"
+prefix = "pac"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module pac --argument '{}'"
+with_argument = true
+url_encode = true
+unbind_proc = false
+
+[[modules]]
+description = "Поиск · GitHub"
+prefix = "gh"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module gh --argument '{}'"
+with_argument = true
+url_encode = true
+unbind_proc = false
+
+[[modules]]
+description = "Поиск · YouTube"
+prefix = "yt"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module yt --argument '{}'"
+with_argument = true
+url_encode = true
+unbind_proc = false
+
+[[modules]]
+description = "Перевод · EN → RU"
+prefix = "tr"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module tr --argument '{}'"
+with_argument = true
+url_encode = true
+unbind_proc = false
+# ── Разработка и файлы ──────────────────────────────────────────────
+
+[[modules]]
+description = "Git · lazygit"
 prefix = "lg"
-cmd = "kitty --override background=#0D1117 -e lazygit >/dev/null 2>&1 & disown"
-unbind_proc = true
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module lg"
+unbind_proc = false
 
 [[modules]]
-description = "lazydocker"
+description = "Контейнеры · lazydocker"
 prefix = "ldk"
-cmd = """
-kitty --override background=#0D1117 -e lazydocker 2>/dev/null \
-  || kitty -e bash -c 'echo "lazydocker not installed. yay -S lazydocker"; read' >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ldk"
+unbind_proc = false
 
 [[modules]]
-description = "jq interactive"
+description = "JSON · jq"
 prefix = "jq"
-cmd = """
-kitty -e bash -c '
-echo "  jq interactive — paste JSON below, Ctrl+D when done:"
-echo " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-json="$(cat)"
-echo ""
-echo "  Result:"
-echo "$json" | jq . 2>&1
-echo ""
-read -p "  Press Enter..."
-' >/dev/null 2>&1 & disown
-"""
-unbind_proc = true
-
-# ── POMODORO / TOMATO TIMERS ──────────────────────────────────────────────────
-# ── POMODORO / TOMATO TIMERS ──────────────────────────────────────────────────
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module jq"
+unbind_proc = false
 
 [[modules]]
-description = "Work: 2 hours (notifies at 1h and 2h)"
-prefix = "t2"
-cmd = """
-bspc desktop -f '^7'
-setsid -f kitty --start-as=fullscreen --class tomato-timer --override background=#1E1E2F --override foreground=#BD93F9 -e bash -c '
-  (
-    sleep 1h
-    notify-send -u normal "⏳ Прогресс (Tomato)" "Прошел 1 час работы. Остался еще 1!"
-    sleep 1h
-    notify-send -u critical "🛑 Отличная работа!" "Прошло 2 часа. Закрывай таймер и запускай отдых (t30)!"
-  ) &
-  pid=$!
-  termdown 2h --blink
-  kill $pid 2>/dev/null
-' >/dev/null 2>&1
-"""
-unbind_proc = true
+description = "Hex · файл в nvim"
+prefix = "hex"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module hex --argument '{}'"
+unbind_proc = false
+with_argument = true
+url_encode = true
 
 [[modules]]
-description = "Work: 1 hour (notifies at 1h)"
-prefix = "t1"
-cmd = """
-bspc desktop -f '^7'
-setsid -f kitty --start-as=fullscreen --class tomato-timer --override background=#1E1E2F --override foreground=#BD93F9 -e bash -c '
-  (
-    sleep 1h
-    notify-send -u critical "🛑 Отличная работа!" "Прошел 1 час. Время сделать перерыв!"
-  ) &
-  pid=$!
-  termdown 1h --blink
-  kill $pid 2>/dev/null
-' >/dev/null 2>&1
-"""
-unbind_proc = true
+description = "Файл · формат / SHA-256 / строки"
+prefix = "info"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module info --argument '{}'"
+unbind_proc = false
+with_argument = true
+url_encode = true
 
 [[modules]]
-description = "Rest: 30 minutes (notifies at 30m)"
-prefix = "t30"
-cmd = """
-bspc desktop -f '^7'
-setsid -f kitty --start-as=fullscreen --class tomato-timer --override background=#1E1E2F --override foreground=#BD93F9 -e bash -c '
-  (
-    sleep 30m
-    notify-send -u critical "☕ Отдых окончен" "Прошло 30 минут. Пора возвращаться за работу!"
-  ) &
-  pid=$!
-  termdown 30m --blink
-  kill $pid 2>/dev/null
-' >/dev/null 2>&1
-"""
-unbind_proc = true
+description = "OCR · область → текст rus/eng"
+prefix = "ocr"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ocr"
+unbind_proc = false
+
+[[modules]]
+description = "CyberChef · локально"
+prefix = "cc"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module cc"
+unbind_proc = false
+
+[[modules]]
+description = "Картинки · очистить метаданные"
+prefix = "meta"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module meta --argument '{}'"
+with_argument = true
+unbind_proc = false
+url_encode = true
+
+[[modules]]
+description = "Клавиатура · VIA"
+prefix = "via"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module via"
+unbind_proc = false
+# ── Реверс и CTF ──────────────────────────────────────────────
+
+[[modules]]
+description = "Реверс · Ghidra"
+prefix = "ghi"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ghi"
+unbind_proc = false
+
+[[modules]]
+description = "Реверс · Cutter"
+prefix = "cut"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module cut"
+unbind_proc = false
+
+[[modules]]
+description = "Формат файла · Detect It Easy"
+prefix = "die"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module die"
+unbind_proc = false
+
+[[modules]]
+description = "CTF · заметки"
+prefix = "rn"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module rn"
+unbind_proc = false
+
+[[modules]]
+description = "CTF · добавить заметку"
+prefix = "rna"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module rna"
+unbind_proc = false
+
+[[modules]]
+description = "CTF · задать цель"
+prefix = "rnt"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module rnt --argument '{}'"
+with_argument = true
+unbind_proc = false
+url_encode = true
+[[modules]]
+description = "Трафик · Wireshark"
+prefix = "wsh"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module wsh"
+unbind_proc = false
+
+[[modules]]
+description = "Сеть · nmap"
+prefix = "nm"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module nm --argument '{}'"
+with_argument = true
+unbind_proc = false
+url_encode = true
+[[modules]]
+description = "Веб · Burp Suite"
+prefix = "burp"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module burp"
+unbind_proc = false
+
+[[modules]]
+description = "Веб · Burp Suite Pro"
+prefix = "bpro"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module bpro"
+unbind_proc = false
+
+[[modules]]
+description = "CTF · Metasploit"
+prefix = "msf"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module msf"
+unbind_proc = false
+
+[[modules]]
+description = "AD · BloodHound"
+prefix = "bh"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module bh"
+unbind_proc = false
+# ── Виртуальные машины ──────────────────────────────────────────────
+
+[[modules]]
+description = "VM · virt-manager"
+prefix = "vm"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module vm"
+unbind_proc = false
+
+[[modules]]
+description = "VM · управление"
+prefix = "vms"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module vms"
+
+
+# ── Мониторинг и обслуживание ──────────────────────────────────────────────
+
+[[modules]]
+description = "Мониторинг · btop"
+prefix = "top"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module top"
+unbind_proc = false
+
+[[modules]]
+description = "Процессор · s-tui"
+prefix = "cpu"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module cpu"
+unbind_proc = false
+
+[[modules]]
+description = "Процессы · htop"
+prefix = "ht"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ht"
+unbind_proc = false
+
+[[modules]]
+description = "Диски · duf"
+prefix = "dsk"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module dsk"
+unbind_proc = false
+
+[[modules]]
+description = "Система · состояние"
+prefix = "sys"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module sys"
+unbind_proc = false
+
+[[modules]]
+description = "Журнал · ошибки"
+prefix = "log"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module log"
+unbind_proc = false
+
+[[modules]]
+description = "Система · обновление"
+prefix = "upd"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module upd"
+unbind_proc = false
+
+[[modules]]
+description = "Snapper · снимки"
+prefix = "snap"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module snap"
+unbind_proc = false
+
+[[modules]]
+description = "Пакеты · план удаления"
+prefix = "rm"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module rm"
+unbind_proc = false
+
+[[modules]]
+description = "Процессы · TERM / KILL"
+prefix = "kill"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module kill"
+unbind_proc = false
+
+[[modules]]
+description = "Wi-Fi · подключение"
+prefix = "wifi"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module wifi"
+unbind_proc = false
+
+[[modules]]
+description = "Wi-Fi · сигнал"
+prefix = "wvm"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module wvm"
+unbind_proc = false
+
+[[modules]]
+description = "Bluetooth · устройства"
+prefix = "bt"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module bt"
+unbind_proc = false
+
+[[modules]]
+description = "Звук · pulsemixer"
+prefix = "vol"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module vol"
+unbind_proc = false
+
+[[modules]]
+description = "Сеть · IP-адреса"
+prefix = "ip"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ip"
+unbind_proc = false
+
+[[modules]]
+description = "Порты · процессы и действия"
+prefix = "ports"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ports"
+unbind_proc = false
+
+[[modules]]
+description = "Сон"
+prefix = "sl"
+cmd = "systemctl suspend"
+
+[[modules]]
+description = "Таймер · длительность / отмена"
+prefix = "timer"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module timer --argument '{}'"
+unbind_proc = false
+with_argument = true
+url_encode = true
+
+[[modules]]
+description = "Питание · меню"
+prefix = "po"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module po"
+
+
+# Служебный поиск: без префикса, скрыт из подсказок и списка ?.
+[[modules]]
+description = "google search"
+prefix = "__search"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module __search --argument '{}'"
+with_argument = true
+url_encode = true
+unbind_proc = false
+hidden = true

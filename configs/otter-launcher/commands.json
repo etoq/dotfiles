@@ -1,0 +1,322 @@
+{
+  "fo": {
+    "command": "exec kitty --class otter-tools -e bash -c 'f=\"$(fd --type f --hidden --exclude .git --exclude .cache . \"$HOME\" 2>/dev/null | fzf --cycle --gutter '\"'\"' '\"'\"' --pointer '\"'\"'▌'\"'\"' --color '\"'\"'bg:#183039,bg+:#183039,fg:#C5D6D8,hl:#0ABAB5,pointer:#0ABAB5'\"'\"' --prompt '\"'\"'  File > '\"'\"' --preview '\"'\"'bat --color=always --style=numbers {+} 2>/dev/null || cat {+}'\"'\"' --preview-window=right:50%:wrap)\"\nif [ -n \"$f\" ]; then\n    setsid -f xdg-open \"$f\" </dev/null >/dev/null 2>&1\nfi\nexit 0\n'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "yz": {
+    "command": "exec kitty --class otter-tools -e bash -c 'd=\"$(fd --type d --hidden --exclude .git --exclude .cache . \"$HOME\" 2>/dev/null | fzf --cycle --gutter '\"'\"' '\"'\"' --pointer '\"'\"'▌'\"'\"' --color '\"'\"'bg:#183039,bg+:#183039,fg:#C5D6D8,hl:#0ABAB5,pointer:#0ABAB5'\"'\"' --prompt '\"'\"'  Dir > '\"'\"')\"\nif [ -n \"$d\" ]; then\n    setsid -f kitty -e yazi \"$d\" </dev/null >/dev/null 2>&1\nfi\nexit 0\n'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "note": {
+    "command": "exec \"$HOME/.local/bin/otter-new-note\"",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "recent": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" recent",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "cal": {
+    "command": "exec \"$HOME/.local/bin/tiffany-calendar\"",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "calc": {
+    "command": "exec \"$HOME/.local/bin/otter-tools\" calc --encoded '{}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "kp": {
+    "command": "keepassxc",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "obs": {
+    "command": "obsidian",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "music": {
+    "command": "yandex-music",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ds": {
+    "command": "exec /usr/bin/discord",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "wf": {
+    "command": "exec /usr/bin/wispr-flow",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "pai": {
+    "command": "xdg-open 'https://chatgpt.com/'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "cx": {
+    "command": "exec kitty --class codex-terminal -e /usr/bin/codex",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "gai": {
+    "command": "xdg-open 'https://www.google.com/search?udm=50&mtid=GWMIasbCILKK9u8PkZiaaA'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "aai": {
+    "command": "xdg-open https://arena.ai/",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "rem": {
+    "command": "xdg-open 'https://www.remnote.com'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "aw": {
+    "command": "xdg-open 'https://wiki.archlinux.org/index.php?search={}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "aur": {
+    "command": "xdg-open 'https://aur.archlinux.org/packages?K={}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "pac": {
+    "command": "xdg-open 'https://archlinux.org/packages/?q={}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "gh": {
+    "command": "xdg-open 'https://github.com/search?q={}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "yt": {
+    "command": "xdg-open 'https://www.youtube.com/results?search_query={}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "tr": {
+    "command": "xdg-open 'https://www.deepl.com/translator#en/ru/{}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "lg": {
+    "command": "kitty --override background=#080D10 -e lazygit",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ldk": {
+    "command": "kitty --override background=#080D10 -e lazydocker 2>/dev/null || kitty -e bash -c 'echo \"lazydocker not installed. yay -S lazydocker\"; read'\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "jq": {
+    "command": "kitty -e bash -c '\necho \"  jq interactive — paste JSON below, Ctrl+D when done:\"\necho \" ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\"\njson=\"$(cat)\"\necho \"\"\necho \"  Result:\"\necho \"$json\" | jq . 2>&1\necho \"\"\nread -p \"  Press Enter...\"\n'\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "hex": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" hex --encoded '{}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "info": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" info --encoded '{}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "ocr": {
+    "command": "exec \"$HOME/.local/bin/otter-tools\" ocr",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "cc": {
+    "command": "exec \"$HOME/.local/bin/otter-tools\" cc",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "meta": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" meta --encoded '{}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "via": {
+    "command": "exec \"$HOME/Programs/via-3.0.0-linux.AppImage\" --no-sandbox",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ghi": {
+    "command": "$HOME/.local/bin/reverse-ghidra",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "cut": {
+    "command": "cutter",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "die": {
+    "command": "die",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "rn": {
+    "command": "kitty --class rednotes-float -e bash -c 'export SHELL=/bin/bash; rednotes manage'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "rna": {
+    "command": "kitty --class rednotes-float -e bash -c 'export SHELL=/bin/bash; rednotes add'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "rnt": {
+    "command": "exec kitty --class rednotes-float -e bash -c 'export SHELL=/bin/bash; rednotes set \"$1\"; read -r -p \"Target set. Enter...\"' otter \"$OTTER_ARGUMENT\"",
+    "url_encoded": true,
+    "raw_argument": true
+  },
+  "wsh": {
+    "command": "wireshark",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "nm": {
+    "command": "exec kitty -e bash -c 'nmap -T4 -F \"$1\"; read -r -p \"Done. Press Enter...\"' otter \"$OTTER_ARGUMENT\"",
+    "url_encoded": true,
+    "raw_argument": true
+  },
+  "burp": {
+    "command": "burpsuite",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "bpro": {
+    "command": "burpsuitepro",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "msf": {
+    "command": "kitty -e msfconsole",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "bh": {
+    "command": "bloodhound",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "vm": {
+    "command": "virt-manager",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "vms": {
+    "command": "exec kitty --class otter-tools -e bash -c 'vm=\"$(virsh list --all --name 2>/dev/null | grep -v '\"'\"'^$'\"'\"' | fzf --cycle --gutter '\"'\"' '\"'\"' --pointer '\"'\"'▌'\"'\"' --color '\"'\"'bg:#080D10,bg+:#183039,fg:#C5D6D8,hl:#4DDDD5,pointer:#4DDDD5'\"'\"' --prompt '\"'\"'  VM > '\"'\"' --preview '\"'\"'virsh dominfo {+} 2>/dev/null'\"'\"' --preview-window=right:40%)\"\n[ -z \"$vm\" ] && exit 0\nstate=\"$(virsh domstate \"$vm\" 2>/dev/null)\"\naction=\"$(printf '\"'\"'  start\n  shutdown\n  reboot\n  force-off\n  snapshot'\"'\"' | fzf --prompt \"  $vm [$state] > \" --color '\"'\"'bg:#080D10,bg+:#183039,fg:#C5D6D8,hl:#4DDDD5,pointer:#4DDDD5'\"'\"')\"\ncase \"$action\" in\n  *start)     virsh start \"$vm\" && notify-send \"VM\" \"Starting $vm\" ;;\n  *shutdown)  virsh shutdown \"$vm\" ;;\n  *reboot)    virsh reboot \"$vm\" ;;\n  *force-off) virsh destroy \"$vm\" ;;\n  *snapshot)  virsh snapshot-create-as \"$vm\" \"snap-$(date +%Y%m%d-%H%M)\" && notify-send \"VM\" \"Snapshot created\" ;;\nesac\n'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "top": {
+    "command": "kitty -e btop\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "cpu": {
+    "command": "kitty -e s-tui\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ht": {
+    "command": "kitty -e htop\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "dsk": {
+    "command": "kitty -e bash -c 'duf; read -p \"Press Enter...\"'\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "sys": {
+    "command": "kitty --class syshealth -e ~/.local/bin/syshealth",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "log": {
+    "command": "kitty -e bash -c 'journalctl -p err -b --no-pager | bat --color=always --paging=always'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "upd": {
+    "command": "kitty -e bash -c 'sudo pacman -Syu; read -p \"Done. Press Enter...\"'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "snap": {
+    "command": "kitty -e bash -c 'sudo snapper -c root list; read -p \"Press Enter...\"'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "rm": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" rm",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "kill": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" kill",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "wifi": {
+    "command": "if command -v impala &>/dev/null; then\n  kitty --override background=#080D10 -e impala\nelse\n  kitty --override background=#080D10 --override foreground=#C5D6D8 -e nmtui\nfi\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "wvm": {
+    "command": "kitty -e wavemon",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "bt": {
+    "command": "if command -v bluetuith &>/dev/null; then\n  kitty --override background=#080D10 --override foreground=#C5D6D8 --class bluetooth -e bluetuith\nelse\n  kitty --override background=#080D10 --override foreground=#C5D6D8 -e bluetoothctl\nfi\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "vol": {
+    "command": "kitty --override background=#080D10 --override foreground=#C5D6D8 -e pulsemixer\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ip": {
+    "command": "kitty -e bash -c '\necho \"  LOCAL:\"\nip -4 addr | grep inet | grep -v 127 | awk \"{print \\\"  \\\" \\$2}\"\necho \"\"\necho \"  EXTERNAL:\"\ncurl -s https://ipinfo.io/ip && echo\necho \"\"\nread -p \"  Press Enter...\"\n'\n",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ports": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" ports",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "timer": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/otter-tools\" timer --encoded '{}'",
+    "url_encoded": true,
+    "raw_argument": false
+  },
+  "po": {
+    "command": "exec kitty --class panel-tool -e bash \"$HOME/bin/powermenu\"",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "__search": {
+    "command": "xdg-open 'https://www.google.com/search?q={}'",
+    "url_encoded": true,
+    "raw_argument": false
+  }
+}

@@ -1,38 +1,38 @@
-! Dracula Color Scheme for Xresources
+! Black Tiffany Color Scheme for Xresources
 ! zer0@p50
 
-*background:  #0D1117
-*foreground:  #F8F8F2
-*cursorColor: #BD93F9
+*background:  #080D10
+*foreground:  #C5D6D8
+*cursorColor: #0ABAB5
 
 ! Black
-*color0:  #21222C
-*color8:  #6272A4
+*color0:  #101B20
+*color8:  #7E999F
 
 ! Red
-*color1:  #FF5555
-*color9:  #FF6E6E
+*color1:  #DE7C86
+*color9:  #E7989F
 
 ! Green
-*color2:  #50FA7B
-*color10: #69FF94
+*color2:  #8DC99B
+*color10: #A7D9B0
 
 ! Yellow
-*color3:  #F1FA8C
-*color11: #FFFFA5
+*color3:  #D8B77B
+*color11: #E3CAA1
 
 ! Purple (Blue slot)
-*color4:  #BD93F9
-*color12: #D6ACFF
+*color4:  #0ABAB5
+*color12: #4DDDD5
 
 ! Pink (Magenta slot)
-*color5:  #FF79C6
-*color13: #FF92DF
+*color5:  #4DDDD5
+*color13: #A3F0E7
 
 ! Cyan
-*color6:  #8BE9FD
-*color14: #A4FFFF
+*color6:  #4DDDD5
+*color14: #A3F0E7
 
 ! White
-*color7:  #F8F8F2
+*color7:  #C5D6D8
 *color15: #FFFFFF

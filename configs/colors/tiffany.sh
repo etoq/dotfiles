@@ -1,0 +1,12 @@
+# Black Tiffany: canonical desktop palette
+export TIFFANY_BG='#080D10'
+export TIFFANY_PANEL='#101B20'
+export TIFFANY_SELECTION='#183039'
+export TIFFANY_FG='#C5D6D8'
+export TIFFANY_MUTED='#7E999F'
+export TIFFANY_ACCENT='#0ABAB5'
+export TIFFANY_CYAN='#4DDDD5'
+export TIFFANY_BLUE='#79A9D1'
+export TIFFANY_GREEN='#8DC99B'
+export TIFFANY_YELLOW='#D8B77B'
+export TIFFANY_RED='#DE7C86'

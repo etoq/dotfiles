@@ -1,0 +1,24 @@
+user: '#C5D6D8'
+group: '#7E999F'
+permission:
+  read: '#8DC99B'
+  write: '#D8B77B'
+  exec: '#0ABAB5'
+  exec-sticky: '#79A9D1'
+  no-access: '#7E999F'
+date:
+  hour-old: '#4DDDD5'
+  day-old: '#C5D6D8'
+  older: '#7E999F'
+size:
+  none: '#7E999F'
+  small: '#C5D6D8'
+  medium: '#4DDDD5'
+  large: '#D8B77B'
+inode:
+  valid: '#7E999F'
+  invalid: '#DE7C86'
+links:
+  valid: '#4DDDD5'
+  invalid: '#DE7C86'
+tree-edge: '#7E999F'

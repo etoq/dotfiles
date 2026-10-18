@@ -1,0 +1,6 @@
+# NetworkManager owns Ethernet; keep networkd available for separate bridges.
+[Match]
+Name=enp0s31f6
+
+[Link]
+Unmanaged=yes

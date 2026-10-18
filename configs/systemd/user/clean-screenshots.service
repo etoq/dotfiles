@@ -1,0 +1,7 @@
+[Unit]
+Description=Clean screenshots older than 15 days
+ConditionPathIsDirectory=%h/Images/screenshots
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/find %h/Images/screenshots -maxdepth 1 -type f -iname *.png -mtime +15 -delete

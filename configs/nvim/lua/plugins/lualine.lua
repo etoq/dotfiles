@@ -8,17 +8,17 @@ local lualine = require('lualine')
 -- Color table for highlights
 -- stylua: ignore
 local colors = {
-  bg       = '#202328',
-  fg       = '#bbc2cf',
-  yellow   = '#ECBE7B',
-  cyan     = '#008080',
-  darkblue = '#081633',
-  green    = '#98be65',
-  orange   = '#FF8800',
-  violet   = '#a9a1e1',
-  magenta  = '#c678dd',
-  blue     = '#51afef',
-  red      = '#ec5f67',
+  bg       = '#101B20',
+  fg       = '#C5D6D8',
+  yellow   = '#D8B77B',
+  cyan     = '#0ABAB5',
+  darkblue = '#183039',
+  green    = '#8DC99B',
+  orange   = '#D8B77B',
+  violet   = '#0ABAB5',
+  magenta  = '#4DDDD5',
+  blue     = '#79A9D1',
+  red      = '#DE7C86',
 }
 
 local conditions = {
@@ -96,13 +96,13 @@ ins_left {
   color = function()
     -- auto change color according to neovims mode
     local mode_color = {
-      n = colors.red,
+      n = colors.cyan,
       i = colors.green,
       v = colors.blue,
       [''] = colors.blue,
       V = colors.blue,
       c = colors.magenta,
-      no = colors.red,
+      no = colors.cyan,
       s = colors.orange,
       S = colors.orange,
       [''] = colors.orange,
@@ -175,7 +175,7 @@ ins_left {
     return msg
   end,
   icon = ' LSP:',
-  color = { fg = '#ffffff', gui = 'bold' },
+  color = { fg = '#C5D6D8', gui = 'bold' },
 }
 
 -- Add components to right sections

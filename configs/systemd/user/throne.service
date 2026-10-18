@@ -1,0 +1,16 @@
+[Unit]
+Description=Throne proxy and TUN for the graphical session
+PartOf=graphical-session.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+ConditionEnvironment=DISPLAY
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/throne -tray
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+UMask=0077
+Environment=QT_QPA_PLATFORM=xcb

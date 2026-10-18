@@ -1,0 +1,12 @@
+{
+  "remember_enable": true,
+  "start_minimal": true,
+  "net_use_proxy": true,
+  "sub_auto_update": 1440,
+  "route_auto_update": 1440,
+  "sub_show_change_popup": false,
+  "log_file_level": "warning",
+  "traffic_stats_retention_days": 30,
+  "enable_tun_routing": true,
+  "dns_use_hosts": true
+}

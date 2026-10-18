@@ -1,0 +1,1 @@
+Built-in imagegen, reference: existing Otter image.png. Prompt: Recolor purple/violet #7416A0 to Tiffany #0ABAB5 and related teal shades; preserve pixel dolphin, cable, palms, shoreline, black areas, aspect ratio and composition; no text or new objects.

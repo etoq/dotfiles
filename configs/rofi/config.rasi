@@ -16,7 +16,7 @@ configuration{
     sidebar-mode: true;
 }
 
-@theme "catppuccin"
+@theme "tiffany"
 
 element-text, element-icon , mode-switcher {
     background-color: inherit;
@@ -25,7 +25,7 @@ element-text, element-icon , mode-switcher {
 
 window {
     height: 360px;
-    border: 3px;
+    border: 2px;
     border-color: @border-col;
     background-color: @bg-col;
 }
@@ -93,7 +93,7 @@ button {
     padding: 10px;
     background-color: @bg-col-light;
     text-color: @grey;
-    vertical-align: 0.5; 
+    vertical-align: 0.5;
     horizontal-align: 0.5;
 }
 

@@ -1,0 +1,14 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = nvidia-470xx-dkms
+Target = linux
+Target = linux-lts
+Target = linux-headers
+Target = linux-lts-headers
+
+[Action]
+Description = Prepare NVIDIA 470 kernel compatibility before DKMS
+When = PostTransaction
+Exec = /usr/local/libexec/nvidia470-compat

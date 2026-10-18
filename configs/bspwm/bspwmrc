@@ -3,7 +3,8 @@
 export DISPLAY=":0"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"
 export XDG_RUNTIME_DIR="/run/user/1000"
-export XDG_CURRENT_DESKTOP="GNOME"
+export XDG_CURRENT_DESKTOP="bspwm"
+export QT_QPA_PLATFORMTHEME="gtk3"
 
 # ── boofer ─────────────────────────────────────────────────────────────────────
 pgrep -x greenclip > /dev/null || greenclip daemon &
@@ -12,26 +13,30 @@ pgrep -x greenclip > /dev/null || greenclip daemon &
 pgrep -x sxhkd > /dev/null || sxhkd &
 
 # ── Мониторы ──────────────────────────────────────────────────────────────────
-sh $HOME/.config/bspwm/dual_monitors.sh
+bash "$HOME/.config/bspwm/dual_monitors.sh"
 
 # ── Рабочие столы (иконки вместо цифр) ───────────────────────────────────────
-bspc monitor -d '' '' '' '' '' '' ''
+# Desktops are initialized by dual_monitors.sh; preserve names on reload.
 
 # ── Рамки окон ────────────────────────────────────────────────────────────────
 bspc config border_width           2
-bspc config normal_border_color    "#44475A"    # Dracula selection
-bspc config focused_border_color   "#BD93F9"    # Dracula purple
-bspc config active_border_color    "#6272A4"    # Dracula comment
-bspc config presel_feedback_color  "#8BE9FD"    # Dracula cyan
+bspc config normal_border_color    "#183039"    # Black Tiffany selection
+bspc config focused_border_color   "#0ABAB5"    # Black Tiffany accent
+bspc config active_border_color    "#7E999F"    # Black Tiffany muted
+bspc config presel_feedback_color  "#4DDDD5"    # Black Tiffany cyan
+
+"$HOME/bin/change_language.sh"
+"$HOME/.local/bin/disable-middle-click"
 
 # ── Поведение ─────────────────────────────────────────────────────────────────
+bspc config ignore_ewmh_struts     false
 bspc config focus_follows_pointer  true
 bspc config borderless_monocle     true
 bspc config gapless_monocle        false
 
 # ── Отступы ───────────────────────────────────────────────────────────────────
 bspc config window_gap             10
-bspc config top_padding            32          # место для polybar
+bspc config top_padding            0          # Polybar резервирует место через X11 strut
 bspc config left_padding           0
 bspc config right_padding          0
 bspc config bottom_padding         0
@@ -42,12 +47,11 @@ bspc config pointer_action1        move
 bspc config pointer_action2        resize_side
 bspc config pointer_action3        resize_corner
 
-# ── Лок скрин ────────────────────────────────────────────────────
-xss-lock -- betterlockscreen -l dimblur &
 
 # ── Правила для приложений ────────────────────────────────────────────────────
-bspc rule -a kitty:calendar state=floating rectangle=800x500+0+0 center=true
-bspc rule -a "otter" state=floating center=true rectangle=500x420+0+0 focus=on 
+bspc rule -a panel-monitor state=fullscreen
+bspc rule -a calendar state=floating rectangle=1400x900+0+0 center=true
+bspc rule -a "otter" state=floating center=true rectangle=500x420+0+0 focus=on
 bspc rule -a "clipboard-manager" state=floating center=true rectangle=600x400+0+0 focus=on
 bspc rule -a pkg-manager state=floating center=true rectangle=800x500+0+0
 bspc rule -a rednotes-float state=floating center=true rectangle=800x600+0+0
@@ -56,25 +60,44 @@ bspc rule -a rednotes-float state=floating center=true rectangle=800x600+0+0
 xsetroot -cursor_name left_ptr
 
 # ── Xresources ────────────────────────────────────────────────────────────────
-xrdb merge ~/.Xresources 2>/dev/null
+xrdb -merge ~/.Xresources 2>/dev/null
 
 # ── Автозапуск ────────────────────────────────────────────────────────────────
+# Import this X11 session before starting the supervised proxy.
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP
+systemctl --user start throne.service
+pgrep -u "$(id -u)" -x easyeffects >/dev/null || easyeffects --service-mode &
+pgrep -u "$(id -u)" -x wispr-flow >/dev/null || wispr-flow &
+
 # Обои
 sh $HOME/bin/random_wallpaper &
 
 # Polybar
-~/.config/polybar/launch.sh &
+"$HOME/.local/bin/panel-autostart" &
 
 # Compositor
-picom --config $HOME/.config/bspwm/picom_configurations/1.conf &
+picom --config $HOME/.config/picom/picom.conf &
 
 # Скриншоты
 pkill flameshot; flameshot &
 
+# --- ФИНАЛЬНЫЙ РАБОЧИЙ БЛОК ---
+
+# 1. Сбрасываем таймеры монитора
+xset s 600 600
+xset +dpms
+xset dpms 600 600 600
+
+# xss-lock handles the X11 idle timeout and logind sleep/lock events.
+# Do not run a second idle locker in parallel.
+pkill -u "$(id -u)" -x xautolock 2>/dev/null || true
+
+# 3. Блокировка при закрытии крышки (Мгновенно)
+pkill xss-lock
+xss-lock -- sh -c 'xset dpms force off; betterlockscreen -l dimblur' &
+
+# 4. Теплые цвета
+pkill gammastep
+gammastep -m randr &
 # Батарея
 pkill battery-alert; ~/bin/battery-alert &
-
-# XDG portal (нужен для диалогов в браузере)
-/usr/lib/xdg-desktop-portal-gtk &
-sleep 1
-/usr/lib/xdg-desktop-portal &

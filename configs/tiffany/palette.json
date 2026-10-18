@@ -1,0 +1,18 @@
+{
+  "background": "#080D10",
+  "surface": "#101B20",
+  "border": "#183039",
+  "accent": "#0ABAB5",
+  "cyan": "#4DDDD5",
+  "mint": "#A3F0E7",
+  "foreground": "#C5D6D8",
+  "muted": "#7E999F",
+  "cpu": "#C99070",
+  "audio": "#D35F5E",
+  "success": "#8DC99B",
+  "warning": "#D8B77B",
+  "error": "#DE7C86",
+  "blue": "#79A9D1",
+  "hover": "#21414B",
+  "bright": "#DFE9E9"
+}

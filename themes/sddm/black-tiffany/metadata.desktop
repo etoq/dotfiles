@@ -1,0 +1,10 @@
+[SddmGreeterTheme]
+Name=Black Tiffany
+Description=Very minimal sddm theme.
+Author=Talyam
+Version=1.0
+MainScript=Main.qml
+Theme-Id=black-tiffany
+QtVersion=6
+
+ConfigFile=configs/black-tiffany.conf

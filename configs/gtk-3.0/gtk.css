@@ -1,0 +1,120 @@
+
+/* Black Tiffany: named colors for GTK / libadwaita. */
+@define-color accent_color #4DDDD5;
+@define-color accent_bg_color #0ABAB5;
+@define-color accent_fg_color #080D10;
+@define-color window_bg_color #080D10;
+@define-color window_fg_color #C5D6D8;
+@define-color view_bg_color #080D10;
+@define-color view_fg_color #C5D6D8;
+@define-color headerbar_bg_color #101B20;
+@define-color headerbar_fg_color #C5D6D8;
+@define-color headerbar_border_color #183039;
+@define-color card_bg_color #101B20;
+@define-color card_fg_color #C5D6D8;
+@define-color popover_bg_color #101B20;
+@define-color popover_fg_color #C5D6D8;
+@define-color dialog_bg_color #101B20;
+@define-color dialog_fg_color #C5D6D8;
+@define-color sidebar_bg_color #101B20;
+@define-color sidebar_fg_color #C5D6D8;
+@define-color sidebar_backdrop_color #101B20;
+@define-color sidebar_border_color #183039;
+@define-color borders #183039;
+@define-color error_color #DE7C86;
+@define-color warning_color #D8B77B;
+@define-color success_color #8DC99B;
+
+
+/* Black Tiffany controls; symbolic vectors inherit the accent. */
+entry:focus, entry:focus-within {
+ border-color: #0ABAB5;
+ box-shadow: inset 0 0 0 1px alpha(#0ABAB5, 0.18);
+}
+button.suggested-action, button.suggested-action:hover,
+button.suggested-action:active {
+ color: #080D10; background-color: #0ABAB5;
+ background-image: none; border-color: #0ABAB5;
+}
+button.suggested-action label { color: #080D10; }
+switch:checked { background-color: #0ABAB5; border-color: #0ABAB5; }
+check, radio {
+ -gtk-icon-source: none; background-image: none;
+ background-color: #101B20; border: 1px solid #7E999F;
+ min-width: 14px; min-height: 14px; color: #080D10;
+}
+check { border-radius: 3px; }
+radio { border-radius: 50%; }
+check:checked, check:checked:hover, check:checked:backdrop,
+check:checked:disabled, check:indeterminate {
+ -gtk-icon-source: -gtk-icontheme("object-select-symbolic");
+ background-image: none; background-color: #0ABAB5;
+ border-color: #0ABAB5; color: #080D10;
+}
+radio:checked, radio:checked:hover, radio:checked:backdrop {
+ -gtk-icon-source: -gtk-icontheme("media-record-symbolic");
+ background-image: none; background-color: #0ABAB5;
+ border-color: #0ABAB5; color: #080D10;
+}
+selection { background-color: #183039; color: #A3F0E7; }
+
+/* Tiffany contrast correction: dark surfaces, readable hover/selection. */
+@define-color selected_bg_color #183039;
+@define-color selected_fg_color #A3F0E7;
+@define-color theme_selected_bg_color #183039;
+@define-color theme_selected_fg_color #A3F0E7;
+@define-color menu_bg_color #101B20;
+@define-color menu_fg_color #C5D6D8;
+@define-color menu_selected_bg_color #183039;
+@define-color menu_selected_fg_color #A3F0E7;
+
+placessidebar, placessidebar list, .sidebar, .sidebar.view,
+.sidebar .view, .navigation-sidebar {
+ background-color: #101B20; background-image: none; color: #C5D6D8;
+}
+placessidebar row, .sidebar row, .navigation-sidebar row {
+ background-color: transparent; background-image: none; color: #C5D6D8;
+ text-shadow: none; box-shadow: none; border-color: transparent;
+}
+placessidebar row:hover, .sidebar row:hover, .navigation-sidebar row:hover {
+ background-color: #183039; background-image: none; color: #DFE9E9;
+}
+placessidebar row:selected, .sidebar row:selected, .navigation-sidebar row:selected {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+ box-shadow: inset 3px 0 #0ABAB5;
+}
+placessidebar row:selected:hover, .sidebar row:selected:hover,
+.navigation-sidebar row:selected:hover {
+ background-color: #21414B; color: #DFE9E9;
+}
+placessidebar row label, placessidebar row image,
+.sidebar row label, .sidebar row image,
+.navigation-sidebar row label, .navigation-sidebar row image {
+ background-color: transparent; background-image: none; color: inherit; opacity: 1;
+}
+menu, .menu, menu menuitem, .menu menuitem {
+ background-color: #101B20; background-image: none; color: #C5D6D8;
+ text-shadow: none; border-color: #183039;
+}
+menu menuitem:hover, menu menuitem:active {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+}
+menu menuitem label, menu menuitem image {
+ background-color: transparent; background-image: none; color: inherit;
+}
+menu menuitem:disabled, menu menuitem:disabled label,
+menu menuitem:disabled image {
+ color: #7E999F; background-color: #101B20; background-image: none; opacity: 1;
+}
+menubar > menuitem:hover {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+}
+treeview.view:selected, treeview.view:selected:focus,
+treeview.view:selected:hover, treeview.view:backdrop:selected {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+}
+tooltip, tooltip.background {
+ background-color: #101B20; background-image: none; color: #DFE9E9;
+ border: 1px solid #183039;
+}
+tooltip label { color: #DFE9E9; }

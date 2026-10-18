@@ -1,0 +1,221 @@
+/* Ant palet */
+@define-color lime #8DC99B;
+@define-color cyan #4DDDD5;
+@define-color yellow #D8B77B;
+@define-color orange #D8B77B;
+@define-color purple #0ABAB5;
+@define-color red #DE7C86;
+
+/* default color scheme */
+@define-color bg_color #080D10;
+@define-color fg_color #C5D6D8;
+@define-color base_color #080D10;
+@define-color text_color #C5D6D8;
+@define-color borders transparent;
+@define-color header_bg_color #080D10;
+@define-color header_fg_color #C5D6D8;
+/*@define-color selected_bg_color #00b0ff;*/
+@define-color selected_bg_color #0ABAB5;
+/*@define-color selected_bg_color #33CBBF;
+*/@define-color selected_fg_color #C5D6D8;
+@define-color tooltip_bg_color #C5D6D8;
+@define-color tooltip_fg_color #101B20;
+
+/* colormap actually used by the theme, to be overridden in other css files */
+@define-color theme_bg_color @bg_color;
+@define-color theme_fg_color @fg_color;
+@define-color theme_base_color @base_color;
+@define-color theme_text_color @text_color;
+@define-color theme_selected_bg_color @selected_bg_color;
+@define-color theme_selected_fg_color @selected_fg_color;
+@define-color theme_tooltip_bg_color @tooltip_bg_color;
+@define-color theme_tooltip_fg_color @tooltip_fg_color;
+
+/* shadow effects */
+@define-color light_shadow #fff;
+@define-color dark_shadow #080D10;
+
+/* misc colors used by gtk+ */
+@define-color info_fg_color #183039;
+@define-color info_bg_color #f3f3f3;
+@define-color warning_fg_color #fefefe;
+@define-color warning_bg_color @orange;
+@define-color question_fg_color #fefefe;
+@define-color question_bg_color @cyan;
+@define-color error_fg_color #fefefe;
+@define-color error_bg_color @red;
+@define-color link_color #df253f;
+@define-color success_color #53a93f;
+@define-color warning_color #f57900;
+@define-color error_color @red;
+@define-color light_grey #dedede;
+
+/* widget colors */
+@define-color button_bg_color @theme_base_color;
+@define-color menubar_bg_color @theme_bg_color;
+@define-color menubar_fg_color @theme_fg_color;
+@define-color toolbar_bg_color @theme_bg_color;
+@define-color toolbar_fg_color @theme_fg_color;
+@define-color menu_bg_color @theme_base_color;
+@define-color menu_fg_color @theme_text_color;
+@define-color panel_bg_color shade(@header_fg_color, 0.8);
+@define-color panel_fg_color @selected_fg_color;
+@define-color menu_selected_bg_color @selected_bg_color;
+@define-color menu_selected_fg_color @selected_fg_color;
+@define-color titlebar_bg_color @theme_bg_color;
+@define-color titlebar_fg_color @theme_fg_color;
+
+/* osd */
+@define-color osd_base @base_color;
+@define-color osd_fg @fg_color;
+@define-color osd_bg @bg_color;
+
+/* window manager colors */
+@define-color wm_bg @header_bg_color;
+@define-color wm_border_focused @header_bg_color;
+@define-color wm_border_unfocused @header_bg_color;
+@define-color wm_title_focused @header_fg_color;
+@define-color wm_title_unfocused alpha(@theme_fg_color, 0.75);
+@define-color wm_icons_focused @theme_fg_color;
+@define-color wm_icons_focused_prelight shade(@theme_selected_bg_color, 1.15);
+@define-color wm_icons_focused_pressed @theme_selected_bg_color;
+@define-color wm_icons_unfocused alpha(@theme_fg_color, 0.95);
+@define-color wm_icons_unfocused_prelight shade(@theme_selected_bg_color, 1.15);
+@define-color wm_icons_unfocused_pressed @theme_selected_bg_color;
+
+@import url("gtk-widgets.css");
+@import url("gtk-widgets-assets.css");
+
+@import url("widgets/app-notifications.css");
+@import url("widgets/assistant.css");
+@import url("widgets/button.css");
+@import url("widgets/cell-row.css");
+@import url("widgets/check-radio.css");
+@import url("widgets/column-header.css");
+@import url("widgets/content-view.css");
+@import url("widgets/calendar.css");
+@import url("widgets/dialogs.css");
+@import url("widgets/entry.css");
+@import url("widgets/infobar.css");
+@import url("widgets/list-boxes.css");
+@import url("widgets/menu.css");
+@import url("widgets/notebook.css");
+@import url("widgets/progress-scale.css");
+@import url("widgets/scrollbar.css");
+@import url("widgets/search-bar.css");
+@import url("widgets/separator.css");
+@import url("widgets/sidebar.css");
+@import url("widgets/spinbutton.css");
+@import url("widgets/spinner.css");
+@import url("widgets/switch.css");
+@import url("widgets/color-chooser.css");
+@import url("widgets/toolbar.css");
+@import url("widgets/osd.css");
+@import url("widgets/csd.css");
+@import url("widgets/combobox.css");
+@import url("widgets/selection-mode.css");
+@import url("widgets/popover.css");
+
+
+@import url("apps/budgie.css");
+@import url("apps/corebird.css");
+@import url("apps/solus-applications.css");
+@import url("apps/gala.css");
+@import url("apps/gnome-applications.css");
+@import url("apps/unity.css");
+@import url("apps/mate-applications.css");
+/*@import url("widgets/gnome-software.css");*/
+
+
+/* Black Tiffany controls; symbolic vectors inherit the accent. */
+entry:focus, entry:focus-within {
+ border-color: #0ABAB5;
+ box-shadow: inset 0 0 0 1px alpha(#0ABAB5, 0.18);
+}
+button.suggested-action, button.suggested-action:hover,
+button.suggested-action:active {
+ color: #080D10; background-color: #0ABAB5;
+ background-image: none; border-color: #0ABAB5;
+}
+button.suggested-action label { color: #080D10; }
+switch:checked { background-color: #0ABAB5; border-color: #0ABAB5; }
+check, radio {
+ -gtk-icon-source: none; background-image: none;
+ background-color: #101B20; border: 1px solid #7E999F;
+ min-width: 14px; min-height: 14px; color: #080D10;
+}
+check { border-radius: 3px; }
+radio { border-radius: 50%; }
+check:checked, check:checked:hover, check:checked:backdrop,
+check:checked:disabled, check:indeterminate {
+ -gtk-icon-source: -gtk-icontheme("object-select-symbolic");
+ background-image: none; background-color: #0ABAB5;
+ border-color: #0ABAB5; color: #080D10;
+}
+radio:checked, radio:checked:hover, radio:checked:backdrop {
+ -gtk-icon-source: -gtk-icontheme("media-record-symbolic");
+ background-image: none; background-color: #0ABAB5;
+ border-color: #0ABAB5; color: #080D10;
+}
+selection { background-color: #183039; color: #A3F0E7; }
+
+/* Tiffany contrast correction: dark surfaces, readable hover/selection. */
+@define-color selected_bg_color #183039;
+@define-color selected_fg_color #A3F0E7;
+@define-color theme_selected_bg_color #183039;
+@define-color theme_selected_fg_color #A3F0E7;
+@define-color menu_bg_color #101B20;
+@define-color menu_fg_color #C5D6D8;
+@define-color menu_selected_bg_color #183039;
+@define-color menu_selected_fg_color #A3F0E7;
+
+placessidebar, placessidebar list, .sidebar, .sidebar.view,
+.sidebar .view, .navigation-sidebar {
+ background-color: #101B20; background-image: none; color: #C5D6D8;
+}
+placessidebar row, .sidebar row, .navigation-sidebar row {
+ background-color: transparent; background-image: none; color: #C5D6D8;
+ text-shadow: none; box-shadow: none; border-color: transparent;
+}
+placessidebar row:hover, .sidebar row:hover, .navigation-sidebar row:hover {
+ background-color: #183039; background-image: none; color: #DFE9E9;
+}
+placessidebar row:selected, .sidebar row:selected, .navigation-sidebar row:selected {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+ box-shadow: inset 3px 0 #0ABAB5;
+}
+placessidebar row:selected:hover, .sidebar row:selected:hover,
+.navigation-sidebar row:selected:hover {
+ background-color: #21414B; color: #DFE9E9;
+}
+placessidebar row label, placessidebar row image,
+.sidebar row label, .sidebar row image,
+.navigation-sidebar row label, .navigation-sidebar row image {
+ background-color: transparent; background-image: none; color: inherit; opacity: 1;
+}
+menu, .menu, menu menuitem, .menu menuitem {
+ background-color: #101B20; background-image: none; color: #C5D6D8;
+ text-shadow: none; border-color: #183039;
+}
+menu menuitem:hover, menu menuitem:active {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+}
+menu menuitem label, menu menuitem image {
+ background-color: transparent; background-image: none; color: inherit;
+}
+menu menuitem:disabled, menu menuitem:disabled label,
+menu menuitem:disabled image {
+ color: #7E999F; background-color: #101B20; background-image: none; opacity: 1;
+}
+menubar > menuitem:hover {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+}
+treeview.view:selected, treeview.view:selected:focus,
+treeview.view:selected:hover, treeview.view:backdrop:selected {
+ background-color: #183039; background-image: none; color: #A3F0E7;
+}
+tooltip, tooltip.background {
+ background-color: #101B20; background-image: none; color: #DFE9E9;
+ border: 1px solid #183039;
+}
+tooltip label { color: #DFE9E9; }

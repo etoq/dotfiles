@@ -1,12 +1,6 @@
-# Переменные окружения для BSPWM
-export XDG_CURRENT_DESKTOP=GNOME
+#!/bin/sh
+export XDG_CURRENT_DESKTOP=bspwm
 export XDG_SESSION_TYPE=x11
 export XDG_SESSION_DESKTOP=bspwm
-
-# Запуск portal для файловых диалогов в браузере
-/usr/lib/xdg-desktop-portal-gtk &
-sleep 1
-/usr/lib/xdg-desktop-portal &
-sleep 1
-
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP
 exec bspwm

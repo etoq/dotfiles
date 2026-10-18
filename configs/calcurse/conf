@@ -1,0 +1,9 @@
+appearance.theme=cyan on default
+
+appearance.calendarview=monthly
+
+appearance.defaultpanel=calendar
+
+appearance.sidebarwidth=38
+
+general.firstdayofweek=monday

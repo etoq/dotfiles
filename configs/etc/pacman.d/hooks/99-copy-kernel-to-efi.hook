@@ -1,0 +1,13 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = linux-lts
+Target = mkinitcpio
+Target = nvidia-470xx-dkms
+
+[Action]
+Description = Synchronize kernel and initramfs copies in EFI
+When = PostTransaction
+Exec = /usr/local/libexec/sync-efi-kernels

@@ -4,14 +4,14 @@
   shrink = no
   padding = 10                  # Уменьшено с 20 (вертикальные отступы)
   horizontal_padding = 12       # Уменьшено с 20 (горизонтальные отступы)
-  
+
   offset = 16x60
   origin = top-right
 
   frame_width = 2
   separator_height = 2
-  frame_color = "#161320"
-  separator_color = "#161320"
+  frame_color = "#101B20"
+  separator_color = "#101B20"
 
   sort = no
   font = JetBrainsMono Nerd Font 11  # Размер шрифта уменьшен с 15 до 11
@@ -38,19 +38,19 @@
   mouse_right_click = close_all
 
 [urgency_low]
-  background = "#1E1E2E"
-  frame_color = "#989CFA"
-  foreground = "#D9E0EE"
+  background = "#101B20"
+  frame_color = "#0ABAB5"
+  foreground = "#C5D6D8"
   timeout = 5
 
 [urgency_normal]
-  background = "#1E1E2E"
-  frame_color = "#989CFA"
-  foreground = "#D9E0EE"
+  background = "#101B20"
+  frame_color = "#0ABAB5"
+  foreground = "#C5D6D8"
   timeout = 5
 
 [urgency_critical]
-  background = "#1E1E2E"
-  frame_color = "#989CFA"
-  foreground = "#D9E0EE"
+  background = "#101B20"
+  frame_color = "#DE7C86"
+  foreground = "#C5D6D8"
   timeout = 10

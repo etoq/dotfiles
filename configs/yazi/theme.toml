@@ -19,7 +19,7 @@ light = ""
 # : App {{{
 
 [app]
-overall = {}
+overall = { bg = "#080D10", fg = "#C5D6D8" }
 
 # : }}}
 
@@ -27,11 +27,11 @@ overall = {}
 # : Manager {{{
 
 [mgr]
-cwd = { fg = "cyan" }
+cwd = { fg = "#4DDDD5" }
 
 # Find
 find_keyword  = { fg = "yellow", bold = true, italic = true, underline = true }
-find_position = { fg = "magenta", bg = "reset", bold = true, italic = true }
+find_position = { fg = "#4DDDD5", bg = "reset", bold = true, italic = true }
 
 # Symlink
 symlink_target = { italic = true }
@@ -39,7 +39,7 @@ symlink_target = { italic = true }
 # Marker
 marker_copied   = { fg = "lightgreen",  bg = "lightgreen" }
 marker_cut      = { fg = "lightred",    bg = "lightred" }
-marker_marked   = { fg = "lightcyan",   bg = "lightcyan" }
+marker_marked   = { fg = "#4DDDD5",   bg = "#4DDDD5" }
 marker_selected = { fg = "lightyellow", bg = "lightyellow" }
 
 # Count
@@ -60,8 +60,8 @@ syntect_theme = ""
 # : Tabs {{{
 
 [tabs]
-active   = { bg = "blue", bold = true }
-inactive = { fg = "blue", bg = "gray" }
+active   = { fg = "#080D10", bg = "#0ABAB5", bold = true }
+inactive = { fg = "#0ABAB5", bg = "gray" }
 
 # Separator
 sep_inner = { open = "", close = "" }
@@ -73,8 +73,8 @@ sep_outer = { open = "", close = "" }
 # : Mode {{{
 
 [mode]
-normal_main = { bg = "blue", bold = true }
-normal_alt  = { fg = "blue", bg = "gray" }
+normal_main = { fg = "#080D10", bg = "#0ABAB5", bold = true }
+normal_alt  = { fg = "#0ABAB5", bg = "gray" }
 
 # Select mode
 select_main = { bg = "red", bold = true }
@@ -91,7 +91,7 @@ unset_alt  = { fg = "red", bg = "gray" }
 
 [indicator]
 parent  = { reversed = true }
-current = { reversed = true }
+current = { fg = "#A3F0E7", bg = "#183039", bold = true }
 preview = { underline = true }
 padding = { open = "", close = "" }
 
@@ -110,7 +110,7 @@ perm_sep   = { fg = "darkgray" }
 perm_type  = { fg = "green" }
 perm_read  = { fg = "yellow" }
 perm_write = { fg = "red" }
-perm_exec  = { fg = "cyan" }
+perm_exec  = { fg = "#4DDDD5" }
 
 # Progress
 progress_label  = { bold = true }
@@ -125,9 +125,9 @@ progress_error  = { fg = "yellow", bg = "red" }
 [which]
 cols            = 3
 mask            = { bg = "black" }
-cand            = { fg = "lightcyan" }
+cand            = { fg = "#4DDDD5" }
 rest            = { fg = "darkgray" }
-desc            = { fg = "lightmagenta" }
+desc            = { fg = "#4DDDD5" }
 separator       = "  "
 separator_style = { fg = "darkgray" }
 
@@ -137,8 +137,8 @@ separator_style = { fg = "darkgray" }
 # : Confirmation {{{
 
 [confirm]
-border     = { fg = "blue" }
-title      = { fg = "blue" }
+border     = { fg = "#0ABAB5" }
+title      = { fg = "#0ABAB5" }
 body       = {}
 list       = {}
 btn_yes    = { reversed = true }
@@ -151,11 +151,11 @@ btn_labels = [ "  [Y]es  ", "  (N)o  " ]
 # : Spotter {{{
 
 [spot]
-border = { fg = "blue" }
-title  = { fg = "blue" }
+border = { fg = "#0ABAB5" }
+title  = { fg = "#0ABAB5" }
 
 # Table
-tbl_col  = { fg = "blue" }
+tbl_col  = { fg = "#0ABAB5" }
 tbl_cell = { fg = "yellow", reversed = true }
 
 # : }}}
@@ -179,8 +179,8 @@ icon_error = ""
 # : Picker {{{
 
 [pick]
-border   = { fg = "blue" }
-active   = { fg = "magenta", bold = true }
+border   = { fg = "#0ABAB5" }
+active   = { fg = "#4DDDD5", bold = true }
 inactive = {}
 
 # : }}}
@@ -189,7 +189,7 @@ inactive = {}
 # : Input {{{
 
 [input]
-border   = { fg = "blue" }
+border   = { fg = "#0ABAB5" }
 title    = {}
 value    = {}
 selected = { reversed = true }
@@ -200,7 +200,7 @@ selected = { reversed = true }
 # : Completion {{{
 
 [cmp]
-border   = { fg = "blue" }
+border   = { fg = "#0ABAB5" }
 active   = { reversed = true }
 inactive = {}
 
@@ -215,9 +215,9 @@ icon_command = ""
 # : Task manager {{{
 
 [tasks]
-border  = { fg = "blue" }
+border  = { fg = "#0ABAB5" }
 title   = {}
-hovered = { fg = "magenta", bold = true }
+hovered = { fg = "#4DDDD5", bold = true }
 
 # : }}}
 
@@ -225,8 +225,8 @@ hovered = { fg = "magenta", bold = true }
 # : Help menu {{{
 
 [help]
-on      = { fg = "cyan" }
-run     = { fg = "magenta" }
+on      = { fg = "#4DDDD5" }
+run     = { fg = "#4DDDD5" }
 desc    = {}
 hovered = { reversed = true, bold = true }
 footer  = { fg = "black", bg = "white" }
@@ -241,11 +241,11 @@ rules = [
 	# Image
 	{ mime = "image/*", fg = "yellow" },
 	# Media
-	{ mime = "{audio,video}/*", fg = "magenta" },
+	{ mime = "{audio,video}/*", fg = "#4DDDD5" },
 	# Archive
 	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "red" },
 	# Document
-	{ mime = "application/{pdf,doc,rtf}", fg = "cyan" },
+	{ mime = "application/{pdf,doc,rtf}", fg = "#4DDDD5" },
 	# Virtual file system
 	{ mime = "vfs/{absent,stale}", fg = "gray" },
 	# Special file
@@ -255,7 +255,7 @@ rules = [
 	{ url = "*", is = "dummy", bg = "red" },
 	{ url = "*/", is = "dummy", bg = "red" },
 	# Fallback
-	{ url = "*/", fg = "blue" }
+	{ url = "*/", fg = "#0ABAB5" }
 ]
 
 # : }}}

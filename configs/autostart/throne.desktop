@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Throne
+Comment=Start the supervised Throne session
+Exec=systemctl --user start throne.service
+Terminal=false
+X-GNOME-Autostart-enabled=true

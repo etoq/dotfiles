@@ -1,6 +1,6 @@
 
 # ~/.config/fish/config.fish
-set -gx XDG_CURRENT_DESKTOP GNOME
+set -gx XDG_CURRENT_DESKTOP bspwm
 set -gx XDG_SESSION_TYPE x11
 # ── Greeting ──────────────────────────────────────────────────────────────────
 set -U fish_greeting  # убрать стандартное приветствие
@@ -18,20 +18,20 @@ set fish_color_autosuggestion brblack
 # ── Переменные окружения ───────────────────────────────────────────────────────
 set -gx EDITOR nvim
 set -gx VISUAL nvim
-set -gx BROWSER /usr/bin/librewolf
-set -gx PATH $HOME/.local/bin $PATH
+set -gx BROWSER zen
+fish_add_path --path $HOME/.local/bin $HOME/bin
 set -gx QT_QPA_PLATFORM xcb        # Telegram / Qt на X11
 set -gx FM yazi
 
-# Dracula цвета (для скриптов которые их используют)
-set -gx DRACULA_BG        "#0D1117"
-set -gx DRACULA_PURPLE    "#BD93F9"
-set -gx DRACULA_PINK      "#FF79C6"
-set -gx DRACULA_CYAN      "#8BE9FD"
-set -gx DRACULA_GREEN     "#50FA7B"
-set -gx DRACULA_YELLOW    "#F1FA8C"
-set -gx DRACULA_RED       "#FF5555"
-set -gx DRACULA_FG        "#F8F8F2"
+# Black Tiffany цвета (для скриптов которые их используют)
+set -gx DRACULA_BG        "#080D10"
+set -gx DRACULA_PURPLE    "#0ABAB5"
+set -gx DRACULA_PINK      "#4DDDD5"
+set -gx DRACULA_CYAN      "#4DDDD5"
+set -gx DRACULA_GREEN     "#8DC99B"
+set -gx DRACULA_YELLOW    "#D8B77B"
+set -gx DRACULA_RED       "#DE7C86"
+set -gx DRACULA_FG        "#C5D6D8"
 
 # ── Замены команд ─────────────────────────────────────────────────────────────
 alias ls='lsd'
@@ -45,7 +45,7 @@ alias rm='rmtrash'                  # в корзину вместо удале�
 alias rmf='/usr/bin/rm -rf'        # настоящее удаление — явно
 alias df='duf'
 alias top='btop'
-alias htop='neohtop'
+# htop is installed directly; no alias to the retired Neohtop.
 alias grep='grep --color=auto'
 alias diff='diff --color=auto'
 alias ip='ip --color=auto'
@@ -59,7 +59,7 @@ alias h='cd ~'
 
 # ── Редакторы ─────────────────────────────────────────────────────────────────
 alias n='nvim'
-alias m='micro'
+alias m='nvim'
 alias g='git'
 
 # ── Система ───────────────────────────────────────────────────────────────────
@@ -82,13 +82,11 @@ alias xlog='grep "(EE)\|(WW)\|error\|failed" ~/.local/share/xorg/Xorg.0.log'
 alias vacuum='journalctl --vacuum-size=100M'
 alias vacuum_time='journalctl --vacuum-time=2weeks'
 
-# ── Security tools ────────────────────────────────────────────────────────────
+# ── Network diagnostics ────────────────────────────────────────────────────────────
 alias ports='ss -tulpn'
 alias listening='ss -tlnp'
 alias myip='curl -s https://ipinfo.io/ip'
 alias localip="ip -4 addr | grep inet | grep -v 127 | awk '{print \$2}'"
-alias scan='nmap -sV -sC'
-alias scanfast='nmap -T4 -F'
 
 # ── VM ────────────────────────────────────────────────────────────────────────
 alias vms='virsh list --all'
@@ -111,7 +109,7 @@ alias reload='source ~/.config/fish/config.fish'
 if status is-interactive
 
     # Starship prompt
-    starship init fish | source
+    # starship init fish | source
 
     # Zoxide (умный cd) вместо обычного cd
     zoxide init fish | source
@@ -120,3 +118,10 @@ if status is-interactive
     fzf --fish | source
 
 end
+
+# Black Tiffany theme (loaded last to override migrated Fish defaults).
+source $HOME/.config/fish/tiffany.fish
+
+# CTF tools retained
+alias scan='nmap -sV -sC'
+alias scanfast='nmap -T4 -F'

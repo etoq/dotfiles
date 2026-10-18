@@ -1,0 +1,15 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = nvidia-470xx-utils
+Target = nvidia-470xx-dkms
+Target = linux
+Target = linux-lts
+Target = linux-headers
+Target = linux-lts-headers
+
+[Action]
+Description = Preserve the selected NVIDIA callback sleep configuration
+When = PostTransaction
+Exec = /usr/local/libexec/nvidia470-sleep-policy

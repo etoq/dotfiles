@@ -1,0 +1,24 @@
+{
+  "enabled": false,
+  "destination": null,
+  "encryption_required": true,
+  "sources": [
+    "dotfiles",
+    "Documents/obsidian",
+    "Projects",
+    "notes",
+    "rednotes",
+    ".config/ghidra",
+    ".config/Throne",
+    ".ssh",
+    ".local/share/keyrings"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.venv",
+    "**/.cache"
+  ],
+  "schedule": null,
+  "note": "No backup or upload until a destination and encryption method are configured."
+}

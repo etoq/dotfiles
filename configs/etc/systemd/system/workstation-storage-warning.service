@@ -1,0 +1,6 @@
+[Unit]
+Description=Notify about a failed storage maintenance job
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/workstation-health-notify
