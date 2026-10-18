@@ -260,6 +260,9 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/systemd/user/throne.service" "$HOME/.config/systemd/user/throne.service"
     link "configs/autostart/throne.desktop" "$HOME/.config/autostart/throne.desktop"
     link "configs/tiffany" "$HOME/.config/tiffany"
+    mkdir -p "$HOME/.config/workstation-backup"
+    chmod 700 "$HOME/.config/workstation-backup"
+    link "configs/workstation-backup/proton-cli.json" "$HOME/.config/workstation-backup/proton-cli.json"
     link "configs/environment.d/60-black-tiffany.conf" "$HOME/.config/environment.d/60-black-tiffany.conf"
     link "configs/autostart/easyeffects.desktop" "$HOME/.config/autostart/easyeffects.desktop"
     link "configs/autostart/wispr-flow.desktop" "$HOME/.config/autostart/wispr-flow.desktop"
@@ -325,7 +328,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"

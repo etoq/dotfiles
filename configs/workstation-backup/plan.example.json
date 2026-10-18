@@ -1,6 +1,12 @@
 {
   "enabled": false,
-  "destination": null,
+  "destination": {
+    "provider": "proton-drive",
+    "remote_directory": "/my-files/Workstation-zer0",
+    "client": "official-cli",
+    "authentication": "browser-and-os-keychain",
+    "connected": false
+  },
   "encryption_required": true,
   "sources": [
     "dotfiles",
@@ -20,5 +26,6 @@
     "**/.cache"
   ],
   "schedule": null,
-  "note": "No backup or upload until a destination and encryption method are configured."
+  "note": "Provider selected. Awaiting browser login and explicit first backup launch; no archives or uploads created.",
+  "encryption": "Proton Drive client-side end-to-end encryption"
 }

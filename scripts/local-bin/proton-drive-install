@@ -1,0 +1,21 @@
+#!/usr/bin/python
+"""Install the pinned official Proton Drive CLI without account access or backup."""
+import hashlib,json,os,platform,tempfile,urllib.request
+from pathlib import Path
+h=Path.home();m=json.loads((h/'.config/workstation-backup/proton-cli.json').read_text())
+if platform.machine()!='x86_64':raise SystemExit('This pinned build is for Linux x86_64')
+p=h/'.local/lib/proton-drive'/m['version']/'proton-drive'
+def digest(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha512').hexdigest()
+if p.is_file() and digest(p)==m['sha512']:print('Official Proton Drive CLI already installed and verified.');raise SystemExit(0)
+if not m['url'].startswith('https://proton.me/download/drive/cli/'):raise SystemExit('Unexpected download origin')
+p.parent.mkdir(parents=True,exist_ok=True)
+fd,tmp=tempfile.mkstemp(prefix='.download-',dir=p.parent)
+try:
+ with os.fdopen(fd,'wb') as f,urllib.request.urlopen(m['url'],timeout=90) as response:
+  while chunk:=response.read(1024*1024):f.write(chunk)
+ if digest(Path(tmp))!=m['sha512']:raise SystemExit('SHA512 mismatch; downloaded file not executed')
+ os.chmod(tmp,0o755);os.replace(tmp,p)
+finally:
+ Path(tmp).unlink(missing_ok=True)
+print('Official Proton Drive CLI installed; no login, archive or upload performed.')

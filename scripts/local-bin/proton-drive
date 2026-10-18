@@ -1,0 +1,9 @@
+#!/usr/bin/python
+"""Run the verified official CLI with quiet logs; credentials stay in OS keychain."""
+import json,os,sys
+from pathlib import Path
+h=Path.home();m=json.loads((h/'.config/workstation-backup/proton-cli.json').read_text())
+p=h/'.local/lib/proton-drive'/m['version']/'proton-drive'
+if not p.is_file():raise SystemExit('Run ~/.local/bin/proton-drive-install first.')
+os.environ.setdefault('PROTON_DRIVE_LOG_LEVEL','WARNING')
+os.execv(str(p),[str(p),*sys.argv[1:]])
