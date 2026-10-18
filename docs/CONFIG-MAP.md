@@ -41,7 +41,7 @@
 | XSettings / Xresources | ~/.config/xsettingsd/xsettingsd.conf, ~/.Xresources | configs/xsettingsd/, configs/Xresources |
 | Qt | ~/.config/environment.d/60-black-tiffany.conf | configs/environment.d/; xcb + gtk3 platform theme |
 | Ассоциации файлов | ~/.config/mimeapps.list | configs/mimeapps.list; локальные desktop entries в ~/.local/share/applications |
-| KeePassXC | ~/.config/keepassxc/ | Приватные настройки/базы не публикуются; launcher ~/.local/bin/keepassxc, docs/KEEPASSXC.md |
+| KeePassXC | ~/.config/keepassxc/ | Штатный /usr/bin/keepassxc; приватные настройки/базы не публикуются, docs/KEEPASSXC.md |
 | Ghidra | ~/.config/ghidra/, ~/.local/share/ghidra/ | Тема themes/Ghidra/BlackTiffany.theme; проекты хранятся отдельно |
 | Obsidian | ~/Documents/obsidian/ | Пользовательский vault; настройки каждого vault в его .obsidian/ |
 | Zen | ~/.config/zen/ | Приватный профиль, не переносить в публичный Git |
@@ -82,3 +82,5 @@
 - Исходный аудит: Documents/Workstation/2026-10-18/system-audit/REPORT.md; фактически выполненные изменения — docs/WORKSTATION-2026-10-18.md.
 
 После правок конфигурации: git diff --check; для Awesome — awesome -k. git status должен показывать осмысленные пользовательские правки. Ничего автоматически не публикуется и не отправляется в Git remote.
+
+Защита очереди Wispr Flow: `~/.local/bin/wispr-a11y-guard` и `~/.config/systemd/user/wispr-a11y-guard.{service,timer}`; источники в scripts/local-bin и configs/systemd/user. Проверяет только счётчики AT-SPI; см. docs/KEEPASSXC.md.

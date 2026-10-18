@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# Launch from the user session manager; keep the normal session bus and confinement.
-set -euo pipefail
-args=(--user --collect --quiet --service-type=exec --expand-environment=no --slice=app.slice)
-for name in DISPLAY XAUTHORITY; do
-    if [[ -n ${!name:-} ]]; then args+=("--setenv=$name=${!name}"); fi
-done
-exec systemd-run "${args[@]}" /usr/bin/keepassxc "$@"

@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Recover a stalled Wispr helper before its AT-SPI queue blocks other apps.
+
+Only broker accounting is read. No accessibility text or clipboard is queried.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import time
+
+LIMIT = 32 * 1024 * 1024
+HELPERS = {
+    "/opt/wispr-flow-appimage/usr/lib/wispr-flow/resources/Release/wispr-flow-linux-helper",
+    "/usr/lib/wispr-flow/resources/Release/wispr-flow-linux-helper",
+}
+
+
+def helper_identity(pid):
+    """Verify ownership, packaged executable and the parent; reject reused PIDs."""
+    proc = Path('/proc') / str(pid)
+    try:
+        if proc.stat().st_uid != os.getuid() or str((proc / 'exe').resolve()) not in HELPERS:
+            return None
+        fields = (proc / 'stat').read_text().rsplit(')', 1)[1].split()
+        parent = Path('/proc') / fields[1]
+        if parent.stat().st_uid != os.getuid() or (parent / 'comm').read_text().strip() != 'wispr-flow':
+            return None
+        return fields[19]  # starttime, field 22 in /proc/PID/stat
+    except (OSError, IndexError):
+        return None
+
+
+def queued_helpers(stats):
+    peers = stats['data'][0]['org.bus1.DBus.Debug.Stats.PeerAccounting']['data']
+    result = {}
+    for _name, properties, counters in peers:
+        if properties['UnixUserID']['data'] != os.getuid():
+            continue
+        queued = counters['OutgoingBytes']
+        if queued < LIMIT:
+            continue
+        pid = properties['ProcessID']['data']
+        identity = helper_identity(pid)
+        if identity is not None:
+            result[str(pid)] = {'start': identity, 'bytes': queued}
+    return result
+
+
+def recover(pid, identity):
+    # pidfd pins the process identity; a recycled numeric PID cannot be killed.
+    try:
+        fd = os.pidfd_open(pid)
+    except ProcessLookupError:
+        return False
+    try:
+        if helper_identity(pid) != identity:
+            return False
+        signal.pidfd_send_signal(fd, signal.SIGTERM)
+        return True
+    finally:
+        os.close(fd)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--run', action='store_true', help='recover after two consecutive large-queue observations')
+    args = parser.parse_args()
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    # Do not start an accessibility bus just for monitoring.
+    if not (runtime / 'at-spi/bus_0').exists():
+        return
+    address = 'unix:path=' + str(runtime / 'at-spi/bus_0')
+    response = subprocess.run([
+        'busctl', '--address=' + address, '--json=short', 'call',
+        'org.freedesktop.DBus', '/org/freedesktop/DBus',
+        'org.freedesktop.DBus.Debug.Stats', 'GetStats',
+    ], capture_output=True, text=True, timeout=5, check=True)
+    candidates = queued_helpers(json.loads(response.stdout))
+    if not args.run:
+        print(json.dumps({'threshold_bytes': LIMIT, 'stalled_helpers': candidates}))
+        return
+    state = runtime / 'wispr-a11y-guard.json'
+    try:
+        previous = json.loads(state.read_text())
+    except (OSError, ValueError):
+        previous = {}
+    now = time.monotonic()
+    for pid, info in candidates.items():
+        old = previous.get(pid, {})
+        # Require a second observation 5–35 seconds later for the same process.
+        if old.get('start') == info['start'] and 5 <= now - old.get('time', 0) <= 35:
+            if recover(int(pid), info['start']):
+                print(f'Recovered Wispr helper PID {pid}: stalled AT-SPI queue {info["bytes"]} bytes', flush=True)
+                subprocess.run([
+                    'notify-send', '--app-name=Wispr Flow', 'Wispr Flow',
+                    'Помощник перезапущен: переполнилась очередь доступности. Если шла диктовка, повтори её.',
+                ], timeout=3, check=False)
+        info['time'] = now
+    if candidates:
+        # Runtime directory is private and removed at logout.
+        temp = state.with_suffix('.tmp')
+        temp.write_text(json.dumps(candidates))
+        temp.chmod(0o600)
+        temp.replace(state)
+    else:
+        state.unlink(missing_ok=True)
+
+
+if __name__ == '__main__':
+    main()

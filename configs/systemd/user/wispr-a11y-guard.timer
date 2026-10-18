@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Wispr Flow accessibility queue
+
+[Timer]
+OnStartupSec=30
+OnUnitInactiveSec=10
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target

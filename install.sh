@@ -245,7 +245,6 @@ fi
 if [ "$DO_CONFIGS" = "1" ]; then
     step "СИМЛИНКИ КОНФИГОВ"
     link "configs/applications/tiffany-image.desktop" "$HOME/.local/share/applications/tiffany-image.desktop"
-    link "configs/applications/org.keepassxc.KeePassXC.desktop" "$HOME/.local/share/applications/org.keepassxc.KeePassXC.desktop"
     link "configs/applications/com.ayugram.desktop.desktop" "$HOME/.local/share/applications/com.ayugram.desktop.desktop"
     link "configs/xdg-desktop-portal/portals.conf" "$HOME/.config/xdg-desktop-portal/portals.conf"
 
@@ -259,6 +258,14 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/gammastep" "$HOME/.config/gammastep"
     link "configs/systemd/user/clean-screenshots.timer" "$HOME/.config/systemd/user/clean-screenshots.timer"
     link "configs/systemd/user/throne.service" "$HOME/.config/systemd/user/throne.service"
+    link "configs/systemd/user/wispr-a11y-guard.service" "$HOME/.config/systemd/user/wispr-a11y-guard.service"
+    link "configs/systemd/user/wispr-a11y-guard.timer" "$HOME/.config/systemd/user/wispr-a11y-guard.timer"
+    # Retire only our former KeePass workaround; preserve unrelated user files.
+    for old in "$HOME/.local/bin/keepassxc" "$HOME/.local/share/applications/org.keepassxc.KeePassXC.desktop"; do
+        case "$(readlink "$old" 2>/dev/null || true)" in
+            "$DOTFILES_DIR/scripts/local-bin/keepassxc"|"$DOTFILES_DIR/configs/applications/org.keepassxc.KeePassXC.desktop") rm "$old" ;;
+        esac
+    done
     link "configs/autostart/throne.desktop" "$HOME/.config/autostart/throne.desktop"
     link "configs/tiffany" "$HOME/.config/tiffany"
     mkdir -p "$HOME/.config/workstation-backup"
@@ -329,7 +336,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(workstation-backup keepassxc proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(workstation-backup wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"
@@ -365,6 +372,7 @@ if [ "$DO_SERVICES" = "1" ]; then
     sudo usermod -aG wheel,audio,video,storage,optical,libvirt,kvm "$USER"
     systemctl --user daemon-reload
     systemctl --user enable clean-screenshots.timer
+    systemctl --user enable --now wispr-a11y-guard.timer
     ok "Системные настройки восстановлены; сеть и графический сеанс не перезапускались"
 fi
 
