@@ -2,13 +2,18 @@
 choice="$(printf '  reboot\n  poweroff\n  suspend\n  lock\n  logout' \
   | fzf --no-sort \
     --cycle --gutter ' ' --pointer '▌' \
-    --color 'bg:#1F2937,bg+:#1F2937,fg:#F8F8F2,hl:#FF5555,pointer:#FF5555' \
+    --color 'bg:#183039,bg+:#183039,fg:#C5D6D8,hl:#DE7C86,pointer:#DE7C86' \
     --prompt '  ')"
 
 case "$choice" in
   *reboot)   systemctl reboot ;;
   *poweroff) systemctl poweroff ;;
-  *suspend)  systemctl suspend ;;
+  *suspend)  systemctl suspend || notify-send "Сон не выполнен" "Проверь настройки: ~/.local/bin/check-sleep-callback" ;;
   *lock)     betterlockscreen -l dimblur;;
-  *logout)   bspc quit ;;
+  *logout)
+    if [[ "${PANEL_WM:-${XDG_CURRENT_DESKTOP:-bspwm}}" == *awesome* ]]; then
+      awesome-client "awesome.quit()"
+    else
+      bspc quit
+    fi ;;
 esac

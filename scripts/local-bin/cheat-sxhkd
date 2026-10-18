@@ -2,17 +2,17 @@
 # ~/.local/bin/cheat-sxhkd
 # Cheat sheet: все биндинги sxhkd — красивый вывод в терминале
 
-# Dracula цвета через ANSI
+# Black Tiffany цвета через ANSI
 R='\033[0m'
-PUR='\033[38;2;189;147;249m'   # #BD93F9
-PNK='\033[38;2;255;121;198m'   # #FF79C6
-CYN='\033[38;2;139;233;253m'   # #8BE9FD
-GRN='\033[38;2;80;250;123m'    # #50FA7B
-YLW='\033[38;2;241;250;140m'   # #F1FA8C
-RED='\033[38;2;255;85;85m'     # #FF5555
-ORG='\033[38;2;255;184;108m'   # #FFB86C
-DIM='\033[38;2;98;114;164m'    # #6272A4
-FG='\033[38;2;248;248;242m'    # #F8F8F2
+PUR='\033[38;2;10;186;181m'   # #0ABAB5
+PNK='\033[38;2;77;221;213m'   # #4DDDD5
+CYN='\033[38;2;77;221;213m'   # #4DDDD5
+GRN='\033[38;2;141;201;155m'    # #8DC99B
+YLW='\033[38;2;216;183;123m'   # #D8B77B
+RED='\033[38;2;222;124;134m'     # #DE7C86
+ORG='\033[38;2;216;183;123m'   # #D8B77B
+DIM='\033[38;2;126;153;159m'    # #7E999F
+FG='\033[38;2;197;214;216m'    # #C5D6D8
 BOLD='\033[1m'
 BG_HDR='\033[48;2;22;27;34m'   # #161B22
 
@@ -45,7 +45,7 @@ printf "${BG_HDR}${PUR}${BOLD}"
 printf "%-${W}s" "    ██████╗██╗  ██╗███████╗ █████╗ ████████╗    ███████╗██╗  ██╗██╗  ██╗██╗  ██╗██████╗"
 printf "${R}\n"
 printf "${BG_HDR}${PNK}${BOLD}"
-printf "%-${W}s" "    BSPWM · sxhkd  keybindings  ·  zer0@p50  ·  Dracula"
+printf "%-${W}s" "    BSPWM · sxhkd  keybindings  ·  zer0@p50  ·  Black Tiffany"
 printf "${R}\n"
 printf "${BG_HDR}${DIM}"
 printf "%-${W}s" "    q — выйти   /   f — fish cheat sheet"
@@ -73,7 +73,7 @@ row "PulseAudio (pavucontrol)"     "super + shift + p"  "$PNK"
 row "Telegram (AyuGram)"           "super + shift + t"  "$PNK"
 row "Калькулятор"                  "super + shift + c"  "$PNK"
 row "virt-manager"                 "super + shift + v"  "$PNK"
-row "Пипетка цвета (xcolor)"       "super + shift + x"  "$PNK"
+row "Пипетка цвета (Gpick)"       "super + shift + x"  "$PNK"
 row "Календарь (calcurse)"         "super + shift + k"  "$PNK"
 row "Блокировка экрана"            "super + shift + l"  "$PNK"
 row "Emoji picker (rofi)"          "super + shift + e"  "$PNK"

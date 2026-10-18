@@ -1,0 +1,15 @@
+audacity
+calf
+homebank
+kdenlive
+lutris
+ncdu
+screenkey
+signal-desktop
+simplex-desktop
+teams-for-linux-bin
+neohtop
+dracula-gtk-theme
+dracula-icons-git
+torbrowser-launcher
+librewolf-bin

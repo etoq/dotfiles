@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+"""Apply published NVIDIA 470 Linux 7.2 fixes atomically after testing a copy."""
+from pathlib import Path
+import tempfile,shutil,subprocess,os
+root=Path('/usr/src/nvidia-470.256.02')
+patches=Path('/usr/local/share/workstation-repair/nvidia470')
+if not root.is_dir():raise SystemExit(0)
+if 'struct drm_atomic_commit *state' in (root/'nvidia-drm/nvidia-drm-modeset.h').read_text() and 'Open-coded strncpy().' in (root/'nvidia-modeset/nvidia-modeset-linux.c').read_text():
+    print('NVIDIA compatibility fixes already present');raise SystemExit(0)
+files=['conftest.sh','nvidia-drm/nvidia-drm-crtc.c','nvidia-drm/nvidia-drm-modeset.c','nvidia-drm/nvidia-drm-modeset.h','nvidia-drm/nvidia-drm.Kbuild','nvidia-drm/nvidia-drm-priv.h','nvidia-modeset/nvidia-modeset-linux.c','nvidia-uvm/uvm_pmm_gpu.c','nvidia/linux_nvswitch.c','nvidia/os-interface.c']
+with tempfile.TemporaryDirectory(prefix='nvidia470-compat-') as td:
+    scratch=Path(td)
+    for rel in files:
+        p=scratch/rel;p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/rel,p)
+    for patch in sorted(patches.glob('part*.patch')):
+        subprocess.run(['patch','--batch','--forward','-p1','-i',str(patch)],cwd=scratch,check=True)
+    for rel in files:
+        dest=root/rel;temp=dest.with_name(dest.name+'.repair-new')
+        shutil.copy2(scratch/rel,temp);os.replace(temp,dest)
+print('NVIDIA 470 Linux 7.2 compatibility applied')

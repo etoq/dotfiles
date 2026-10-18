@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║  zer0 dotfiles installer · Arch Linux · BSPWM · Dracula          ║
+# ║  zer0 dotfiles installer · Arch Linux · BSPWM · Black Tiffany          ║
 # ║  ThinkPad P50 · nvidia-470xx                                     ║
 # ╚══════════════════════════════════════════════════════════════════╝
 # Usage:
@@ -11,10 +11,10 @@ set -e
 
 # ── Цвета ──────────────────────────────────────────────────────────
 R='\033[0m'; BOLD='\033[1m'
-PUR='\033[38;2;189;147;249m'; PNK='\033[38;2;255;121;198m'
-CYN='\033[38;2;139;233;253m'; GRN='\033[38;2;80;250;123m'
+PUR='\033[38;2;10;186;181m'; PNK='\033[38;2;77;221;213m'
+CYN='\033[38;2;77;221;213m'; GRN='\033[38;2;80;250;123m'
 YLW='\033[38;2;241;250;140m'; RED='\033[38;2;255;85;85m'
-DIM='\033[38;2;98;114;164m'
+DIM='\033[38;2;126;153;159m'
 
 ok()   { echo -e "${GRN}[✓]${R} $1"; }
 warn() { echo -e "${YLW}[!]${R} $1"; }
@@ -38,7 +38,7 @@ cat << 'BANNER'
  ╚═════╝  ╚═════╝    ╚═╝   ╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝
 BANNER
 echo -e "${R}"
-echo -e "${DIM}  zer0@p50 · Arch Linux · BSPWM · Dracula${R}"
+echo -e "${DIM}  zer0@p50 · Arch Linux · BSPWM · Black Tiffany${R}"
 echo -e "${DIM}  ────────────────────────────────────────────${R}\n"
 
 # ── Проверки ───────────────────────────────────────────────────────
@@ -100,8 +100,10 @@ link() {
 
     if [ -e "$dst" ] && [ ! -L "$dst" ]; then
         mkdir -p "$BACKUP_DIR"
-        mv "$dst" "$BACKUP_DIR/"
-        warn "Бэкап: $dst → $BACKUP_DIR/"
+        local backup_path="$BACKUP_DIR/${dst#"$HOME"/}"
+        mkdir -p "$(dirname "$backup_path")"
+        mv "$dst" "$backup_path"
+        warn "Бэкап: $dst → $backup_path"
     fi
 
     if [ -L "$dst" ]; then
@@ -121,19 +123,11 @@ link() {
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_PKGS" = "1" ]; then
     step "ПОДГОТОВКА РЕПОЗИТОРИЕВ"
-    
-    # 1. Добавление BlackArch (Критично сделать ДО установки пакетов)
-    if ! grep -q "blackarch" /etc/pacman.conf; then
-        info "Подключаю репозиторий BlackArch..."
-        curl -O https://blackarch.org/strap.sh
-        chmod +x strap.sh
-        sudo ./strap.sh
-        rm strap.sh
-        sudo pacman -Sy --noconfirm
-        ok "BlackArch добавлен"
-    else
-        ok "BlackArch уже подключен"
-    fi
+
+    # RE/malware workstation: use official Arch + reviewed AUR packages.
+    # Existing third-party repositories are preserved; none is added automatically.
+    info "Профиль: reverse engineering / malware analysis"
+    sudo pacman -Syu --noconfirm
 
     step "УСТАНОВКА YAY (AUR helper)"
     if ! command -v yay &>/dev/null; then
@@ -153,30 +147,30 @@ if [ "$DO_PKGS" = "1" ]; then
         base base-devel git curl wget sudo nano vim
         man-db man-pages linux linux-headers linux-lts linux-lts-headers
         linux-firmware intel-ucode grub efibootmgr grub-btrfs
-        btrfs-progs cryptsetup snap-pac snapper
+        btrfs-progs smartmontools cryptsetup snap-pac snapper
         xorg-server xorg-xinit xorg-xrandr xorg-xsetroot xdotool
         xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs
-        bspwm sxhkd picom polybar feh flameshot dunst libnotify playerctl
+        bspwm awesome lua53-dkjson xorg-server-xephyr sxhkd picom polybar gjs gtk3 feh flameshot dunst libnotify playerctl
         kitty fish zoxide fzf bat lsd fd duf
         ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-fira-code ttf-iosevka-nerd ttf-dejavu
         noto-fonts noto-fonts-cjk noto-fonts-emoji terminus-font
         nvidia-prime vulkan-intel lib32-vulkan-intel mesa-utils
-        pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer
-        networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils blueman bolt
+        pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer easyeffects python-gobject
+        networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils bolt
         dnsmasq openresolv
         htop btop s-tui fastfetch cpufetch tlp tlp-rdw brightnessctl
         apparmor chrony nftables reflector xss-lock
         qemu-full libvirt virt-manager virt-viewer swtpm
-        nmap masscan rustscan wireshark-qt tcpdump metasploit sqlmap hydra john hashcat
-        nikto feroxbuster ffuf nuclei subfinder amass netexec impacket evil-winrm
-        aircrack-ng radare2 ghidra gdb pwndbg binwalk foremost volatility3 autopsy
-        exploitdb bloodhound proxychains-ng python-pwntools python-scapy
+        wireshark-qt tcpdump python-scapy
+        radare2 gdb pwndbg binwalk foremost volatility3
+        yara python-yara python-pefile python-capstone python-unicorn python-pycryptodome
+        strace ltrace elfutils file binutils ripgrep hexyl python-pwntools
         neovim python-pip python-pipx python-pynvim git lazygit tmux shellcheck jq clang gdb luarocks
-        keepassxc obsidian rofi chromium torbrowser-launcher
-        qbittorrent mpv kdenlive libreoffice-fresh evince zathura zathura-pdf-mupdf
-        signal-desktop calcurse veracrypt mat2 bleachbit
+        keepassxc obsidian rofi libqalculate tesseract vim
+        qbittorrent mpv libreoffice-fresh zathura zathura-pdf-mupdf
+        calcurse veracrypt mat2 bleachbit
         yazi ffmpegthumbnailer poppler unzip zip wimlib 7zip imagemagick gparted gnome-disk-utility
-        xclip xsel xcolor gpick chafa screenkey scrot yt-dlp tldr tree perl-image-exiftool
+        xclip xsel gpick chafa yt-dlp tldr tree perl-image-exiftool
         pacman-contrib kernel-modules-hook zram-generator
     )
 
@@ -184,16 +178,22 @@ if [ "$DO_PKGS" = "1" ]; then
         sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}" || { err "ОШИБКА: Пакеты не найдены! Установка прервана."; exit 1; }
     ok "Pacman пакеты установлены"
 
+    # Keep the existing working Ghidra development build on this machine.
+    if [[ ! -x "$HOME/ghidra/build/dist/ghidra_12.2_DEV/ghidraRun" ]] && ! command -v ghidra >/dev/null; then
+        sudo pacman -S --needed --noconfirm ghidra
+    fi
+
     step "ПАКЕТЫ AUR"
     AUR_PKGS=(
         nvidia-470xx-dkms nvidia-470xx-utils nvidia-470xx-settings
         lib32-nvidia-470xx-utils lib32-opencl-nvidia-470xx opencl-nvidia-470xx
         acpilight thinkfan
-        happ-desktop-bin bluetuith impala neohtop rmtrash ptpython hyx snapper-rollback btrfs-assistant
-        dracula-gtk-theme dracula-icons-git ttf-material-symbols-variable-git ttf-symbola
+        bluetuith impala rmtrash ptpython hyx snapper-rollback btrfs-assistant
+        papirus-icon-theme ttf-material-symbols-variable-git ttf-symbola
         i3lock-color rofi-greenclip apparmor.d-git
-        ayugram-desktop-bin librewolf-bin otter-launcher lazydocker-bin termdown light 
+        ayugram-desktop-bin otter-launcher lazydocker-bin termdown light
         woff2-font-awesome betterlockscreen
+        cutter-bin detect-it-easy-bin capa-bin
     )
 
     info "Устанавливаю AUR пакеты..."
@@ -205,8 +205,23 @@ if [ "$DO_PKGS" = "1" ]; then
         fi
     done
 
+    # Optional CTF toolkit; never add a third-party repository automatically.
+    if ask "Добавить инструменты CTF (сканеры, Burp, Metasploit и другие)?"; then
+        CTF_AVAILABLE=()
+        while IFS= read -r pkg; do
+            if pacman -Si "$pkg" >/dev/null 2>&1; then
+                CTF_AVAILABLE+=("$pkg")
+            else
+                warn "CTF: $pkg отсутствует в подключённых репозиториях; пропускаю"
+            fi
+        done < "$DOTFILES_DIR/docs/packages-ctf.txt"
+        if (( ${#CTF_AVAILABLE[@]} )); then
+            sudo pacman -S --needed --noconfirm "${CTF_AVAILABLE[@]}"
+        fi
+    fi
+
     step "УСТАНОВКА ДОПОЛНИТЕЛЬНЫХ УТИЛИТ"
-    
+
     # Установка Rednotes
     if ! command -v rednotes &>/dev/null; then
         info "Устанавливаю rednotes..."
@@ -229,6 +244,35 @@ fi
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_CONFIGS" = "1" ]; then
     step "СИМЛИНКИ КОНФИГОВ"
+    link "configs/applications/tiffany-image.desktop" "$HOME/.local/share/applications/tiffany-image.desktop"
+    link "configs/applications/com.ayugram.desktop.desktop" "$HOME/.local/share/applications/com.ayugram.desktop.desktop"
+    link "configs/xdg-desktop-portal/portals.conf" "$HOME/.config/xdg-desktop-portal/portals.conf"
+
+    link "configs/bspwm/dual_monitors.sh" "$HOME/.config/bspwm/dual_monitors.sh"
+    link "configs/bspwm/picom_configurations" "$HOME/.config/bspwm/picom_configurations"
+    link "configs/panel-lab" "$HOME/.config/panel-lab"
+    link "configs/awesome" "$HOME/.config/awesome"
+    link "configs/kitty/otter.conf" "$HOME/.config/kitty/otter.conf"
+    link "configs/otter-launcher/commands.json" "$HOME/.config/otter-launcher/commands.json"
+    link "configs/otter-launcher/image.png" "$HOME/.config/otter-launcher/image.png"
+    link "configs/gammastep" "$HOME/.config/gammastep"
+    link "configs/systemd/user/clean-screenshots.timer" "$HOME/.config/systemd/user/clean-screenshots.timer"
+    link "configs/systemd/user/throne.service" "$HOME/.config/systemd/user/throne.service"
+    link "configs/autostart/throne.desktop" "$HOME/.config/autostart/throne.desktop"
+    link "configs/tiffany" "$HOME/.config/tiffany"
+    link "configs/environment.d/60-black-tiffany.conf" "$HOME/.config/environment.d/60-black-tiffany.conf"
+    link "configs/autostart/easyeffects.desktop" "$HOME/.config/autostart/easyeffects.desktop"
+    link "configs/autostart/wispr-flow.desktop" "$HOME/.config/autostart/wispr-flow.desktop"
+    link "themes/Ghidra/BlackTiffany.theme" "$HOME/.local/share/ghidra/BlackTiffany.theme"
+
+    mkdir -p "$HOME/.themes"
+    cp -a "$DOTFILES_DIR/themes/Black-Tiffany" "$HOME/.themes/"
+    link "configs/systemd/user/clean-screenshots.service" "$HOME/.config/systemd/user/clean-screenshots.service"
+    link "configs/xsettingsd" "$HOME/.config/xsettingsd"
+    link "configs/fish/tiffany.fish" "$HOME/.config/fish/tiffany.fish"
+    link "configs/btop/themes" "$HOME/.config/btop/themes"
+    link "configs/gtk-3.0/gtk.css" "$HOME/.config/gtk-3.0/gtk.css"
+    link "configs/lsd" "$HOME/.config/lsd"
 
     link "configs/bspwm/bspwmrc"          "$HOME/.config/bspwm/bspwmrc"
     link "configs/bspwm/autostart.sh"     "$HOME/.config/bspwm/autostart.sh"
@@ -237,9 +281,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
 
     link "configs/sxhkd/sxhkdrc"          "$HOME/.config/sxhkd/sxhkdrc"
     link "configs/polybar/config.ini"     "$HOME/.config/polybar/config.ini"
-    link "configs/polybar/modules.ini"    "$HOME/.config/polybar/modules.ini"
     link "configs/polybar/launch.sh"      "$HOME/.config/polybar/launch.sh"
-    link "configs/polybar/colors.ini"     "$HOME/.config/polybar/colors.ini"
     chmod +x "$HOME/.config/polybar/launch.sh" 2>/dev/null
 
     link "configs/kitty/kitty.conf"       "$HOME/.config/kitty/kitty.conf"
@@ -249,11 +291,11 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/yazi/theme.toml"        "$HOME/.config/yazi/theme.toml"
     link "configs/otter-launcher/config.toml" "$HOME/.config/otter-launcher/config.toml"
     link "configs/rofi/config.rasi"       "$HOME/.config/rofi/config.rasi"
-    link "configs/rofi/dracula.rasi"      "$HOME/.config/rofi/dracula.rasi"
+    link "configs/rofi/tiffany.rasi"      "$HOME/.config/rofi/tiffany.rasi"
     link "configs/picom/picom.conf"       "$HOME/.config/picom/picom.conf"
     link "configs/dunst/dunstrc"          "$HOME/.config/dunst/dunstrc"
     link "configs/fish/config.fish"       "$HOME/.config/fish/config.fish"
-    link "configs/colors/dracula.sh"      "$HOME/.config/colors/dracula.sh"
+    link "configs/colors/tiffany.sh"      "$HOME/.config/colors/tiffany.sh"
     link "configs/gtk-3.0/settings.ini"   "$HOME/.config/gtk-3.0/settings.ini"
     link "configs/zathura/zathurarc"      "$HOME/.config/zathura/zathurarc"
     link "configs/btop/btop.conf"         "$HOME/.config/btop/btop.conf"
@@ -265,7 +307,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/flameshot"              "$HOME/.config/flameshot"
     link "configs/calcurse"               "$HOME/.config/calcurse"
     link "Images"                         "$HOME/Images"
-    link "configs/.gtkrc-2.0"             "$HOME/.gtkrc-2.0"
+    link "configs/gtkrc-2.0"             "$HOME/.gtkrc-2.0"
     # Snapper
     if [ -d "$DOTFILES_DIR/configs/snapper" ]; then
         sudo cp "$DOTFILES_DIR/configs/snapper/root" /etc/snapper/configs/root
@@ -283,7 +325,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(syshealth clean-meta lock battery-status power-menu vm-menu layout-switch brightness weather wifi-menu weekly-clean cheat-sxhkd cheat-fish cheat-yazi cheat-nvim cheat-aliases otter-exec otter-run greet-wrapper)
+    LOCAL_SCRIPTS=(check-win-analysis workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"
@@ -291,136 +333,35 @@ if [ "$DO_SCRIPTS" = "1" ]; then
         fi
     done
 
-    BIN_SCRIPTS=(battery-alert random_wallpaper powermenu brightness volume weather weather2 screen-lock change_language.sh wifimenu toggle-polybar timer xcolor-pick)
+    BIN_SCRIPTS=(calculator temps.sh battery-alert random_wallpaper powermenu brightness volume weather weather2 screen-lock change_language.sh wifimenu toggle-polybar timer xcolor-pick)
     for s in "${BIN_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/bin/$s" ]; then
             link "scripts/bin/$s" "$HOME/bin/$s"
             chmod +x "$HOME/bin/$s"
         fi
     done
+    "$HOME/.local/bin/otter-install-assets" || warn "Ресурсы Otter: повтори otter-install-assets при доступном интернете"
     ok "Скрипты установлены"
 
-    # Starship
-    if ! command -v starship &>/dev/null; then
-        info "Устанавливаю Starship..."
-        curl -sS https://starship.rs/install.sh | sh -s -- --yes
-        ok "Starship установлен"
-    else
-        ok "Starship уже установлен"
-    fi
+
 fi
 
 # ══════════════════════════════════════════════════════════════════
 # СЕРВИСЫ И СИСТЕМНЫЕ НАСТРОЙКИ
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_SERVICES" = "1" ]; then
-    step "СИСТЕМНЫЕ НАСТРОЙКИ И БЕЗОПАСНОСТЬ"
-    
-    # 1. Настройка пользователя (Группы)
-    info "Добавляю $USER в нужные группы..."
+    step "ПРОВЕРЕННЫЕ СИСТЕМНЫЕ НАСТРОЙКИ"
+    # This payload is machine-specific. It preserves the tested callback sleep,
+    # modular libvirt and EFI hooks and does not replace DNS configuration.
+    sudo bash "$DOTFILES_DIR/restore-system.sh" --apply
+
     for g in wheel audio video storage optical libvirt kvm; do
-        sudo groupadd -f "$g" 2>/dev/null || true
+        sudo groupadd -f "$g"
     done
     sudo usermod -aG wheel,audio,video,storage,optical,libvirt,kvm "$USER"
-    ok "Права пользователя обновлены"
-
-    # 2. Настройка сети для Виртуалок (NAT)
-    info "Настройка сети KVM/libvirt..."
-    sudo virsh net-autostart default 2>/dev/null || true
-    sudo virsh net-start default 2>/dev/null || true
-    ok "Сеть default (NAT) для VM включена"
-
-    # 3. Изолированный DNS (DoT)
-    info "Настройка защищенного DNS (systemd-resolved)..."
-    sudo systemctl enable --now systemd-resolved 2>/dev/null
-    sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-    ok "DNS-over-TLS включен"
-
-    # 4. Инициализация Snapper (если еще не создан)
-    if [ ! -d "/.snapshots" ]; then
-        info "Инициализация Snapper..."
-        sudo snapper -c root create-config / 2>/dev/null || true
-        sudo chmod 750 /.snapshots
-        ok "Snapper структура создана"
-    fi
-
-    # 1. Жестко блокируем службы сна NVIDIA (чтобы обновления их не воскресили)
-    sudo systemctl mask nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service
-
-    # 2. Настраиваем реакцию на закрытие крышки (Блокировка вместо сна)
-    # Создаем drop-in директорию (это чище, чем править сам logind.conf)
-    sudo mkdir -p /etc/systemd/logind.conf.d/
-    echo "[Login]
-    HandleLidSwitch=lock
-    HandleLidSwitchExternalPower=lock
-    HandleLidSwitchDocked=ignore" | sudo tee /etc/systemd/logind.conf.d/99-lid-lock.conf > /dev/null
-    
-    # 6. Создание Pacman хука для копирования ядра в EFI
-    info "Создание Pacman hooks (Kernel to EFI)..."
-    sudo mkdir -p /etc/pacman.d/hooks/
-    sudo mkdir -p /boot/efi/EFI/ARCH/
-    
-    sudo tee /etc/pacman.d/hooks/99-copy-kernel-to-efi.hook > /dev/null << 'EOF'
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Package
-Target = linux
-Target = linux-lts
-
-[Action]
-Description = Copying kernel to EFI...
-When = PostTransaction
-Exec = /bin/sh -c 'cp /boot/vmlinuz-linux* /boot/efi/EFI/ARCH/ 2>/dev/null; cp /boot/initramfs-linux* /boot/efi/EFI/ARCH/ 2>/dev/null; echo "Kernel copied to EFI"'
-EOF
-    ok "Pacman hook для EFI успешно создан"
-
-    # 5. Копирование системных конфигов в /etc/
-    info "Копирование системных конфигураций (grub, nftables, mkinitcpio)..."
-    if [ -d "$DOTFILES_DIR/configs/etc" ]; then
-        sudo cp "$DOTFILES_DIR/configs/etc/nftables.conf" /etc/nftables.conf 2>/dev/null || true
-        sudo cp "$DOTFILES_DIR/configs/etc/mkinitcpio.conf" /etc/mkinitcpio.conf 2>/dev/null || true
-        if [ -f "$DOTFILES_DIR/configs/etc/default/grub" ]; then
-            sudo cp "$DOTFILES_DIR/configs/etc/default/grub" /etc/default/grub 2>/dev/null || true
-        fi
-        
-        # Права root для системных конфигов
-        sudo chown root:root /etc/nftables.conf /etc/mkinitcpio.conf /etc/default/grub 2>/dev/null || true
-        sudo chmod 644 /etc/nftables.conf /etc/mkinitcpio.conf /etc/default/grub 2>/dev/null || true
-        
-        ok "Системные конфиги применены и защищены"
-    else
-        warn "Папка configs/etc не найдена в репозитории (пропущено)"
-    fi
-
-    step "SYSTEMD СЕРВИСЫ"
-    SYSTEM_SERVICES=(
-        NetworkManager bluetooth apparmor auditd chronyd nftables libvirtd
-        virtnetworkd thinkfan tlp grub-btrfsd 
-    )
-
-    for svc in "${SYSTEM_SERVICES[@]}"; do
-        if systemctl list-unit-files "$svc.service" &>/dev/null; then
-            sudo systemctl enable "$svc" 2>/dev/null && ok "$svc" || warn "$svc — пропущен"
-        fi
-    done
-
-    USER_SERVICES=(wireplumber pipewire pipewire-pulse)
-    for svc in "${USER_SERVICES[@]}"; do
-        systemctl --user enable "$svc" 2>/dev/null && ok "$svc (user)" || warn "$svc — пропущен"
-    done
-
-    # GRUB
-    if ask "Обновить GRUB конфиг?"; then
-        sudo grub-mkconfig -o /boot/grub/grub.cfg
-        ok "GRUB обновлён"
-    fi
-
-    # mkinitcpio
-    if ask "Пересобрать initramfs?"; then
-        sudo mkinitcpio -P
-        ok "initramfs пересобран"
-    fi
+    systemctl --user daemon-reload
+    systemctl --user enable clean-screenshots.timer
+    ok "Системные настройки восстановлены; сеть и графический сеанс не перезапускались"
 fi
 
 # ══════════════════════════════════════════════════════════════════
@@ -428,11 +369,11 @@ fi
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_CONFIGS" = "1" ]; then
     step "GTK ТЕМА"
-    gsettings set org.gnome.desktop.interface gtk-theme "Dracula" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface gtk-theme "Black-Tiffany" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface font-name "JetBrainsMono Nerd Font 11" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
-    ok "GTK: Dracula + Papirus-Dark"
+    ok "GTK: Black Tiffany + Papirus-Dark"
 
     [ -f "$HOME/.Xresources" ] && xrdb -merge "$HOME/.Xresources" 2>/dev/null && ok "Xresources загружены"
     fc-cache -fv &>/dev/null && ok "Шрифты обновлены"

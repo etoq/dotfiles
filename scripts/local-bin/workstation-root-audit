@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Read-only privileged health checks; report is readable by the invoking user."""
+import json,os,pwd,subprocess as sp,time
+from pathlib import Path
+if os.geteuid()!=0:raise SystemExit('Run with sudo; never send a password to chat.')
+uid=int(os.environ.get('SUDO_UID','1000'));user=pwd.getpwuid(uid);out=Path('/run')/f'workstation-audit-{uid}'
+if out.is_symlink() or (out.exists() and out.stat().st_uid!=0):raise SystemExit('Unsafe report directory')
+out.mkdir(mode=0o750,exist_ok=True);os.chown(out,0,user.pw_gid);out.chmod(0o750)
+def run(args):
+ try:
+  r=sp.run(args,capture_output=True,text=True,timeout=90);return {'status':r.returncode,'output':r.stdout.strip(),'error':r.stderr.strip()[:600]}
+ except (OSError,sp.TimeoutExpired) as e:return {'status':-1,'error':str(e)}
+r={'timestamp':time.strftime('%Y-%m-%dT%H:%M:%S%z')}
+s=run(['smartctl','-a','-j','/dev/nvme0n1'])
+try:
+ data=json.loads(s.get('output',''));r['nvme']={k:data.get(k) for k in ['smart_status','temperature','power_on_time','power_cycle_count','nvme_smart_health_information_log']};r['nvme']['command_status']=s['status']
+except ValueError:r['nvme']=s
+r['btrfs_devices']=run(['btrfs','device','stats','/']);r['btrfs_scrub']=run(['btrfs','scrub','status','/'])
+r['cryptroot']=run(['cryptsetup','status','cryptroot']);r['cryptvms']=run(['cryptsetup','status','cryptvms'])
+r['discard']=run(['lsblk','-D','-J','-o','NAME,DISC-GRAN,DISC-MAX'])
+r['firewall']=run(['nft','-j','list','ruleset'])
+r['listeners']=run(['ss','-H','-lntup'])
+r['snapshots']=run(['snapper','-c','root','list','--columns','number,type,pre-number,date'])
+p=Path('/etc/snapper/configs/root');r['snapper_limits']=[l for l in p.read_text().splitlines() if l.startswith(('TIMELINE_','NUMBER_','SPACE_','FREE_'))] if p.exists() else []
+r['kernels']=run(['/home/eto/.local/bin/verify-kernel-stack'])
+tmp=out/'report.tmp';tmp.write_text(json.dumps(r,indent=2)+'\n');os.chown(tmp,0,user.pw_gid);tmp.chmod(0o640);tmp.replace(out/'report.json')
+print('Audit complete. Report:',out/'report.json')
+print('No network, driver, package, encryption or filesystem settings were changed.')

@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Remove only unowned old module trees; keep running and packaged kernels."""
+import argparse
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+
+
+def candidates(root: Path, owned_versions: set[str], running: str) -> list[Path]:
+    return sorted(path for path in root.iterdir()
+                  if path.is_dir() and not path.is_symlink()
+                  and re.fullmatch(r"\d+\.\d+[A-Za-z0-9_.+-]*", path.name)
+                  and path.name != running and path.name not in owned_versions)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    owned = subprocess.run(["pacman", "-Qlq"], check=True, text=True, capture_output=True).stdout.splitlines()
+    versions = {path.split("/")[4] for path in owned
+                if path.startswith("/usr/lib/modules/") and len(path.split("/")) > 4}
+    paths = candidates(Path("/usr/lib/modules"), versions, os.uname().release)
+    if not paths:
+        print("No unowned old kernel module trees.")
+        return
+    print("Unowned old module trees (running/packaged kernels excluded):", flush=True)
+    for path in paths:
+        print(path, flush=True)
+    if not args.apply:
+        print("Dry run only.")
+        return
+    if os.geteuid() != 0:
+        raise SystemExit("Root required for --apply")
+    status = subprocess.run(["dkms", "status"], check=True, text=True, capture_output=True).stdout
+    for path in paths:
+        # Remove corresponding generated DKMS records before deleting old trees.
+        for line in status.splitlines():
+            match = re.match(r"([^/]+)/([^,]+), ([^,]+),", line)
+            if match and match[3] == path.name:
+                subprocess.run(["dkms", "remove", "-m", match[1], "-v", match[2], "-k", path.name], check=True)
+        # Refuse to race another package transaction or delete newly owned files.
+        if Path("/var/lib/pacman/db.lck").exists():
+            raise SystemExit("Another package transaction is active; stopping")
+        owned_now = subprocess.run(["pacman", "-Qlq"], check=True, text=True, capture_output=True).stdout.splitlines()
+        if any(item.startswith(str(path) + "/") for item in owned_now):
+            raise SystemExit(f"Package-owned files appeared in {path}; stopping")
+        if path.name == os.uname().release or path.is_symlink():
+            raise SystemExit("Kernel path changed; stopping")
+        shutil.rmtree(path)
+        print("Removed:", path, flush=True)
+
+
+if __name__ == "__main__":
+    main()

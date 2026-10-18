@@ -1,0 +1,48 @@
+--- a/src/glob_vars.rs
++++ b/src/glob_vars.rs
+@@ -76,6 +76,7 @@
+ pub struct Module {
+     pub description: String,
+     pub prefix: String,
++    pub hidden: Option<bool>,
+     pub cmd: String,
+     pub with_argument: Option<bool>,
+     pub url_encode: Option<bool>,
+--- a/src/mod_exec.rs
++++ b/src/mod_exec.rs
+@@ -26,6 +26,7 @@
+         let fallback = Module {
+             description: String::new(),
+             prefix: String::new(),
++            hidden: None,
+             cmd: "printf 'no default_module or empty_module found\n'".to_string(),
+             with_argument: None,
+             url_encode: None,
+@@ -124,6 +125,7 @@
+             let mapped_modules = config()
+                 .modules
+                 .iter()
++                .filter(|module| !module.hidden.unwrap_or(false))
+                 .map(|module| {
+                     let arg_indicator = if module.with_argument == Some(true) {
+                         indicator_with_arg_module
+--- a/src/helper.rs
++++ b/src/helper.rs
+@@ -634,6 +634,7 @@
+     let set = config()
+         .modules
+         .iter()
++        .filter(|module| !module.hidden.unwrap_or(false))
+         .map(|module| {
+             let arg_indicator = if module.with_argument == Some(true) {
+                 indicator_with_arg_module
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "otter-launcher"
+-version = "0.7.3"
++version = "0.7.3+tiffany.1"
+ edition = "2024"
+ 
+ [dependencies]

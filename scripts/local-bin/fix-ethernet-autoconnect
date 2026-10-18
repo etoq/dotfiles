@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source_config="$HOME/dotfiles/configs/etc/systemd/network/10-networkmanager-ethernet.network"
+target_config=/etc/systemd/network/10-networkmanager-ethernet.network
+profile=5b43222d-adb0-467d-a804-16be91c10a6e
+if [[ ! -f "$source_config" ]]; then echo "Missing config: $source_config" >&2; exit 1; fi
+sudo -v
+backup_dir="/var/backups/ethernet-autoconnect-$(date +%Y%m%d-%H%M%S)"
+sudo install -d -m 700 "$backup_dir"
+if sudo test -f "$target_config"; then sudo cp -a "$target_config" "$backup_dir/"; fi
+if sudo test -f /etc/systemd/network/20-linear.network; then sudo cp -a /etc/systemd/network/20-linear.network "$backup_dir/"; fi
+nmcli -f connection.id,connection.uuid,connection.interface-name,connection.autoconnect,connection.autoconnect-priority,connection.autoconnect-retries connection show "$profile"
+sudo install -m 644 "$source_config" "$target_config"
+nmcli connection modify "$profile" connection.autoconnect yes connection.autoconnect-priority 100 connection.autoconnect-retries 0
+printf '%s\n' 'Saved. NetworkManager will exclusively manage enp0s31f6 on next boot.' 'Current connection was not restarted.' "Backup: $backup_dir"

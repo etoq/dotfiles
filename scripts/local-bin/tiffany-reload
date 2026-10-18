@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Refresh Black Tiffany on the running WM without restarting the session."""
+import json,os,subprocess as sp
+from pathlib import Path
+H=Path.home()
+def run(args,optional=False,input=None):
+    try:
+        p=sp.run(args,input=input,text=True,capture_output=True,timeout=20)
+    except (OSError,sp.TimeoutExpired) as e:
+        if not optional: print(f'Could not run {args[0]}: {e}')
+        return False
+    if p.returncode and not optional: print(f'{args[0]}: {p.stderr.strip() or p.stdout.strip()}')
+    return p.returncode==0
+if not run([str(H/'.local/bin/tiffany-theme'),'--apply']): raise SystemExit(1)
+palette=json.loads((H/'.config/tiffany/palette.json').read_text())
+run(['xrdb','-merge',str(H/'.Xresources')])
+if run(['pgrep','-u',str(os.getuid()),'-x','awesome'],optional=True):
+    lua="""local b=require('beautiful'); b.init(require('gears').filesystem.get_configuration_dir()..'theme.lua'); for _,c in ipairs(client.get()) do c.border_color=(c==client.focus) and b.border_focus or b.border_normal end; awesome.emit_signal('tiffany::palette_changed'); return 'Theme reloaded'"""
+    run(['awesome-client'],input=lua)
+elif run(['pgrep','-u',str(os.getuid()),'-x','bspwm'],optional=True):
+    for setting,role in [('normal_border_color','border'),('focused_border_color','accent'),('active_border_color','muted'),('presel_feedback_color','cyan')]:
+        run(['bspc','config',setting,palette[role]])
+for key,value in [('gtk-theme','Black-Tiffany'),('icon-theme','Papirus-Dark'),('cursor-theme','Adwaita'),('color-scheme','prefer-dark')]:
+    run(['gsettings','set','org.gnome.desktop.interface',key,value])
+run(['pkill','-HUP','-u',str(os.getuid()),'-x','xsettingsd'],optional=True)
+run(['dunstctl','reload'],optional=True)
+run(['pkill','-USR1','-u',str(os.getuid()),'-x','kitty'],optional=True)
+run(['pkill','-USR1','-u',str(os.getuid()),'-x','picom'],optional=True)
+run(['polybar-msg','cmd','restart'],optional=True)
+print('Black Tiffany refreshed. Existing GTK/Qt applications may need to be reopened.')

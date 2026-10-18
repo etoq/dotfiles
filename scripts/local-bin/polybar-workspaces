@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+"""Render Awesome's real application occupancy; update through Linux inotify."""
+import ctypes,json,os,re,shlex,sys
+from pathlib import Path
+runtime=Path(os.environ.get('PANEL_LAB_RUNTIME',str(Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))/'panel-lab-awesome')))
+runtime.mkdir(parents=True,exist_ok=True)
+monitor=os.environ.get('MONITOR','')
+if not re.fullmatch(r'[A-Za-z0-9_.-]*',monitor):raise SystemExit('Invalid monitor')
+def render():
+ try:data=json.loads((runtime/'workspaces.json').read_text())
+ except (OSError,ValueError):return ''
+ if not data:return ''
+ selected=next((s for s in data if monitor in s['outputs']),data[0])
+ labels=[]
+ for t in selected['tags']:
+  ident=int(t['id']);label=str(ident) if t['occupied'] else '·'
+  color='#4DDDD5' if t['active'] else '#DE7C86' if t['urgent'] else '#C5D6D8' if t['occupied'] else '#7E999F'
+  code=f'tiffany.view_tag({ident},"{monitor}")'
+  command='awesome-client '+shlex.quote(code)+' >/dev/null'
+  start='%{+u}' if t['active'] else '';end='%{-u}' if t['active'] else ''
+  labels.append('%{A1:'+command+':}%{F'+color+'}%{u#0ABAB5}'+start+' '+label+' '+end+'%{F-}%{A}')
+ text=''.join(labels)
+ for button,step in [(4,'viewprev'),(5,'viewnext')]:
+  command='awesome-client '+shlex.quote('require("awful").tag.'+step+'()')+' >/dev/null'
+  text='%{A'+str(button)+':'+command+':}'+text+'%{A}'
+ return text
+if '--once' in sys.argv:print(render());raise SystemExit
+libc=ctypes.CDLL(None,use_errno=True);fd=libc.inotify_init1(os.O_CLOEXEC)
+if fd<0:raise OSError(ctypes.get_errno(),'inotify_init1')
+# Watch the directory: the publisher replaces the JSON file atomically.
+if libc.inotify_add_watch(fd,os.fsencode(runtime),0x008|0x080|0x100|0x200)<0:raise OSError(ctypes.get_errno(),'inotify_add_watch')
+last=None
+while True:
+ value=render()
+ if value!=last:print(value,flush=True);last=value
+ try:os.read(fd,65536)
+ except InterruptedError:continue

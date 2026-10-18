@@ -1,5 +1,3 @@
-#!/bin/bash
-
-CURRENT_LAYOUT=$(xset -q|grep LED| awk '{ print $10 }')
-
-setxkbmap -layout us,ru -option "grp:alt_shift_toggle"
+#!/bin/sh
+# Configure both layouts once; XKB handles Alt+Shift without a hotkey daemon.
+exec setxkbmap -layout us,ru -option grp:alt_shift_toggle

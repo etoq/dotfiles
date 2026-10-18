@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Use the GTK portal file chooser instead of the generic light Qt dialog.
+export QT_QPA_PLATFORMTHEME=xdgdesktopportal
+exec /usr/bin/AyuGram "$@"

@@ -1,3 +1,4 @@
-#!/bin/bash
-
-feh --randomize --no-fehbg --bg-fill ~/Images/
+#!/usr/bin/env bash
+set -euo pipefail
+wallpaper=$(find "$HOME/Images" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print | shuf -n 1)
+[[ -z "$wallpaper" ]] || feh --no-fehbg --bg-fill "$wallpaper"

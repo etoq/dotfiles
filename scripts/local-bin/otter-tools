@@ -1,0 +1,479 @@
+#!/usr/bin/env python3
+"""Black Tiffany launcher tools. All external commands use argv, never shell input."""
+import collections
+import contextlib
+import datetime as dt
+import fcntl
+import hashlib
+import html
+import json
+import math
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess as sp
+import sys
+import tempfile
+import time
+from urllib.parse import unquote
+
+HOME = Path.home()
+STATE = HOME / '.local/state/otter-tools'
+ASSETS = HOME / '.local/share/otter-tools'
+SELF = Path(__file__).resolve()
+COLORS = 'bg:#080D10,bg+:#183039,fg:#C5D6D8,fg+:#A3F0E7,hl:#0ABAB5,hl+:#4DDDD5,pointer:#0ABAB5,header:#7E999F'
+ROFI_STYLE = ('window { width: 780px; } listview { columns: 1; lines: 8; } '
+              'message { background-color: #101B20; padding: 12px; } '
+              'textbox { background-color: transparent; text-color: #A3F0E7; } '
+              'entry { placeholder: ""; }')
+
+
+def clean(text):
+    return ''.join(c if c.isprintable() else ' ' for c in str(text))
+
+
+def notify(title, text):
+    sp.run(['notify-send', '--', title, html.escape(clean(text))], check=False)
+
+
+def copy(text):
+    sp.run(['xclip', '-selection', 'clipboard'], input=text.encode(), check=True)
+
+
+def capture(argv, **kw):
+    return sp.run(argv, capture_output=True, text=True, **kw)
+
+
+def choose(items, prompt, multiple=False, header='Enter — выбрать · Esc — отмена'):
+    """Indexed display keeps whitespace, newlines and shell characters in paths safe."""
+    if not items:
+        return [] if multiple else None
+    rows = ''.join(f'{i}\t{clean(label)}\n' for i, (label, _) in enumerate(items))
+    argv = ['fzf', '--delimiter=\t', '--with-nth=2..', '--layout=reverse',
+            '--border=rounded', '--color', COLORS, '--prompt', prompt + ' › ',
+            '--header', header, '--cycle', '--pointer', '▌']
+    if multiple:
+        argv += ['--multi', '--bind', 'ctrl-a:select-all,ctrl-d:deselect-all']
+    result = capture(argv, input=rows)
+    selected = [items[int(line.split('\t', 1)[0])][1]
+                for line in result.stdout.splitlines() if line]
+    return selected if multiple else (selected[0] if selected else None)
+
+
+def file_path(argument=''):
+    if argument.strip():
+        value = argument.strip()
+        if len(value) > 1 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        path = Path(value).expanduser().absolute()
+    else:
+        result = sp.run(['fd', '--type', 'f', '--hidden', '--print0', '--exclude', '.git',
+                         '--exclude', '.cache', '.', str(HOME)], capture_output=True, check=True)
+        paths = [Path(os.fsdecode(p)) for p in result.stdout.split(b'\0') if p]
+        path = choose([(str(p.relative_to(HOME)), p) for p in paths], 'Файл')
+    if path is not None and not path.is_file():
+        raise ValueError('Файл не найден: ' + str(path))
+    return path
+
+
+def view_report(text, name='report.txt', filetype='text'):
+    with tempfile.TemporaryDirectory(prefix='otter-view-') as folder:
+        path = Path(folder) / name
+        path.write_text(text)
+        sp.run(['nvim', '-u', 'NONE', '-i', 'NONE', '-n', '-R',
+                '--cmd', 'set nomodeline termguicolors background=dark',
+                '-c', 'hi Normal guifg=#C5D6D8 guibg=#080D10',
+                '-c', 'setlocal buftype=nofile noswapfile readonly nomodifiable filetype=' + filetype,
+                '--', str(path)], check=False)
+
+
+def hex_view(argument=''):
+    path = file_path(argument)
+    if path is None:
+        return
+    limit = 16 * 1024 * 1024
+    result = capture(['xxd', '-l', str(limit), '--', str(path)], check=True)
+    header = f'Файл: {clean(path)}\nРазмер: {path.stat().st_size:,} байт\n'
+    if path.stat().st_size > limit:
+        header += 'Показаны первые 16 МиБ. Исходный файл не изменяется.\n'
+    view_report(header + '\n' + result.stdout, 'hex.txt', 'xxd')
+
+
+def file_report(path):
+    counts = collections.Counter()
+    sha = hashlib.sha256()
+    size = 0
+    with path.open('rb') as stream:
+        prefix = stream.read(1024 * 1024)
+        stream.seek(0)
+        while chunk := stream.read(1024 * 1024):
+            sha.update(chunk)
+            counts.update(chunk)
+            size += len(chunk)
+    entropy = -sum((n / size) * math.log2(n / size) for n in counts.values()) if size else 0
+    kind = capture(['file', '-b', '--', str(path)], check=True).stdout.strip()
+    strings = sp.run(['strings', '-a', '-n', '6'], input=prefix, capture_output=True, check=True)
+    lines = strings.stdout.decode('utf-8', errors='replace').splitlines()[:80]
+    return (f'Файл: {clean(path)}\nРазмер: {size:,} байт\nФормат: {clean(kind)}\n'
+            f'SHA-256: {sha.hexdigest()}\nЭнтропия: {entropy:.4f} бит/байт\n'
+            'Энтропия сама по себе не определяет вредоносность.\n\n'
+            'Первые 80 ASCII-строк из первого МиБ:\n' + '\n'.join(map(clean, lines)))
+
+
+def info(argument=''):
+    path = file_path(argument)
+    if path is not None:
+        print('Вычисляю SHA-256 и статистику файла…', flush=True)
+        view_report(file_report(path))
+
+
+def rofi(items, prompt, message=''):
+    result = capture(['rofi', '-dmenu', '-i', '-p', prompt, '-mesg', html.escape(message),
+                      '-theme-str', ROFI_STYLE],
+                     input='\n'.join(items))
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def calculate(expression):
+    result = capture(['qalc', '-t', '-m', '3000', expression], timeout=8)
+    answer = result.stdout.strip()
+    if result.returncode or not answer or re.search(r'error:|ошибка:', answer + result.stderr, re.I):
+        raise ValueError(clean(result.stderr or answer or 'Не удалось вычислить'))
+    return answer
+
+
+def calculator(argument=''):
+    STATE.mkdir(parents=True, exist_ok=True)
+    history_file = STATE / 'calc-history.json'
+    try:
+        history = json.loads(history_file.read_text())[-30:]
+    except (OSError, ValueError):
+        history = []
+    expression = argument.strip()
+    message = '2+2 · 255 to hex · 0xFF to dec · 10 km to m · sin(30 deg)'
+    while True:
+        entries = {f'{x[0]} = {x[1]}': x for x in reversed(history)}
+        if not expression:
+            expression = rofi(list(entries), 'calc', message)
+            if not expression:
+                return
+            if expression in entries:
+                copy(entries[expression][1])
+                notify('Калькулятор', 'Результат скопирован')
+                return
+        try:
+            answer = calculate(expression)
+        except (ValueError, sp.TimeoutExpired) as error:
+            message = str(error)
+            expression = ''
+            continue
+        history = [x for x in history if x[0] != expression] + [[expression, answer]]
+        history_file.write_text(json.dumps(history[-30:], ensure_ascii=False))
+        action = rofi(['Скопировать результат', 'Продолжить с результатом', 'Новое выражение'],
+                      'calc', expression + ' = ' + answer)
+        if action == 'Скопировать результат':
+            copy(answer)
+            notify('Калькулятор', answer)
+            return
+        if action == 'Продолжить с результатом':
+            value = rofi([], 'calc', 'ans = ' + answer + ' · пример: ans * 2')
+            if not value:
+                return
+            expression = value.replace('ans', '(' + answer + ')')
+        elif action == 'Новое выражение':
+            expression = ''
+        else:
+            return
+
+
+def ocr():
+    tessdata = ASSETS / 'tessdata'
+    if not all((tessdata / (lang + '.traineddata')).is_file() for lang in ('rus', 'eng')):
+        raise ValueError('Нужны модели OCR: запусти otter-install-assets')
+    image = sp.run(['flameshot', 'gui', '--raw', '--accept-on-select'], capture_output=True)
+    if image.returncode or not image.stdout:
+        return
+    with tempfile.TemporaryDirectory(prefix='otter-ocr-') as folder:
+        path = Path(folder) / 'selection.png'
+        path.write_bytes(image.stdout)
+        result = capture(['tesseract', str(path), 'stdout', '--tessdata-dir', str(tessdata),
+                          '-l', 'rus+eng', '--psm', '6'], timeout=60)
+    if result.returncode:
+        raise ValueError(result.stderr)
+    text = result.stdout.strip()
+    if text:
+        copy(text)
+        notify('OCR · текст скопирован', text[:160])
+    else:
+        notify('OCR', 'Текст не найден. Попробуй выделить область крупнее.')
+
+
+def recent():
+    paths = list((HOME / 'notes/quick').glob('*.md')) + list((HOME / 'notes').glob('*.md'))
+    paths.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    rows = []
+    for path in paths:
+        with path.open(errors='replace') as stream:
+            title = next((line.strip('# \n') for line in stream if line.strip()), path.stem)
+        date = dt.datetime.fromtimestamp(path.stat().st_mtime).strftime('%d.%m %H:%M')
+        rows.append((f'{date}  {title[:65]}  · {path.name}', path))
+    if not rows:
+        notify('Заметки', 'Пока нет заметок. Создай первую командой note.')
+        return
+    path = choose(rows, 'Заметки')
+    if path is not None:
+        sp.run(['nvim', '--', str(path)], check=False)
+
+
+def metadata(argument=''):
+    if argument.strip():
+        value = argument.strip()
+        if len(value) > 1 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        path = Path(value).expanduser().absolute()
+        if not path.exists():
+            raise ValueError('Путь не найден: ' + str(path))
+    else:
+        path = file_path()
+    if path is None:
+        return
+    print('Удаление метаданных изображений:', clean(path))
+    print('Исходные метаданные будут удалены у выбранного файла или изображений в папке.')
+    if input('Для подтверждения введи yes: ').strip() != 'yes':
+        return
+    sp.run([str(HOME / '.local/bin/clean-meta'), str(path)], check=True)
+    input('Enter — закрыть…')
+
+
+def process_identity(pid):
+    try:
+        path = Path('/proc') / str(pid)
+        if pid <= 1 or pid == os.getpid() or path.stat().st_uid != os.getuid():
+            return None
+        start = (path / 'stat').read_text().rsplit(') ', 1)[1].split()[19]
+        return start, clean((path / 'comm').read_text().strip())
+    except (OSError, IndexError):
+        return None
+
+
+def signal_process(pid):
+    identity = process_identity(pid)
+    if identity is None:
+        print('Доступно завершение только собственных процессов. Процесс мог уже выйти.')
+        input('Enter…')
+        return
+    action = choose([('TERM · обычное завершение', signal.SIGTERM),
+                     ('KILL · принудительно, несохранённые данные будут потеряны', signal.SIGKILL)],
+                    f'{pid} · {identity[1]}')
+    if action is None:
+        return
+    if action == signal.SIGKILL and input(f'Для SIGKILL введи PID {pid}: ').strip() != str(pid):
+        return
+    if process_identity(pid) != identity:
+        raise ValueError('Процесс изменился или завершился. Выбери его заново.')
+    # A pidfd prevents signalling a different process if this PID is recycled.
+    with contextlib.ExitStack() as stack:
+        fd = os.pidfd_open(pid)
+        stack.callback(os.close, fd)
+        if process_identity(pid) != identity:
+            raise ValueError('Процесс изменился. Выбери его заново.')
+        signal.pidfd_send_signal(fd, action)
+    notify('Процессы', f'{identity[1]} · PID {pid} · {action.name}')
+
+
+def processes():
+    while True:
+        result = capture(['ps', '-u', str(os.getuid()), '-o', 'pid=,comm=,pcpu=,pmem=,etime=', '--sort=-pcpu'], check=True)
+        rows = [(line, int(line.split()[0])) for line in result.stdout.splitlines()
+                if line.strip() and int(line.split()[0]) != os.getpid()]
+        pid = choose(rows, 'Процессы', header='PID   имя   CPU%  RAM%   время · TERM по умолчанию')
+        if pid is None:
+            return
+        signal_process(pid)
+
+
+def removal_plan(packages):
+    result = capture(['pacman', '-Rs', '--print', '--print-format', '%n\t%s', '--', *packages])
+    if result.returncode:
+        raise ValueError(result.stderr)
+    return [(name, int(size)) for name, size in (row.split('\t') for row in result.stdout.splitlines())]
+
+
+def packages():
+    result = capture(['pacman', '-Qe'], check=True)
+    rows = [(line, line.split()[0]) for line in result.stdout.splitlines() if line.strip()]
+    selected = choose(rows, 'Удаление пакетов', multiple=True,
+                      header='Tab — выделить · Enter — показать план · Esc — отмена')
+    if not selected:
+        return
+    plan = removal_plan(selected)
+    print('\nПолная транзакция, включая удаляемые зависимости:\n')
+    for name, size in plan:
+        print(f'  {name:42} {size / 1024 ** 2:9.2f} МиБ' + ('  [выбран]' if name in selected else '  [зависимость]'))
+    print(f'\nВсего: {len(plan)} пакетов · {sum(s for _, s in plan) / 1024 ** 2:.2f} МиБ')
+    print('Pacman повторно рассчитает транзакцию и запросит окончательное подтверждение.')
+    if input('Продолжить? Введи yes: ').strip() != 'yes':
+        return
+    sp.run(['sudo', 'pacman', '-Rns', '--', *selected], check=False)
+    input('Enter — закрыть…')
+
+
+def ports():
+    while True:
+        result = capture(['ss', '-H', '-lntup'])
+        if result.returncode:
+            raise ValueError(result.stderr)
+        line = choose([(line, line) for line in result.stdout.splitlines() if line.strip()],
+                      'Порты', header='TCP/UDP · адрес:порт · процесс/PID · Esc — закрыть')
+        if line is None:
+            return
+        pids = sorted(set(map(int, re.findall(r'pid=(\d+)', line))))
+        actions = [('Подробнее', 'info'), ('Скопировать адрес:порт', 'copy')]
+        if any(process_identity(pid) for pid in pids):
+            actions.append(('Завершить выбранный процесс…', 'signal'))
+        action = choose(actions, 'Порт')
+        if action == 'copy':
+            copy(line.split()[4])
+            notify('Порты', 'Адрес скопирован')
+        elif action == 'signal':
+            owned = [(f'{p} · {identity[1]}', p) for p in pids if (identity := process_identity(p))]
+            pid = choose(owned, 'Процесс')
+            if pid is not None:
+                signal_process(pid)
+        elif action == 'info':
+            details = line + '\n\n'
+            for pid in pids:
+                details += capture(['ps', '-p', str(pid), '-o', 'user,pid,ppid,comm,etime,pcpu,pmem']).stdout + '\n'
+            view_report(details)
+
+
+def duration(value):
+    value = value.strip().lower().replace(' ', '')
+    if re.fullmatch(r'\d+', value):
+        seconds = int(value) * 60  # bare numbers are minutes
+    elif re.fullmatch(r'\d+:\d{2}(:\d{2})?', value):
+        parts = list(map(int, value.split(':')))
+        if any(n >= 60 for n in parts[1:]):
+            raise ValueError('Минуты/секунды после двоеточия должны быть меньше 60')
+        seconds = sum(n * 60 ** i for i, n in enumerate(reversed(parts)))
+    elif re.fullmatch(r'(?:\d+[hms])+', value):
+        seconds = sum(int(n) * {'h': 3600, 'm': 60, 's': 1}[unit] for n, unit in re.findall(r'(\d+)([hms])', value))
+    else:
+        raise ValueError('Длительность: 25m, 1h30m, 90s, 05:30; число без единицы — минуты')
+    if not 1 <= seconds <= 7 * 86400:
+        raise ValueError('Допустимая длительность: от 1 секунды до 7 дней')
+    return seconds
+
+
+@contextlib.contextmanager
+def timer_lock():
+    STATE.mkdir(parents=True, exist_ok=True)
+    with (STATE / 'timer.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def timer_state():
+    try:
+        data = json.loads((STATE / 'timer.json').read_text())
+        boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+        return data if data.get('boot') == boot else None
+    except (OSError, ValueError):
+        return None
+
+
+def remaining(data):
+    seconds = max(0, math.ceil(data['end'] - time.time()))
+    hours, rest = divmod(seconds, 3600)
+    minutes, seconds = divmod(rest, 60)
+    return f'{hours}:{minutes:02}:{seconds:02}' if hours else f'{minutes:02}:{seconds:02}'
+
+
+def start_timer(seconds):
+    data = dict(id=os.urandom(12).hex(), end=time.time() + seconds,
+                boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip())
+    with timer_lock():
+        tmp = STATE / 'timer.json.new'
+        tmp.write_text(json.dumps(data))
+        tmp.replace(STATE / 'timer.json')
+        try:
+            sp.Popen([sys.executable, str(SELF), 'timer-worker', data['id']],
+                     stdin=sp.DEVNULL, stdout=sp.DEVNULL, stderr=sp.DEVNULL, start_new_session=True)
+        except OSError:
+            (STATE / 'timer.json').unlink(missing_ok=True)
+            raise
+    notify('Таймер запущен', remaining(data) + ' · отмена правым кликом по таймеру в Polybar')
+
+
+def timer_worker(token):
+    while True:
+        with timer_lock():
+            data = timer_state()
+            if not data or data['id'] != token:
+                return
+            if data['end'] <= time.time():
+                (STATE / 'timer.json').unlink(missing_ok=True)
+                break
+        time.sleep(.25)
+    sp.run(['notify-send', '-u', 'critical', '--', 'Таймер завершён', 'Время вышло.'], check=False)
+
+
+def timer_cancel():
+    with timer_lock():
+        (STATE / 'timer.json').unlink(missing_ok=True)
+    notify('Таймер', 'Отменён')
+
+
+def timer(argument=''):
+    if argument.strip():
+        start_timer(duration(argument))
+        return
+    data = timer_state()
+    items = [('Работа · 25 минут', '25m'), ('Работа · 45 минут', '45m'),
+             ('Отдых · 5 минут', '5m'), ('Своя длительность', 'custom')]
+    if data:
+        items = [('Отменить текущий таймер · ' + remaining(data), 'cancel')] + items
+    action = choose(items, 'Таймер', header='Один активный таймер · новый заменяет предыдущий')
+    if action == 'cancel':
+        timer_cancel()
+    elif action:
+        value = input('Длительность (25m / 1h30m / 05:30): ') if action == 'custom' else action
+        if value.strip():
+            start_timer(duration(value))
+
+
+def cyberchef():
+    files = list((ASSETS / 'cyberchef').glob('CyberChef*.html'))
+    if not files:
+        raise ValueError('Нужен офлайн CyberChef: запусти otter-install-assets')
+    sp.Popen(['xdg-open', files[0].as_uri()], start_new_session=True,
+             stdin=sp.DEVNULL, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+
+
+def main():
+    os.umask(0o077)
+    command = sys.argv[1] if len(sys.argv) > 1 else 'help'
+    args = sys.argv[2:]
+    argument = unquote(args[1]) if len(args) == 2 and args[0] == '--encoded' else ' '.join(args)
+    actions = {'calc': lambda: calculator(argument), 'ocr': ocr, 'hex': lambda: hex_view(argument),
+               'info': lambda: info(argument), 'recent': recent, 'kill': processes,
+               'rm': packages, 'ports': ports, 'timer': lambda: timer(argument),
+               'timer-worker': lambda: timer_worker(argument), 'timer-cancel': timer_cancel,
+               'timer-label': lambda: print('⏱ ' + remaining(data) if (data := timer_state()) else ''),
+               'cc': cyberchef, 'meta': lambda: metadata(argument)}
+    if command not in actions:
+        print('otter-tools: calc ocr hex [path] info [path] cc timer [25m] recent kill rm ports')
+        return
+    actions[command]()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        pass
+    except (OSError, ValueError, sp.SubprocessError) as error:
+        print('Ошибка:', error, file=sys.stderr)
+        notify('Otter · ошибка', str(error)[:240])
+        sys.exit(1)

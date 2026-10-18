@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if command -v impala &>/dev/null; then
-  kitty --override background=#282A36 -e impala >/dev/null 2>&1 & disown
+  kitty --override background=#080D10 -e impala >/dev/null 2>&1 & disown
 else
-  kitty --override background=#282A36 --override foreground=#F8F8F2 -e nmtui >/dev/null 2>&1 & disown
+  kitty --override background=#080D10 --override foreground=#C5D6D8 -e nmtui >/dev/null 2>&1 & disown
 fi

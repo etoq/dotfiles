@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Allowlisted panel actions. No user text is evaluated as shell code."""
+import os,sys,subprocess as sp
+from pathlib import Path
+H=Path.home(); AWESOME='awesome' in os.environ.get('PANEL_WM',os.environ.get('XDG_CURRENT_DESKTOP','bspwm')).lower()
+STATE=Path(os.environ.get('XDG_STATE_HOME',H/'.local/state'))/'panel-lab'
+if AWESOME:STATE=STATE/'awesome'
+action=sys.argv[1] if len(sys.argv)>1 else 'launcher'
+def launch(argv):
+    sp.Popen([str(x) for x in argv],stdin=sp.DEVNULL,stdout=sp.DEVNULL,stderr=sp.DEVNULL,start_new_session=True)
+def music(command):
+    sys.path.insert(0,str(H/'.config/panel-lab'))
+    from yandex_media import control
+    control(command)
+def term(*args): launch(['kitty','--class','panel-tool','-e',*args])
+tools={'calc','ocr','hex','info','cc','timer','recent','ports','kill'}
+if action in tools: term(str(H/'.local/bin/otter-tools'),action)
+elif action=='launcher': launch(['kitty','--class','otter','--override','window_padding_width=22.5 12.75 7.5 17.25','--override','background=#101B20','--override','foreground=#C5D6D8','-e',str(H/'.local/bin/otter-launcher')])
+elif action=='monitor': launch(['kitty','--class','panel-monitor','--start-as=fullscreen','-e','btop'])
+elif action=='network': term('nmtui')
+elif action=='vpn': launch(['throne'])
+elif action=='ghidra': launch([str(H/'.local/bin/reverse-ghidra')])
+elif action=='vms': launch(['virt-manager'])
+elif action=='notes': launch([str(H/'.local/bin/otter-new-note')])
+elif action=='power': term(str(H/'bin/powermenu'))
+elif action=='lock': launch([str(H/'bin/screen-lock')])
+elif action=='color': launch([str(H/'bin/xcolor-pick')])
+elif action=='shot': launch(['flameshot','gui'])
+elif action=='files': term('yazi',str(H))
+elif action=='wallpaper': launch([str(H/'bin/random_wallpaper')])
+elif action=='clipboard': launch([str(H/'.local/bin/clipmenu.sh')])
+elif action=='mute': sp.run(['pamixer','-t'])
+elif action in ('volume-set','brightness-set') and len(sys.argv)>2:
+    try:value=max(0,min(100,round(float(sys.argv[2]))))
+    except ValueError:sys.exit('Invalid slider value')
+    sp.run(['pamixer','--set-volume',str(value),'--unmute'] if action=='volume-set' else ['brightnessctl','set',f'{max(1,value)}%'])
+elif action=='volume-scroll' and len(sys.argv)>2:
+    if sys.argv[2] in ('up','down'):sp.run(['pamixer','-i' if sys.argv[2]=='up' else '-d','5'])
+elif action=='volume-up': sp.run(['pamixer','-i','5','--unmute'])
+elif action=='volume-down': sp.run(['pamixer','-d','5','--unmute'])
+elif action=='brightness-up': sp.run(['brightnessctl','set','+5%'])
+elif action=='brightness-down': sp.run(['brightnessctl','set','5%-'])
+elif action=='media': music('play-pause')
+elif action=='media-scroll' and len(sys.argv)>2:
+    if sys.argv[2] in ('up','down'):music('previous' if sys.argv[2]=='up' else 'next')
+elif action=='next': music('next')
+elif action=='previous': music('previous')
+elif action=='timer-cancel': sp.run([str(H/'.local/bin/otter-tools'),'timer-cancel'])
+elif action=='timer25': sp.run([str(H/'.local/bin/otter-tools'),'timer','25m'])
+elif action=='calendar': launch([str(H/'.local/bin/tiffany-calendar')])
+elif action=='workspace' and len(sys.argv)>2 and sys.argv[2].isdigit():
+    n=int(sys.argv[2])
+    if 1<=n<=10:sp.run(['awesome-client',f'tiffany.view_tag({n})'] if AWESOME else ['bspc','desktop','-f',f'^{n}'])
+elif action=='focus':
+    on=sp.check_output(['dunstctl','is-paused']).strip()!=b'true'
+    sp.run(['dunstctl','set-paused','true' if on else 'false'])
+    sp.run(['notify-send','Фокус','Уведомления приостановлены' if on else 'Уведомления включены'])
+elif action=='switch': launch([str(H/'.local/bin/panel-switch')])
+elif action=='dashboard': launch([str(H/'.local/bin/panel-dashboard')])
+else: sys.exit('Unknown action: '+action)

@@ -1,3 +1,8 @@
-#!/bin/bash
-
-arttime --nolearn -a colorowl2 -b colorowl3 -t "We don't Owls"
+#!/usr/bin/env bash
+set -euo pipefail
+if (( $# )); then
+    exec termdown "$@"
+fi
+read -r -p 'Duration (e.g. 25m, 1h, 90s): ' duration
+[[ -n "$duration" ]] || exit 0
+exec termdown "$duration"

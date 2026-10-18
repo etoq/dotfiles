@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Read system controls or select an existing audio device, without shell evaluation."""
+import concurrent.futures,json,subprocess as sp,sys
+from pathlib import Path
+H=Path.home()
+def command(args):
+ try:
+  p=sp.run(args,capture_output=True,text=True,timeout=4)
+  return p.stdout.strip() if p.returncode==0 else ''
+ except (OSError,sp.TimeoutExpired):return ''
+def devices(kind):
+ try:data=json.loads(command(['pactl','-f','json','list',kind]))
+ except ValueError:return []
+ return [{'id':d['name'],'label':d.get('description') or d['name']} for d in data if not (kind=='sources' and (d.get('monitor_of_sink') not in (None,4294967295,'4294967295') or d['name'].endswith('.monitor')))]
+def vm_status():
+ try:
+  p=sp.run(['virsh','-c','qemu:///system','list','--name'],capture_output=True,text=True,timeout=4)
+  return {'names':p.stdout.strip().splitlines() if p.returncode==0 else [],'available':p.returncode==0}
+ except (OSError,sp.TimeoutExpired):return {'names':[],'available':False}
+def status():
+ with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+  queries=[pool.submit(devices,'sinks'),pool.submit(devices,'sources'),pool.submit(command,['pactl','get-default-sink']),pool.submit(command,['pactl','get-default-source']),pool.submit(vm_status)]
+  sinks,sources,sink,source,vms=[x.result() for x in queries]
+ try:backup=json.loads((H/'.local/state/workstation-backup/status.json').read_text())
+ except (OSError,ValueError):backup={'state':'not_configured','last_success':None}
+ return dict(sinks=sinks,sources=sources,default_sink=sink,default_source=source,vms=vms['names'],vm_available=vms['available'],backup=backup)
+action=sys.argv[1] if len(sys.argv)>1 else 'status'
+if action=='status':print(json.dumps(status(),ensure_ascii=False))
+elif action in ('set-sink','set-source') and len(sys.argv)==3:
+ kind='sinks' if action=='set-sink' else 'sources'
+ if sys.argv[2] not in {d['id'] for d in devices(kind)}:raise SystemExit('Audio device no longer exists')
+ sp.run(['pactl','set-default-'+('sink' if kind=='sinks' else 'source'),sys.argv[2]],check=True)
+else:raise SystemExit('Usage: deck-system status | set-sink NAME | set-source NAME')

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Every invocation creates a separate Markdown note; existing notes are untouched.
+set -euo pipefail
+umask 077
+notes_dir="$HOME/notes/quick"
+mkdir -p -- "$notes_dir"
+note_file=$(mktemp --suffix=.md "$notes_dir/note-$(date +%Y-%m-%d_%H-%M-%S)-XXXXXX")
+printf '# Заметка %s\n\n' "$(date '+%Y-%m-%d %H:%M')" > "$note_file"
+exec kitty --class quick-note -e nvim -- "$note_file"

@@ -22,19 +22,24 @@
 
 
 # Values
-TEXT="${1:-abcd efg hijk lmno pqrs tuv wxyz\nABCD EFG HIJK LMNO PQRS TUV WXYZ\n  1234567890       ,./\\;'[]-=\`\n  !@#\$%%^&*()      <>?|:\"\{\}_+~}"
+if [ "$#" -gt 0 ]; then
+    TEXT=$1
+else
+    TEXT=$(cat <<'SAMPLE'
+abcd efg hijk lmno pqrs tuv wxyz
+ABCD EFG HIJK LMNO PQRS TUV WXYZ
+  1234567890       ,./\;'[]-=`
+  !@#$%%^&*()      <>?|:"{}_+~
+SAMPLE
+)
+fi
 STYLES="${2:-normal bold italic}"
-
-# Start
+printf '\n'
 for style in $STYLES; do
-	case "$style" in
-		'normal') print="$print${print:+\n}\033[0m$TEXT\033[0m" ;;
-		'bold')   print="$print${print:+\n}\033[1m$TEXT\033[0m" ;;
-		'italic') print="$print${print:+\n}\033[3m$TEXT\033[0m" ;;
-	esac
+    case "$style" in
+        normal) printf '\033[0m%s\033[0m\n' "$TEXT" ;;
+        bold)   printf '\033[1m%s\033[0m\n' "$TEXT" ;;
+        italic) printf '\033[3m%s\033[0m\n' "$TEXT" ;;
+    esac
 done
-
-echo -e "\n$print\n"
-
-
-exit 0
+printf '\n'

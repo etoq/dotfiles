@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""Disable the X11 middle button while preserving all other button mappings."""
+import re
+import subprocess
+
+result = subprocess.run(['xmodmap', '-pp'], check=True, capture_output=True, text=True)
+buttons = [int(match.group(2)) for line in result.stdout.splitlines()
+           if (match := re.fullmatch(r'\s*(\d+)\s+(\d+)\s*', line))]
+if len(buttons) < 2:
+    raise SystemExit('Cannot read X11 pointer button map')
+buttons[1] = 0
+subprocess.run(['xmodmap', '-e', 'pointer = ' + ' '.join(map(str, buttons))], check=True)

@@ -27,7 +27,7 @@ installed() {
 installed "xdotool"
 
 get_cursor_location() {
-    eval $(xdotool getmouselocation -s);
+    eval "$(xdotool getmouselocation -s)";
 }
 
 toggle_protection() {

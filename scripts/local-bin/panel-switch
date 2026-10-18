@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Manage the single Tiffany Polybar in bspwm and Awesome, scoped to this display."""
+import fcntl,os,re,signal,subprocess as sp,sys,time
+from pathlib import Path
+H=Path.home();AWESOME='awesome' in os.environ.get('PANEL_WM',os.environ.get('XDG_CURRENT_DESKTOP','bspwm')).lower()
+STATE=Path(os.environ.get('XDG_STATE_HOME',H/'.local/state'))/'panel-lab'
+if AWESOME:STATE=STATE/'awesome'
+RUN=Path(os.environ.get('PANEL_LAB_RUNTIME',str(Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))/('panel-lab-awesome' if AWESOME else 'panel-lab'))))
+STATE.mkdir(parents=True,exist_ok=True);RUN.mkdir(parents=True,exist_ok=True)
+def call(argv):return sp.run([str(x) for x in argv],capture_output=True,text=True,timeout=8)
+def padding():
+ if AWESOME:
+  call(['awesome-client','for s in screen do s.padding={top=0,left=0,right=0,bottom=0}; require("awful").layout.arrange(s) end'])
+ else:
+  call(['bspc','config','ignore_ewmh_struts','false'])
+  for output in monitors()[0]:call(['bspc','config','-m',output,'top_padding','0'])
+def monitors():
+ lines=call(['xrandr','--query']).stdout.splitlines()
+ lines=[l for l in lines if ' connected' in l and re.search(r'\b\d+x\d+[+-]\d+[+-]\d+',l)]
+ names=[l.split()[0] for l in lines]
+ primary=next((l.split()[0] for l in lines if ' connected primary ' in l),names[0] if names else '')
+ return names,primary
+def alive(p):
+ try:return p.joinpath('stat').read_text().split()[2]!='Z'
+ except OSError:return False
+def stop():
+ victims=[]
+ for p in Path('/proc').iterdir():
+  if not p.name.isdigit():continue
+  try:
+   if p.stat().st_uid!=os.getuid():continue
+   if b'DISPLAY='+os.fsencode(os.environ.get('DISPLAY',':0')) not in (p/'environ').read_bytes().split(b'\0'):continue
+   args=(p/'cmdline').read_bytes().split(b'\0')
+   data=len(args)>2 and args[1]==os.fsencode(H/'.local/bin/panel-data') and args[2]==b'daemon'
+   rollback=len(args)>2 and args[1]==os.fsencode(H/'.local/bin/panel-switch') and args[2]==b'rollback'
+   if (p/'comm').read_text().strip()=='polybar' or data or rollback:
+    os.kill(int(p.name),signal.SIGTERM);victims.append(p)
+  except (OSError,ProcessLookupError):pass
+ deadline=time.monotonic()+1
+ while time.monotonic()<deadline and any(alive(p) for p in victims):time.sleep(.03)
+ padding()
+def spawn(args,name,env=None):
+ with (STATE/(name+'.log')).open('ab') as log:
+  return sp.Popen([str(x) for x in args],env=env,stdin=sp.DEVNULL,stdout=log,stderr=log,start_new_session=True)
+def start():
+ names,primary=monitors()
+ if not names:raise RuntimeError('Нет активных мониторов')
+ stop()
+ cfg=H/'.config/polybar/config.ini'
+ if AWESOME:
+  cfg=RUN/'polybar.ini';text=(H/'.config/polybar/config.ini').read_text().replace('wm-restack = bspwm','wm-restack = generic')
+  # Native xworkspaces counts dock windows as occupied desktops in Awesome.
+  workspace_module='[module/bspwm]\ntype = custom/script\nexec = $HOME/.local/bin/polybar-workspaces\ntail = true\nlabel = %output%\n'
+  text=re.sub(r'\[module/bspwm\]\n.*?(?=\n\[|\Z)',lambda _:workspace_module,text,flags=re.S)
+  cfg.write_text(text)
+ spawn([H/'.local/bin/panel-data','daemon'],'telemetry')
+ jobs=[spawn(['polybar','-c',cfg,'main' if name==primary else 'secondary'],'bar-'+name,dict(os.environ,MONITOR=name)) for name in names]
+ time.sleep(.5)
+ if any(p.poll() is not None for p in jobs):raise RuntimeError('Polybar завершился: смотри ~/.local/state/panel-lab/')
+ if AWESOME:padding()
+ (RUN/'hidden').unlink(missing_ok=True)
+ for name in ('current','selected'):(STATE/name).write_text('polybar\n')
+ print('Polybar · Black Tiffany')
+def main():
+ args=sys.argv[1:]
+ if not args:os.execv(str(H/'.local/bin/panel-dashboard'),['panel-dashboard'])
+ if args[0]=='--status':print('polybar');return
+ if args[0]=='rollback':return
+ if args[0] not in ('start','use','test','2','polybar','toggle','stop','restart'):sys.exit('Оставлен один Polybar. panel-switch start | toggle | stop')
+ if args[0] in ('use','test','start') and len(args)>1 and args[1] not in ('2','polybar'):sys.exit('Оставлен только новый Polybar (2).')
+ with (RUN/'switch.lock').open('w') as lock:
+  fcntl.flock(lock,fcntl.LOCK_EX);(RUN/'preview-token').unlink(missing_ok=True)
+  if args[0]=='stop' or (args[0]=='toggle' and not (RUN/'hidden').exists()):
+   stop();(RUN/'hidden').touch()
+  else:start()
+if __name__=='__main__':
+ try:main()
+ except (OSError,RuntimeError,sp.SubprocessError) as e:sys.exit(str(e))

@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Keep the explicitly selected NVIDIA callback sleep mode across upgrades."""
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+
+
+def enforce_files(root: Path) -> list[str]:
+    changes = []
+    config_dir = root / "etc/modprobe.d"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    for path in config_dir.glob("*.conf"):
+        original = path.read_text()
+        updated = re.sub(r"\bNVreg_PreserveVideoMemoryAllocations=\d+\b",
+                         "NVreg_PreserveVideoMemoryAllocations=0", original)
+        if original != updated:
+            path.write_text(updated)
+            changes.append(str(path))
+    path = config_dir / "90-nvidia-sleep-policy.conf"
+    expected = "# Managed callback sleep policy; see /etc/workstation/nvidia-sleep-mode.\noptions nvidia NVreg_PreserveVideoMemoryAllocations=0\n"
+    if not path.exists() or path.read_text() != expected:
+        path.write_text(expected)
+        path.chmod(0o644)
+        changes.append(str(path))
+    hook = root / "usr/lib/systemd/system-sleep/nvidia"
+    if hook.exists():
+        mode = stat.S_IMODE(hook.stat().st_mode)
+        if mode & 0o111:
+            hook.chmod(mode & ~0o111)
+            changes.append(str(hook))
+    return changes
+
+
+def main() -> None:
+    marker = Path("/etc/workstation/nvidia-sleep-mode")
+    if not marker.exists() or marker.read_text().strip() != "callback":
+        print("NVIDIA sleep policy is not set to callback; unchanged")
+        return
+    if os.geteuid() != 0:
+        raise SystemExit("Root is required to enforce the NVIDIA sleep policy")
+    changes = enforce_files(Path("/"))
+    units = ["nvidia-suspend.service", "nvidia-resume.service", "nvidia-hibernate.service"]
+    units = [unit for unit in units if (Path("/usr/lib/systemd/system") / unit).exists()]
+    if units:
+        subprocess.run(["systemctl", "disable", *units], check=True)
+        subprocess.run(["systemctl", "daemon-reload"], check=True)
+    print("NVIDIA callback sleep policy preserved; file changes:", len(changes))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,39 +1,34 @@
-#!/bin/sh
-
-# Possible values: NONE, FULL, LOW, CRITICAL
-last="NONE"
-critical=10
-low=25
-
-while true; do
-
-  # If battery is plugged, do stuff
-  battery="/sys/class/power_supply/BAT1"
-  if [ -d $battery ]; then
-
-    capacity=$(cat $battery/capacity)
-    status=$(cat $battery/status)
-
-    # If battery full and not already warned about that
-    if [ "$last" != "FULL" ] && [ "$status" = "Full" ]; then
-      notify-send "Battery full"
-      last="FULL"
+#!/usr/bin/env bash
+# Detect the actual battery; warn once per discharge cycle.
+set -u
+last=NONE
+check_battery() {
+    local battery="$1" capacity status
+    [[ -r "$battery/capacity" && -r "$battery/status" ]] || return 0
+    read -r capacity < "$battery/capacity"
+    read -r status < "$battery/status"
+    [[ "$capacity" =~ ^[0-9]+$ ]] || return 0
+    if [[ "$status" == Discharging ]]; then
+        if (( capacity <= 10 )) && [[ "$last" != CRITICAL ]]; then
+            notify-send -u critical 'Battery critical' "${capacity}% remaining"
+            last=CRITICAL
+        elif (( capacity <= 25 )) && [[ "$last" != LOW && "$last" != CRITICAL ]]; then
+            notify-send -u normal 'Battery low' "${capacity}% remaining"
+            last=LOW
+        fi
+    else
+        last=NONE
     fi
-
-    # If low and discharging
-    if [ "$last" != "LOW" ] && [ "$last" != "CRITICAL" ]  && \
-       [ "$status" = "Discharging" ] && [ $capacity -le $low ]; then
-      notify-send "Battery low: $capacity%"
-      last="LOW"
-	fi
-
-	# If critical level and discharging
-	if [ "$last" = "LOW" ] && [ "$status" = "Discharging" ] && \
-	   [ $capacity -le $critical ]; then
-	  notify-send "Battery critical: $capacity%"
-      last="CRITICAL"
-    fi
-  fi
-  sleep 60
-
+}
+if [[ "${1:-}" == --once ]]; then
+    check_battery "${2:-/sys/class/power_supply/BAT0}"
+    exit
+fi
+while :; do
+    for battery in /sys/class/power_supply/*; do
+        [[ -r "$battery/type" ]] || continue
+        [[ "$(<"$battery/type")" == Battery ]] || continue
+        check_battery "$battery"
+    done
+    sleep 60
 done

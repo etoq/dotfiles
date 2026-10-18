@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+failed=0
+check() {
+    local label=$1
+    shift
+    if "$@"; then printf 'OK: %s\n' "$label"; else printf 'FAIL: %s\n' "$label"; failed=1; fi
+}
+check 'Loaded NVIDIA PreserveVideoMemoryAllocations=0' grep -Eq '^PreserveVideoMemoryAllocations: 0$' /proc/driver/nvidia/params
+check 'SysRq recovery mask 244' test "$(cat /proc/sys/kernel/sysrq)" = 244
+check 'NVIDIA post-sleep hook is not executable' test ! -x /usr/lib/systemd/system-sleep/nvidia
+for unit in nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service; do
+    state=$(systemctl is-enabled "$unit" 2>/dev/null || true)
+    check "$unit disabled" test "$state" = disabled
+done
+is_supported_kernel() {
+    local kernel pkgbase
+    kernel=$(uname -r)
+    [[ -r "/usr/lib/modules/$kernel/pkgbase" ]] || return 1
+    pkgbase=$(cat "/usr/lib/modules/$kernel/pkgbase")
+    case "$pkgbase" in
+        linux|linux-lts) [[ $(modinfo -F vermagic nvidia) == "$kernel "* ]] ;;
+        *) return 1 ;;
+    esac
+}
+check 'Arch linux/linux-lts with matching NVIDIA module' is_supported_kernel
+if (( failed )); then echo 'Configuration incomplete: do not test sleep.'; exit 1; fi
+echo 'Callback configuration verified. Actual sleep/resume is NOT tested.'
+echo 'Use systemctl suspend. The normal route has been tested successfully.'

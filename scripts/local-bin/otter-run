@@ -1,2 +1,30 @@
-#!/bin/bash
-nohup bash -ic "$@" >/dev/null 2>&1 &
+#!/usr/bin/env python3
+"""Start configured Otter actions after detaching every terminal descriptor."""
+import argparse,json,os,subprocess as sp,sys
+from pathlib import Path
+from urllib.parse import unquote
+H=Path.home()
+def main():
+ parser=argparse.ArgumentParser();parser.add_argument('--module',required=True);parser.add_argument('--argument',default='');args=parser.parse_args()
+ data=json.loads((H/'.config/otter-launcher/commands.json').read_text())
+ if args.module not in data:raise ValueError('Неизвестная команда Otter: '+args.module)
+ item=data[args.module];command=item['command'];env=os.environ.copy()
+ env['PATH']=str(H/'.local/bin')+':'+str(H/'bin')+':'+env.get('PATH','/usr/bin:/bin')
+ if item.get('raw_argument'):env['OTTER_ARGUMENT']=unquote(args.argument)
+ else:
+  argument=args.argument
+  # All substituted arguments are percent-encoded by Otter before reaching the shell.
+  if item.get('url_encoded') and any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~%' for c in argument):
+   raise ValueError('Аргумент должен быть URL-кодирован')
+  command=command.replace('{}',argument)
+ logs=Path(os.environ.get('XDG_STATE_HOME',H/'.local/state'))/'otter-tools/launches';logs.mkdir(mode=0o700,parents=True,exist_ok=True)
+ logfile=logs/(args.module+'.log')
+ with os.fdopen(os.open(logfile,os.O_WRONLY|os.O_CREAT|os.O_APPEND,0o600),'ab') as output:
+  sp.Popen(['/usr/bin/bash','-c',command],cwd=H,env=env,stdin=sp.DEVNULL,stdout=output,stderr=output,
+           close_fds=True,start_new_session=True)
+if __name__=='__main__':
+ try:main()
+ except (OSError,ValueError,KeyError) as e:
+  print('Otter:',e,file=sys.stderr)
+  sp.run(['notify-send','Otter · ошибка запуска',str(e)],check=False)
+  sys.exit(1)

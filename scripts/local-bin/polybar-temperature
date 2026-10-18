@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+"""Polybar CPU package temperature: turquoise <70, amber 70–84, red >=85 C."""
+from pathlib import Path
+import sys
+
+def render(temp):
+    color = '#DE7C86' if temp >= 85 else '#D8B77B' if temp >= 70 else '#4DDDD5'
+    return '%{A1:kitty --class thermal-monitor -e s-tui:}%{F'+color+'} '+str(temp)+'°C%{F-}%{A}'
+
+if len(sys.argv) == 3 and sys.argv[1] == '--value':
+    print(render(int(sys.argv[2])))
+else:
+    readings=[]
+    for node in Path('/sys/class/hwmon').glob('hwmon*'):
+        try:
+            if (node/'name').read_text().strip() in ('coretemp','k10temp','zenpower'):
+                readings.append(int((node/'temp1_input').read_text()) // 1000)
+        except (OSError,ValueError):
+            pass
+    print(render(max(readings)) if readings else '%{A1:kitty --class thermal-monitor -e s-tui:}%{F#7E999F} N/A%{F-}%{A}')

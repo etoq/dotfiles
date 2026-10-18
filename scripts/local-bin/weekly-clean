@@ -1,17 +1,18 @@
 #!/bin/bash
-PUR='\033[38;2;189;147;249m'
-GRN='\033[38;2;80;250;123m'
-YLW='\033[38;2;241;250;140m'
+set -euo pipefail
+PUR='\033[38;2;10;186;181m'
+GRN='\033[38;2;141;201;155m'
+YLW='\033[38;2;216;183;123m'
 R='\033[0m'
 
 echo -e "${PUR}=== Weekly Clean ===${R}\n"
 
 echo -e "${YLW}Pacman cache...${R}"
 sudo paccache -rvk2
-sudo paccache -rvuk0
+# Keep two versions even for removed packages, so rollback remains possible.
 
 echo -e "\n${YLW}Orphans...${R}"
-orphans=$(pacman -Qqdt 2>/dev/null)
+orphans=$(pacman -Qqdt 2>/dev/null || true)
 if [ -n "$orphans" ]; then
     echo "$orphans"
     read -p "Удалить? [y/N] " ans

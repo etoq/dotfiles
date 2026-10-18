@@ -1,0 +1,27 @@
+#!/usr/bin/python
+"""Read-only checks of the offline Windows analysis VM. Does not start it."""
+import subprocess
+import xml.etree.ElementTree as ET
+
+def virsh(*args):
+    return subprocess.check_output(['virsh', '-c', 'qemu:///system', *args], text=True)
+
+r = ET.fromstring(virsh('dumpxml', '--inactive', 'win-analysis'))
+d = r.find('devices')
+checks = {
+    'Independent disk path': d.find("disk[@device='disk']/source").get('file') == '/vms/storage/win-analysis.qcow2',
+    'No network adapters': not d.findall('interface'),
+    'No shared folders or device passthrough': not any(d.findall(t) for t in ('filesystem', 'hostdev', 'redirdev')),
+    'No guest-agent or SPICE channels': not d.findall('channel'),
+    'Clipboard disabled': d.find("graphics/clipboard").get('copypaste') == 'no',
+    'File transfer disabled': d.find("graphics/filetransfer").get('enable') == 'no',
+    'Display bound to loopback': d.find('graphics/listen').get('address') == '127.0.0.1',
+    'Initial snapshot exists': 'initial-clone' in virsh('snapshot-list', 'win-analysis', '--name').splitlines(),
+}
+v = ET.fromstring(virsh('vol-dumpxml', '--pool', 'storage vms', 'win-analysis.qcow2'))
+checks['No backing disk dependency'] = v.find('backingStore/path') is None
+checks['Autostart disabled'] = 'win-analysis' not in virsh('list','--all','--autostart','--name').splitlines()
+for label, ok in checks.items():
+    print(('OK: ' if ok else 'FAIL: ') + label)
+print('Windows configuration and actual guest boot are not checked by this command.')
+raise SystemExit(0 if all(checks.values()) else 1)

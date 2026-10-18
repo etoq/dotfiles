@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Restart existing user Polybar instances with their original command lines."""
+from pathlib import Path
+import os,signal,subprocess,time
+uid=os.getuid();jobs=[]
+for p in Path('/proc').iterdir():
+ if not p.name.isdigit():continue
+ try:
+  if p.stat().st_uid!=uid or (p/'comm').read_text().strip()!='polybar':continue
+  args=[os.fsdecode(a) for a in (p/'cmdline').read_bytes().split(b'\0') if a]
+  if not args:continue
+  # Always call the installed executable, preserving only the original options.
+  try:cwd=os.readlink(p/'cwd')
+  except OSError:cwd=str(Path.home())
+  env=os.environ.copy()
+  for value in (p/'environ').read_bytes().split(b'\0'):
+   if value.startswith(b'MONITOR='):
+    env['MONITOR']=os.fsdecode(value.split(b'=',1)[1])
+  jobs.append((int(p.name),args[1:],cwd,env))
+ except (OSError,ProcessLookupError):continue
+logdir=Path.home()/'.local/state/black-tiffany';logdir.mkdir(parents=True,exist_ok=True)
+for pid,args,cwd,env in jobs:
+ try:os.kill(pid,signal.SIGTERM)
+ except ProcessLookupError:pass
+ deadline=time.monotonic()+3
+ while Path(f'/proc/{pid}').exists() and time.monotonic()<deadline:time.sleep(.05)
+ if Path(f'/proc/{pid}').exists():
+  # A blocked module may prevent graceful shutdown. Replace only this user's bar.
+  old=Path(f'/proc/{pid}')
+  try:
+   if old.stat().st_uid!=uid or (old/'comm').read_text().strip()!='polybar':
+    print(f'Polybar {pid}: PID changed; skipped.');continue
+   fd=os.pidfd_open(pid)
+   try: signal.pidfd_send_signal(fd,signal.SIGKILL)
+   finally: os.close(fd)
+  except ProcessLookupError: pass
+  time.sleep(.2)
+ with (logdir/'polybar.log').open('ab') as log:
+  p=subprocess.Popen(['/usr/bin/polybar',*args],cwd=cwd,stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True,env=env)
+ time.sleep(.5)
+ print(f'Polybar: {pid} → {p.pid}; '+('running' if p.poll() is None else f'exit {p.returncode}'))

@@ -1,0 +1,13 @@
+#!/bin/sh
+exec kitty --class calendar \
+ --override font_size=18 \
+ --override remember_window_size=no \
+ --override initial_window_width=1400 \
+ --override initial_window_height=900 \
+ --override background=#080D10 \
+ --override background_opacity=0.96 \
+ --override color1=#A3F0E7 \
+ --override color9=#4DDDD5 \
+ --override color6=#0ABAB5 \
+ --override color14=#4DDDD5 \
+ -e calcurse "$@"

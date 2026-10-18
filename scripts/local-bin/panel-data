@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Shared read-only telemetry for Tiffany Polybar and Control Deck."""
+import json, os, sys, time, subprocess as sp, socket, fcntl
+from pathlib import Path
+HOME = Path.home()
+sys.path.insert(0,str(HOME/'.config/panel-lab'))
+from yandex_media import metadata as yandex_metadata
+AWESOME='awesome' in os.environ.get('PANEL_WM',os.environ.get('XDG_CURRENT_DESKTOP','bspwm')).lower()
+RUN = Path(os.environ.get('PANEL_LAB_RUNTIME',str(Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / ('panel-lab-awesome' if AWESOME else 'panel-lab'))))
+STATE = RUN / 'status.json'
+def read(p, default='0'):
+    try: return Path(p).read_text().strip()
+    except OSError: return default
+def cmd(args):
+    try: return sp.check_output(args, text=True, stderr=sp.DEVNULL, timeout=1.2).strip()
+    except (OSError, sp.SubprocessError): return ''
+def snapshot(previous=None):
+    ticks=list(map(int,read('/proc/stat').splitlines()[0].split()[1:9])); total=sum(ticks); idle=ticks[3]+ticks[4]
+    cpu=0 if not previous else max(0,min(100,round(100*(1-(idle-previous[1])/max(1,total-previous[0])))))
+    mem={k:int(v.split()[0]) for k,v in (l.split(':',1) for l in read('/proc/meminfo').splitlines())}
+    used=(mem['MemTotal']-mem['MemAvailable'])/1048576; ram=round(used/(mem['MemTotal']/1048576)*100)
+    temps=[]
+    for hw in Path('/sys/class/hwmon').glob('hwmon*'):
+        if read(hw/'name','')=='coretemp':
+            for p in hw.glob('temp*_input'):
+                try: temps.append(int(read(p))/1000)
+                except ValueError: pass
+    temp=round(max(temps)) if temps else 0
+    bat=Path('/sys/class/power_supply/BAT0'); capacity=int(read(bat/'capacity','0')); charging=read(bat/'status','Unknown')
+    cap_full=int(read(bat/'energy_full',read(bat/'charge_full','0'))); cap_design=int(read(bat/'energy_full_design',read(bat/'charge_full_design','0')))
+    health=round(cap_full/cap_design*100) if cap_design else 0
+    interfaces=[p for p in Path('/sys/class/net').iterdir() if p.name!='lo' and read(p/'operstate','')=='up']
+    physical=[p for p in interfaces if (p/'device').exists()]
+    iface=next((p for p in physical if not (p/'wireless').exists()),physical[0] if physical else None)
+    kind=('Wi-Fi' if (iface/'wireless').exists() else 'LAN') if iface else 'OFFLINE'
+    vpn=any(p.name.startswith(('tun','throne','sing','hiddify','wg')) and int(read(p/'flags','0'),16)&1 for p in Path('/sys/class/net').iterdir())
+    tree=cmd(['bspc','wm','-d']) if not AWESOME else ''; desktops=[]
+    try:
+        t=json.loads(tree)
+        for mon in t['monitors']:
+            for d in mon['desktops']:
+                desktops.append({'id':d['id'],'active':d['id']==mon['focusedDesktopId'],'occupied':d.get('root') is not None})
+    except (ValueError,KeyError,TypeError): pass
+    if AWESOME:
+        try:
+            reply=cmd(['awesome-client','return tiffany.workspace_json()']).strip()
+            if reply.startswith('string '):
+                text=reply[7:].strip()
+                try:decoded=json.loads(text)
+                except ValueError:decoded=text[1:-1] if text.startswith('"') and text.endswith('"') else text
+                desktops=json.loads(decoded) if isinstance(decoded,str) else decoded
+        except (ValueError,TypeError):pass
+    if not desktops:desktops=[dict(id=i+1,active=i==0,occupied=False) for i in range(7)]
+    uptime=int(float(read('/proc/uptime').split()[0])); free=os.statvfs(HOME); disk=round(free.f_bavail*free.f_frsize/1073741824)
+    timer=''
+    try:
+        tr=json.loads((HOME/'.local/state/otter-tools/timer.json').read_text()); sec=max(0,int(tr['end']-time.time()))
+        if sec and tr.get('boot')==read('/proc/sys/kernel/random/boot_id'): timer=f'{sec//60:02}:{sec%60:02}'
+    except (OSError,ValueError,KeyError): pass
+    volume=cmd(['pamixer','--get-volume']); mute=cmd(['pamixer','--get-mute'])=='true'
+    bright=[]
+    for dev in Path('/sys/class/backlight').glob('*'):
+        maximum=int(read(dev/'max_brightness','0'))
+        if maximum: bright.append(round(int(read(dev/'brightness'))/maximum*100))
+    track=yandex_metadata()
+    media=(' · '.join(p for p in (track.get('artist',''),track.get('title','')) if p)[:48]
+           if track.get('status') in ('Playing','Paused') else '')
+    data=dict(cpu=cpu,ram=ram,memory=f'{used:.1f} GiB',temp=temp,battery=capacity,battery_status=charging,battery_health=health,
+        network=kind,interface=iface.name if iface else '',vpn=vpn,volume=int(volume or 0),muted=mute,brightness=bright[0] if bright else 0,
+        uptime=f'{uptime//3600}h {uptime%3600//60:02}m',disk=f'{disk} GiB',time=time.strftime('%H:%M'),date=time.strftime('%a · %d %b'),
+        timer=timer,media=media,host=socket.gethostname(),desktops=desktops[:14])
+    data['summary']=f"CPU {cpu}%  ·  RAM {used:.1f} GiB  ·  {temp}°C"
+    color='#DE7C86' if temp>=85 else '#D8B77B' if temp>=70 else '#0ABAB5'
+    data['polybar_stats']=f'%{{F#C99070}} {cpu}%%{{F-}}  %{{F#A3F0E7}}󰘚 {used:.1f} GiB%{{F-}}  %{{F{color}}}󰔏 {temp}°C%{{F-}}'
+    data['polybar_media']=('󰎆 '+media.replace('%','％').replace('\n',' ').replace('\r',' ')) if media else ''
+    data['net_label']=kind+(' · VPN' if vpn else '')
+    data['battery_label']=f"{'󰂄' if charging=='Charging' else '󰁹'} {capacity}%"
+    data['volume_label']=f"{'󰖁' if mute else '󰕾'} {data['volume']}%"
+    data['focus']=cmd(['dunstctl','is-paused'])=='true'
+    return data,(total,idle)
+def daemon():
+    RUN.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (RUN/'data.lock').open('w') as lock:
+        try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError: return
+        (RUN/'data.pid').write_text(str(os.getpid()))
+        old=None
+        while True:
+            try:
+                data,old=snapshot(old); tmp=STATE.with_suffix('.new'); tmp.write_text(json.dumps(data,ensure_ascii=False)); tmp.replace(STATE)
+            except Exception as e: print(e,file=sys.stderr,flush=True)
+            time.sleep(2)
+def main():
+    mode=sys.argv[1] if len(sys.argv)>1 else 'once'
+    if mode=='daemon': daemon(); return
+    if mode=='stream':
+        while True:
+            value=read(STATE,'')
+            if value:print(value,flush=True)
+            time.sleep(2 if value else .2)
+    elif mode=='field':
+        data=json.loads(read(STATE,'{}'));field=sys.argv[2]; value=data.get(field,'—')
+        print(value if not isinstance(value,bool) else ('ON' if value else 'OFF'))
+    else: print(json.dumps(snapshot()[0],ensure_ascii=False))
+if __name__=='__main__': main()

@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Final approved maintenance step. Run as eto, without sudo; sudo is requested once.
+set -euo pipefail
+(( EUID != 0 )) || { echo 'Run ~/.local/bin/finalize-workstation without sudo.'; exit 1; }
+mode=${1:---apply}
+case "$mode" in --check|--apply) ;; *) echo 'Usage: finalize-workstation [--check|--apply]'; exit 2 ;; esac
+repo_dir="$HOME/dotfiles"
+report_dir="$HOME/Documents/Workstation/2026-10-16/repair/final-maintenance"
+mkdir -p "$report_dir"
+if [[ "$mode" == --check ]]; then
+    bash "$repo_dir/maintain-system.sh" --check
+    echo 'User cleanup: three repair build trees, pip cache, Go build cache, uv prune.'
+    echo 'Retired one-time repair commands will be archived; personal directories stay in place.'
+    exit 0
+fi
+sudo -v
+sudo -- bash "$repo_dir/maintain-system.sh" --apply | tee "$report_dir/root-maintenance.log"
+# This part runs only after root maintenance has completed successfully.
+python3 - <<'PY'
+from pathlib import Path
+import shutil, subprocess
+home = Path.home()
+base = home / 'Documents/Workstation/2026-10-16'
+repair = base / 'repair'
+log = []
+for name in ['nvidia-build', 'nvidia-verified', 'nvidia-lts-test']:
+    path = repair / name
+    if path.is_dir() and not path.is_symlink() and path.resolve().parent == repair.resolve():
+        shutil.rmtree(path)
+        log.append('Removed generated repair build tree: ' + str(path))
+for name in ['pip', 'go-build']:
+    path = home / '.cache' / name
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+        log.append('Removed rebuildable cache: ' + str(path))
+if shutil.which('uv'):
+    subprocess.run(['uv', 'cache', 'prune'], check=True)
+archive = repair / 'archive/one-time-commands'
+archive.mkdir(parents=True, exist_ok=True)
+for name in ['finish-network-and-ayugram', 'finish-system-repair', 'finish-postboot-repair',
+             'finish-nvidia-suspend-repair', 'finish-login-theme', 'prepare-sleep-callback',
+             'test-sleep-callback', 'sleep-nvidia']:
+    path = home / '.local/bin' / name
+    if path.is_file() and not path.is_symlink():
+        target = archive / name
+        if not target.exists():
+            path.rename(target)
+            log.append('Archived retired helper: ' + name)
+# Remove only user integration files referring to the deleted PortProton tree.
+config = home / '.config/PortProton.conf'
+if config.is_file() and config.read_text().strip() == '/vms/PortProton':
+    config.unlink()
+    log.append('Removed PortProton path configuration')
+applications = home / '.local/share/applications'
+for desktop in applications.rglob('*.desktop'):
+    if desktop.is_symlink():
+        continue
+    content = desktop.read_text(errors='replace').lower()
+    if '/vms/portproton' in content or 'ru.linux_gaming.portproton' in content:
+        desktop.unlink()
+        log.append('Removed PortProton launcher: ' + desktop.name)
+if shutil.which('update-desktop-database'):
+    subprocess.run(['update-desktop-database', str(applications)], check=True)
+inventory = base / 'inventory'
+for args, name in [(['pacman', '-Q'], 'packages-all.txt'),
+                   (['pacman', '-Qqe'], 'packages-explicit.txt'),
+                   (['pacman', '-Qdtq'], 'packages-orphans.txt')]:
+    result = subprocess.run(args, text=True, capture_output=True)
+    if result.returncode not in (0, 1):
+        raise RuntimeError(result.stderr)
+    (inventory / name).write_text(result.stdout)
+installed = {line.split()[0] for line in (inventory / 'packages-all.txt').read_text().splitlines()}
+selected = (home / 'dotfiles/docs/cleanup-packages.txt').read_text().split()
+remaining = sorted(installed.intersection(selected))
+if remaining:
+    raise RuntimeError('Selected packages still installed: ' + ', '.join(remaining))
+assert 'obsidian' in installed and 'throne' in installed and 'libvirt' in installed
+assert (home / 'Programs/Hiddify-Linux-x64-AppImage.AppImage').is_file()
+shutil.copy2(inventory / 'packages-explicit.txt', home / 'dotfiles/docs/packages-explicit.txt')
+(inventory / 'ANALOGS.txt').write_text('vim\nnano\nblue-recorder-git\nHiddify\n')
+(inventory / 'UNUSED-CONFIRMED.txt').write_text('')
+summary = '\n'.join(log) + '\nObsidian, Hiddify, VM disks, personal files and yay cache preserved. Trash was cleared separately by user request.\n'
+(repair / 'final-maintenance/USER-CLEANUP.log').write_text(summary)
+(repair / 'final-maintenance/COMPLETED').write_text('Root and user cleanup completed.\n')
+with (repair / 'STATUS.md').open('a') as f:
+    f.write('\n## Финальная очистка выполнена\n\nВыбранные пакеты удалены; root-maintenance.log и USER-CLEANUP.log содержат результат. Защита callback после обновлений установлена. Obsidian/Hiddify и личные файлы сохранены. Пакетные списки обновлены.\n')
+print(summary)
+PY
+"$HOME/.local/bin/check-sleep-callback"
+echo 'Completed. Send root-maintenance.log and USER-CLEANUP.log for final verification.'

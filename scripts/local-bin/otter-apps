@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""Pick XDG desktop entries without colliding with Otter's {} placeholders."""
+import configparser,os,shutil,subprocess as sp
+from pathlib import Path
+H=Path.home()
+def applications():
+    roots=[Path(os.environ.get('XDG_DATA_HOME',H/'.local/share'))]
+    roots.extend(Path(p) for p in os.environ.get('XDG_DATA_DIRS','/usr/local/share:/usr/share').split(':') if p)
+    seen=set();entries=[]
+    locale=os.environ.get('LC_ALL') or os.environ.get('LC_MESSAGES') or os.environ.get('LANG','')
+    locale=locale.split('.')[0];locales=[locale,locale.split('_')[0]] if locale else []
+    for root in roots:
+        folder=root/'applications'
+        for p in sorted(folder.rglob('*.desktop')):
+            desktop_id=str(p.relative_to(folder)).replace('/','-')
+            if desktop_id in seen:continue
+            seen.add(desktop_id)
+            try:
+                config=configparser.ConfigParser(interpolation=None,strict=False);config.optionxform=str
+                config.read(p,encoding='utf-8');entry=config['Desktop Entry']
+                if entry.get('Type','Application')!='Application':continue
+                if any(entry.get(k,'false').lower()=='true' for k in ['Hidden','NoDisplay']):continue
+                if entry.get('TryExec') and not shutil.which(entry['TryExec']):continue
+                if not entry.get('Exec') and entry.get('DBusActivatable','false').lower()!='true':continue
+                name=next((entry[f'Name[{loc}]'] for loc in locales if f'Name[{loc}]' in entry),entry.get('Name',p.stem))
+                name=' '.join(name.split());entries.append((name,desktop_id))
+            except (OSError,configparser.Error,KeyError,UnicodeError):continue
+    return sorted(entries,key=lambda row:(row[0].casefold(),row[1]))
+def main():
+    rows=applications()
+    menu='\n'.join(f'{name}\t{desktop_id}' for name,desktop_id in rows)
+    pick=sp.run(['fzf','--no-info','--cycle','--gutter',' ','--pointer','▌','--delimiter','\t','--with-nth','1',
+        '--color','bg:#080D10,bg+:#183039,fg:#C5D6D8,fg+:#A3F0E7,hl:#0ABAB5,hl+:#4DDDD5,pointer:#0ABAB5',
+        '--prompt','  Приложение > '],input=menu,text=True,stdout=sp.PIPE)
+    if pick.returncode:return
+    chosen=pick.stdout.rstrip('\n').rsplit('\t',1)
+    if len(chosen)!=2 or chosen[1] not in {row[1] for row in rows}:return
+    logs=Path(os.environ.get('XDG_STATE_HOME',H/'.local/state'))/'otter-tools';logs.mkdir(parents=True,exist_ok=True)
+    with (logs/'applications.log').open('ab') as log:
+        sp.Popen(['gtk-launch',chosen[1]],stdin=sp.DEVNULL,stdout=log,stderr=log,start_new_session=True)
+if __name__=='__main__':
+    try:main()
+    except KeyboardInterrupt:pass

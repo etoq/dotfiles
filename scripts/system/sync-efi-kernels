@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mountpoint -q /boot/efi || { echo 'EFI is not mounted; skipped copy' >&2; exit 0; }
+target=/boot/efi/EFI/ARCH
+[[ -d "$target" ]] || exit 0
+for kernel in linux linux-lts; do
+    for image in "vmlinuz-$kernel" "initramfs-$kernel.img"; do
+        [[ -f "/boot/$image" ]] || continue
+        tmp="$target/.$image.new"
+        install -m 644 "/boot/$image" "$tmp"
+        mv -f "$tmp" "$target/$image"
+    done
+done

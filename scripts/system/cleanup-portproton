@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Delete the explicitly approved PortProton installation, not other /vms data."""
+import argparse
+from pathlib import Path
+import shutil
+import subprocess
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    path = Path("/vms/PortProton")
+    if not path.exists():
+        print("PortProton data directory is already absent.")
+        return
+    if path.is_symlink() or path.resolve() != path or not (path / "data/scripts/start.sh").is_file():
+        raise SystemExit("Unexpected PortProton path or missing installation marker; stopping")
+    for command in ["wineserver", "wine", "wine64"]:
+        if subprocess.run(["pgrep", "-x", command], capture_output=True).returncode == 0:
+            raise SystemExit("Wine is running; close it before deleting PortProton")
+    print("Approved deletion: /vms/PortProton including its games and Windows prefixes.", flush=True)
+    if not args.apply:
+        print("Dry run only.")
+        return
+    shutil.rmtree(path)
+    print("Removed /vms/PortProton. Other /vms directories unchanged.", flush=True)
+
+
+if __name__ == "__main__":
+    main()

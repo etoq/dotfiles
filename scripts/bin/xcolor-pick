@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
-
-TEMP_DIR=/tmp/xcolor
-MSG=${XDG_CACHE_HOME:-$HOME/.cache}/xcolor.msg
-
-EXPIRE_TIME=5000
-
-main() {
-    HEX_COLOR=$(gpick -pso --no-newline)
-    mkdir -p $TEMP_DIR
-    HEX="${HEX_COLOR#\#}"
-    FNAME="$TEMP_DIR/$HEX.png"
-    convert -size 100x100 xc:"$HEX_COLOR" "$FNAME"
-    COLOR_CODE="$HEX_COLOR"
-
-    printf %s "$COLOR_CODE" | xclip -sel c
-        notify-send -a XColor --icon="$FNAME" xcolor-pick "$COLOR_CODE" --expire-time="$EXPIRE_TIME"
-}
-
-main
+set -euo pipefail
+# Original Gpick floating picker; Win+Shift+X keeps its historical command name.
+if ! command -v gpick >/dev/null 2>&1; then
+    notify-send 'Пипетка Gpick' 'Установи gpick: sudo ~/.local/bin/finish-color-picker' || true
+    exit 1
+fi
+color=$(gpick -pso --no-newline) || exit 0
+[[ "$color" =~ ^#[[:xdigit:]]{6}$ ]] || exit 0
+preview_dir="${XDG_CACHE_HOME:-$HOME/.cache}/gpick-swatches"
+mkdir -p "$preview_dir"
+swatch="$preview_dir/${color#\#}.png"
+magick -size 100x100 "xc:$color" "$swatch"
+printf '%s' "$color" | xclip -selection clipboard
+notify-send -a Gpick --icon="$swatch" 'Цвет скопирован' "$color" --expire-time=5000
