@@ -85,7 +85,7 @@ app.connect('activate',()=>{
     if(GLib.get_monotonic_time()-deviceEdited>1200000)item.combo.set_active_id(data[item.selectedKey]||'');
    }
    deviceSync=false;const names=(data.vms||[]).join(', ');vmState.set_text(data.vm_available===false?'VM: служба недоступна':(names?`VM: ${names}`:'VM: все выключены'));vmState.set_tooltip_text(names||'Нет запущенных виртуальных машин');
-   const last=data.backup?.last_success;const backupLabels={awaiting_destination:'ждёт выбора облака',awaiting_authentication:'Proton — нужен вход',not_configured:'не настроена',ready:'готова к запуску',running:'выполняется',error:'ошибка'};backupState.set_text(last?`Копия: ${last}`:`Копия: ${backupLabels[data.backup?.state]||'не запущена'}`);backupState.set_tooltip_text(data.backup?.message||'Резервирование пока не запущено');
+   const last=data.backup?.last_success;const backupLabels={awaiting_destination:'ждёт выбора облака',awaiting_authentication:'Proton — нужен вход',not_configured:'не настроена',ready:'Proton подключён, копии ещё нет',running:'выполняется',error:'ошибка'};backupState.set_text(last?`Копия: ${last}`:`Копия: ${backupLabels[data.backup?.state]||'не запущена'}`);backupState.set_tooltip_text(data.backup?.message||'Резервирование пока не запущено');
   }catch(e){deviceSync=false;controls.set_tooltip_text(String(e));}});
  }
  refreshSystem();
