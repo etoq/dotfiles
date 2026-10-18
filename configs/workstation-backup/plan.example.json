@@ -17,7 +17,8 @@
     ".config/ghidra",
     ".config/Throne",
     ".ssh",
-    ".local/share/keyrings"
+    ".local/share/keyrings",
+    ".config/keepassxc"
   ],
   "exclude": [
     "**/__pycache__",
@@ -26,6 +27,6 @@
     "**/.cache"
   ],
   "schedule": null,
-  "note": "Provider selected. Awaiting browser login and explicit first backup launch; no archives or uploads created.",
+  "note": "Add the private path to your .kdbx database and any required key file locally. Never commit a vault or keys. No backup until connected and explicitly launched.",
   "encryption": "Proton Drive client-side end-to-end encryption"
 }

@@ -19,3 +19,8 @@ secrets.json
 
 # Fish universal state is local runtime data
 configs/fish/fish_variables
+
+# Password vaults and key files never belong in the public dotfiles repo
+*.kdbx
+*.kdbx.*
+*.keyx

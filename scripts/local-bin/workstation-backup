@@ -61,9 +61,11 @@ def restore_verify(archive,entries,dest):
     return verified
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run-once',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run-once',action='store_true');parser.add_argument('--only',action='append',help='Back up only this exact configured source (repeatable)');args=parser.parse_args()
     if os.geteuid()==0:raise RuntimeError('Run as your normal desktop user, without sudo')
-    plan=json.loads(PLAN.read_text());sources=plan['sources']
+    plan=json.loads(PLAN.read_text());sources=args.only or plan['sources']
+    if any(name not in plan['sources'] for name in sources):raise RuntimeError('--only source is not in the configured plan')
+    scope='partial' if args.only else 'full'
     for name in sources:
         safe_name(name)
         if not (H/name).exists():raise RuntimeError('A configured source is missing: '+name)
@@ -79,7 +81,7 @@ def main():
     lock=(STATE/'backup.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     status=STATE/'status.json'
     previous=json.loads(status.read_text()) if status.exists() else {}
-    run_id=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    run_id=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+('-partial' if args.only else '')
     record=STATE/'runs'/run_id;record.mkdir(parents=True,mode=0o700)
     client=str(H/'.local/bin/proton-drive');log=(record/'client.log').open('a')
     last=previous.get('last_success');remote=plan['destination']['remote_directory'].rstrip('/')
@@ -113,7 +115,7 @@ def main():
         phase('manifest','Хеширование файлов из готового архива')
         entries=inspect_archive(archive);digest=sha(archive)
         manifest=stage/'manifest.json'
-        data={'created_utc':run_id,'archive':archive.name,'sha256':digest,'bytes':archive.stat().st_size,'sources':sources,'exclude':plan.get('exclude',[]),'entries':entries,'encryption':'Proton Drive client-side E2EE','consistency':'File-level archive of live user data; not an application-consistent database or VM snapshot.'}
+        data={'created_utc':run_id,'archive':archive.name,'sha256':digest,'bytes':archive.stat().st_size,'sources':sources,'scope':scope,'exclude':plan.get('exclude',[]),'entries':entries,'encryption':'Proton Drive client-side E2EE','consistency':'File-level archive of live user data; not an application-consistent database or VM snapshot.'}
         atomic_json(manifest,data);shutil.copyfile(manifest,record/'manifest.json')
         (stage/'SHA256SUMS').write_text(digest+'  '+archive.name+'\n')
         # All archive names and symlink ancestors were validated before upload/extraction.
@@ -135,9 +137,11 @@ def main():
         restored=stage/'restore';restored.mkdir(mode=0o700)
         count=restore_verify(returned,entries,restored)
         finished=datetime.datetime.now().astimezone().isoformat()
-        result={'state':'success','run_id':run_id,'last_success':finished,'remote':run_remote,'archive':archive.name,'archive_bytes':archive.stat().st_size,'archive_sha256':digest,'verified_files':count,'verified_entries':len(entries),'restore_verified':True,'message':f'Proton: копия и восстановление проверены, файлов {count}.'}
+        result={'state':'success','run_id':run_id,'last_success':finished,'remote':run_remote,'archive':archive.name,'archive_bytes':archive.stat().st_size,'archive_sha256':digest,'verified_files':count,'verified_entries':len(entries),'restore_verified':True,'scope':scope,'sources':sources,'last_full_success':plan.get('last_full_success',last) if scope=='partial' else finished,'message':f'Proton: {"дополнение" if scope=="partial" else "полная копия"} и восстановление проверены, файлов {count}.'}
         atomic_json(record/'result.json',result);atomic_json(status,result)
-        plan['last_success']=finished;plan['last_verified_remote']=run_remote;plan['note']='First manual backup uploaded, downloaded and fully restore-verified. Automatic schedule remains disabled.';atomic_json(PLAN,plan)
+        plan['last_success']=finished;plan['last_verified_remote']=run_remote
+        if scope=='full':plan['last_full_success']=finished;plan['last_full_verified_remote']=run_remote
+        plan['note']='Manual backup uploaded, downloaded and restore-verified. Check scope: partial versions supplement the last full backup. Automatic schedule remains disabled.';atomic_json(PLAN,plan)
         print('SUCCESS:',run_remote,flush=True);print('SHA256:',digest,flush=True);print('Restored and verified files:',count,flush=True)
     except BaseException as e:
         atomic_json(status,{'state':'error','last_success':last,'run_id':run_id,'uploaded':uploaded,'message':str(e)})
