@@ -85,12 +85,16 @@ def main():
     record=STATE/'runs'/run_id;record.mkdir(parents=True,mode=0o700)
     client=str(H/'.local/bin/proton-drive');log=(record/'client.log').open('a')
     last=previous.get('last_success');remote=plan['destination']['remote_directory'].rstrip('/')
+    history={'last_success':last,
+             'last_full_success':plan.get('last_full_success',previous.get('last_full_success')),
+             'last_verified_remote':plan.get('last_verified_remote',previous.get('remote')),
+             'last_full_verified_remote':plan.get('last_full_verified_remote',previous.get('last_full_verified_remote'))}
     if not remote.startswith('/my-files/') or '..' in PurePosixPath(remote).parts:raise RuntimeError('Unsafe destination')
     temp_root=H/'.local/share/workstation-backup/staging';temp_root.mkdir(parents=True,exist_ok=True);temp_root.chmod(0o700)
     stage=Path(tempfile.mkdtemp(prefix=run_id+'-',dir=temp_root))
     uploaded=False
     def phase(name,message):
-        atomic_json(status,dict(state='running',phase=name,last_success=last,message=message,run_id=run_id))
+        atomic_json(status,dict(history,state='running',phase=name,scope=scope,message=message,run_id=run_id))
         print(name+': '+message,flush=True)
     def cli(*args,check=True):
         p=sp.run([client,*args],stdout=log,stderr=log,text=True)
@@ -137,14 +141,14 @@ def main():
         restored=stage/'restore';restored.mkdir(mode=0o700)
         count=restore_verify(returned,entries,restored)
         finished=datetime.datetime.now().astimezone().isoformat()
-        result={'state':'success','run_id':run_id,'last_success':finished,'remote':run_remote,'archive':archive.name,'archive_bytes':archive.stat().st_size,'archive_sha256':digest,'verified_files':count,'verified_entries':len(entries),'restore_verified':True,'scope':scope,'sources':sources,'last_full_success':plan.get('last_full_success',last) if scope=='partial' else finished,'message':f'Proton: {"дополнение" if scope=="partial" else "полная копия"} и восстановление проверены, файлов {count}.'}
+        result={'state':'success','run_id':run_id,'last_success':finished,'remote':run_remote,'archive':archive.name,'archive_bytes':archive.stat().st_size,'archive_sha256':digest,'verified_files':count,'verified_entries':len(entries),'restore_verified':True,'scope':scope,'sources':sources,'last_full_success':history['last_full_success'] if scope=='partial' else finished,'last_verified_remote':run_remote,'last_full_verified_remote':history['last_full_verified_remote'] if scope=='partial' else run_remote,'message':f'Proton: {"дополнение" if scope=="partial" else "полная копия"} и восстановление проверены, файлов {count}.'}
         atomic_json(record/'result.json',result);atomic_json(status,result)
         plan['last_success']=finished;plan['last_verified_remote']=run_remote
         if scope=='full':plan['last_full_success']=finished;plan['last_full_verified_remote']=run_remote
         plan['note']='Manual backup uploaded, downloaded and restore-verified. Check scope: partial versions supplement the last full backup. Automatic schedule remains disabled.';atomic_json(PLAN,plan)
         print('SUCCESS:',run_remote,flush=True);print('SHA256:',digest,flush=True);print('Restored and verified files:',count,flush=True)
     except BaseException as e:
-        atomic_json(status,{'state':'error','last_success':last,'run_id':run_id,'uploaded':uploaded,'message':str(e)})
+        atomic_json(status,dict(history,state='error',scope=scope,run_id=run_id,uploaded=uploaded,message=str(e)))
         raise
     finally:
         log.close();shutil.rmtree(stage)
