@@ -47,7 +47,7 @@ TRIM через LUKS оставлен без изменений: discard сей�
 
 Пользователь выполнил finish-workstation-audit: Completed, backup /var/backups/workstation-audit-20261018-213042. Wine/Winetricks удалены (592.01 MiB), paccache удалил 56 старых пакетов (429.78 MiB), pacman -Dk без ошибок. br0 отсутствует; SMART и scrub timer активны. Первый scrub запущен и на момент проверки ещё выполняется — итог пока не подтверждён. Отказавших системных/пользовательских служб не найдено.
 
-Три дополнительные socket-юнита networkd disabled, но пока active в текущем сеансе: systemd-networkd-varlink.socket, systemd-networkd-varlink-metrics.socket, systemd-networkd-resolve-hook.socket. Для немедленного завершения достаточно sudo systemctl stop с этими тремя именами; на следующей загрузке их автозапуск уже отключён. Драйвер 470 и LUKS/TRIM сохранены; backup/upload не запускались.
+После дополнительного root-командного шага networkd и все четыре его socket-юнита inactive и disabled. Проверено после сообщения пользователя; хвосты socket activation остановлены. Драйвер 470 и LUKS/TRIM сохранены; backup/upload не запускались.
 
 ## Проверки
 
