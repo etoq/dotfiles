@@ -1,0 +1,149 @@
+#!/usr/bin/python
+"""Manual, versioned Proton backup with a complete round-trip restore check.
+Default is local plan inspection. --run-once is explicit upload authorization.
+"""
+import argparse,datetime,fcntl,hashlib,json,os,shutil,stat,subprocess as sp,sys,tarfile,tempfile,time
+from pathlib import Path,PurePosixPath
+H=Path.home();STATE=H/'.local/state/workstation-backup';PLAN=H/'.config/workstation-backup/plan.json'
+os.umask(0o077)
+def atomic_json(path,data):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n');tmp.replace(path)
+def sha(path):
+    with path.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def safe_name(name):
+    p=PurePosixPath(name)
+    if p.is_absolute() or '..' in p.parts or not p.parts:raise RuntimeError('Unsafe archive member')
+    return str(p)
+def inspect_archive(archive):
+    entries={}
+    proc=sp.Popen(['zstd','-dc',str(archive)],stdout=sp.PIPE,stderr=sp.DEVNULL)
+    try:
+        with tarfile.open(fileobj=proc.stdout,mode='r|') as tf:
+            for m in tf:
+                name=safe_name(m.name)
+                if name in entries:raise RuntimeError('Duplicate archive member')
+                item={'type':'','mode':m.mode,'size':m.size}
+                if m.isfile():
+                    item['type']='file'
+                    with tf.extractfile(m) as f:item['sha256']=hashlib.file_digest(f,'sha256').hexdigest()
+                elif m.isdir():item['type']='directory'
+                elif m.issym():item.update(type='symlink',target=m.linkname)
+                elif m.islnk():item.update(type='hardlink',target=safe_name(m.linkname))
+                else:raise RuntimeError('Archive contains unsupported special files')
+                entries[name]=item
+        if proc.wait()!=0:raise RuntimeError('Could not decompress the full archive')
+    finally:
+        proc.stdout.close()
+        if proc.poll() is None:proc.terminate();proc.wait()
+    for name,item in entries.items():
+        for parent in PurePosixPath(name).parents:
+            if str(parent) in entries and entries[str(parent)]['type']!='directory':raise RuntimeError('Non-directory archive ancestor')
+        if item['type']=='hardlink' and item['target'] not in entries:raise RuntimeError('Hardlink target outside archive')
+    return entries
+
+def restore_verify(archive,entries,dest):
+    sp.run(['tar','--extract','--zstd','--file',str(archive),'--directory',str(dest),'--no-same-owner','--same-permissions','--acls','--xattrs'],check=True,stdout=sp.DEVNULL)
+    verified=0
+    for name,item in entries.items():
+        p=dest/name;st=p.lstat();kind=item['type']
+        if kind=='symlink':
+            if not stat.S_ISLNK(st.st_mode) or os.readlink(p)!=item['target']:raise RuntimeError('Restored symlink differs')
+        elif kind=='directory':
+            if not stat.S_ISDIR(st.st_mode):raise RuntimeError('Restored directory differs')
+        elif kind=='file':
+            if not stat.S_ISREG(st.st_mode) or st.st_size!=item['size'] or sha(p)!=item['sha256']:raise RuntimeError('Restored file hash differs')
+            verified+=1
+        elif kind=='hardlink':
+            target=dest/item['target']
+            if not stat.S_ISREG(st.st_mode) or st.st_ino!=target.stat().st_ino:raise RuntimeError('Restored hardlink differs')
+        if kind!='symlink' and stat.S_IMODE(st.st_mode)!=item['mode']:raise RuntimeError('Restored permissions differ')
+    return verified
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run-once',action='store_true');args=parser.parse_args()
+    if os.geteuid()==0:raise RuntimeError('Run as your normal desktop user, without sudo')
+    plan=json.loads(PLAN.read_text());sources=plan['sources']
+    for name in sources:
+        safe_name(name)
+        if not (H/name).exists():raise RuntimeError('A configured source is missing: '+name)
+    if not args.run_once:
+        print('Local plan only. Provider:',plan['destination']['provider'])
+        print('Sources:',', '.join(sources));print('Schedule:',plan.get('schedule'))
+        print('Use --run-once to create, upload, download and restore-check one version.');return
+    if plan['destination']['provider']!='proton-drive' or not plan['destination'].get('connected'):raise RuntimeError('Proton connection is not configured')
+    if plan.get('encryption')!='Proton Drive client-side end-to-end encryption':raise RuntimeError('Expected official Proton client encryption')
+    for command in ['tar','zstd']:
+        if not shutil.which(command):raise RuntimeError('Missing dependency: '+command)
+    STATE.mkdir(parents=True,exist_ok=True);STATE.chmod(0o700)
+    lock=(STATE/'backup.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    status=STATE/'status.json'
+    previous=json.loads(status.read_text()) if status.exists() else {}
+    run_id=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    record=STATE/'runs'/run_id;record.mkdir(parents=True,mode=0o700)
+    client=str(H/'.local/bin/proton-drive');log=(record/'client.log').open('a')
+    last=previous.get('last_success');remote=plan['destination']['remote_directory'].rstrip('/')
+    if not remote.startswith('/my-files/') or '..' in PurePosixPath(remote).parts:raise RuntimeError('Unsafe destination')
+    temp_root=H/'.local/share/workstation-backup/staging';temp_root.mkdir(parents=True,exist_ok=True);temp_root.chmod(0o700)
+    stage=Path(tempfile.mkdtemp(prefix=run_id+'-',dir=temp_root))
+    uploaded=False
+    def phase(name,message):
+        atomic_json(status,dict(state='running',phase=name,last_success=last,message=message,run_id=run_id))
+        print(name+': '+message,flush=True)
+    def cli(*args,check=True):
+        p=sp.run([client,*args],stdout=log,stderr=log,text=True)
+        log.flush()
+        if check and p.returncode:raise RuntimeError('Proton command failed; private log: '+str(record/'client.log'))
+        return p.returncode
+    try:
+        phase('connection','Проверка доступа к Proton Drive')
+        cli('filesystem','info','/my-files','--json')
+        phase('archive','Создание локального архива выбранных папок')
+        archive=stage/('zer0-'+run_id+'.tar.zst')
+        for attempt in range(3):
+            cmd=['tar','--create','--file',str(archive),'--directory',str(H),'--acls','--xattrs','--sparse','--use-compress-program=zstd -T2 -3']
+            cmd += ['--exclude='+pattern for pattern in plan.get('exclude',[])]
+            cmd += ['--',*sources]
+            p=sp.run(cmd,stdout=sp.DEVNULL,stderr=sp.PIPE,text=True)
+            (record/'archive.log').write_text(p.stderr)
+            if p.returncode==0:break
+            if p.returncode!=1 or attempt==2:raise RuntimeError('Source files changed or tar failed; archive was not uploaded. See '+str(record/'archive.log'))
+            time.sleep(2)
+        archive.chmod(0o600)
+        phase('manifest','Хеширование файлов из готового архива')
+        entries=inspect_archive(archive);digest=sha(archive)
+        manifest=stage/'manifest.json'
+        data={'created_utc':run_id,'archive':archive.name,'sha256':digest,'bytes':archive.stat().st_size,'sources':sources,'exclude':plan.get('exclude',[]),'entries':entries,'encryption':'Proton Drive client-side E2EE','consistency':'File-level archive of live user data; not an application-consistent database or VM snapshot.'}
+        atomic_json(manifest,data);shutil.copyfile(manifest,record/'manifest.json')
+        (stage/'SHA256SUMS').write_text(digest+'  '+archive.name+'\n')
+        # All archive names and symlink ancestors were validated before upload/extraction.
+        phase('upload',f'Загрузка версии {run_id} ({archive.stat().st_size//1024**2} МиБ)')
+        if cli('filesystem','info',remote,'--json',check=False):
+            parent,name=remote.rsplit('/',1);cli('filesystem','create-folder',parent,name)
+        run_remote=remote+'/'+run_id
+        cli('filesystem','create-folder',remote,run_id)
+        cli('filesystem','upload','--skip-thumbnails','--file-conflict-strategy','skip',str(archive),str(manifest),str(stage/'SHA256SUMS'),run_remote)
+        uploaded=True
+        phase('download','Скачивание созданной копии обратно для проверки')
+        download=stage/'download';download.mkdir(mode=0o700)
+        cli('filesystem','download',run_remote+'/'+archive.name,run_remote+'/manifest.json',run_remote+'/SHA256SUMS',str(download))
+        returned=download/archive.name
+        if not returned.is_file() or sha(returned)!=digest:raise RuntimeError('Downloaded archive hash mismatch')
+        if json.loads((download/'manifest.json').read_text())!=data:raise RuntimeError('Downloaded manifest differs')
+        if (download/'SHA256SUMS').read_bytes()!=(stage/'SHA256SUMS').read_bytes():raise RuntimeError('Downloaded checksum file differs')
+        phase('restore','Пробное восстановление всех файлов в отдельную папку')
+        restored=stage/'restore';restored.mkdir(mode=0o700)
+        count=restore_verify(returned,entries,restored)
+        finished=datetime.datetime.now().astimezone().isoformat()
+        result={'state':'success','run_id':run_id,'last_success':finished,'remote':run_remote,'archive':archive.name,'archive_bytes':archive.stat().st_size,'archive_sha256':digest,'verified_files':count,'verified_entries':len(entries),'restore_verified':True,'message':f'Proton: копия и восстановление проверены, файлов {count}.'}
+        atomic_json(record/'result.json',result);atomic_json(status,result)
+        plan['last_success']=finished;plan['last_verified_remote']=run_remote;plan['note']='First manual backup uploaded, downloaded and fully restore-verified. Automatic schedule remains disabled.';atomic_json(PLAN,plan)
+        print('SUCCESS:',run_remote,flush=True);print('SHA256:',digest,flush=True);print('Restored and verified files:',count,flush=True)
+    except BaseException as e:
+        atomic_json(status,{'state':'error','last_success':last,'run_id':run_id,'uploaded':uploaded,'message':str(e)})
+        raise
+    finally:
+        log.close();shutil.rmtree(stage)
+if __name__=='__main__':
+    try:main()
+    except (Exception,KeyboardInterrupt) as e:print('Backup failed:',e,file=sys.stderr);sys.exit(1)
