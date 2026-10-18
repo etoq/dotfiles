@@ -16,3 +16,6 @@ id_rsa*
 id_ed25519*
 credentials.json
 secrets.json
+
+# Fish universal state is local runtime data
+configs/fish/fish_variables
