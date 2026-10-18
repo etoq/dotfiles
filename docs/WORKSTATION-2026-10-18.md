@@ -35,7 +35,7 @@ Backup root: /var/backups/workstation-audit-*. В files/ прежние конф
 
 ## Backup — только подготовка
 
-~/.config/workstation-backup/plan.json: enabled=false, выбран Proton Drive, encryption_required=true, без расписания. Официальный CLI 0.9.0 установлен с проверкой SHA512; вход выполнен пользователем, доступ подтверждён запросом чтения; первый backup ещё не запускался. Подробности: docs/PROTON-BACKUP.md. Источники включают dotfiles с историей Git, документы/заметки/проекты, профили Ghidra/Throne, SSH и keyrings. Резервные архивы не создавались и данные не загружались; для передачи выбран официальный клиент с E2EE. Конфиденциальные источники требуют шифрования до отправки. Пример плана без данных — configs/workstation-backup/plan.example.json.
+~/.config/workstation-backup/plan.json: enabled=false, выбран Proton Drive, encryption_required=true, без расписания. Официальный CLI 0.9.0 установлен с проверкой SHA512; вход выполнен пользователем; первая ручная копия 18 октября загружена и проверена полным восстановлением 3081 файла, подробности в PROTON-BACKUP.md. Подробности: docs/PROTON-BACKUP.md. Источники включают dotfiles с историей Git, документы/заметки/проекты, профили Ghidra/Throne, SSH и keyrings. Первая версия 962.3 MiB сохранена через официальный клиент с E2EE; архив скачан обратно, SHA256 и восстановление проверены. Автоматическое расписание не включено. Конфиденциальные источники требуют шифрования до отправки. Пример плана без данных — configs/workstation-backup/plan.example.json.
 
 TRIM через LUKS оставлен без изменений: discard сейчас запрещён. Еженедельный fstrim не включён до решения об этом компромиссе.
 
