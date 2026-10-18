@@ -39,9 +39,15 @@ Backup root: /var/backups/workstation-audit-*. В files/ прежние конф
 
 TRIM через LUKS оставлен без изменений: discard сейчас запрещён. Еженедельный fstrim не включён до решения об этом компромиссе.
 
-## Windows Analysis
+## Linux — текущий фокус лаборатории
 
-win-analysis — отдельная полная копия win, независимый qcow2, сеть отключена отсутствием адаптера. Нет общих папок/USB/SPICE-канала, clipboard/file transfer; без 3D/звука, автозапуск выключен. Есть снимок initial-clone и read-only CD со скриптом подготовки Windows. До образцов удалить личные данные копии, подготовить инструменты и создать analyst-ready; initial-clone не является очищенной лабораторной базой. Гостевая Windows автоматически не запускалась и не настраивалась. Инструкция — Documents/Workstation/2026-10-18/win-analysis/README.md. Проверка хостовой конфигурации: check-win-analysis.
+По просьбе пользователя win-analysis удалена 18 октября вместе с независимым диском, снимком и setup ISO. Исходные win/win-clean и остальные гости сохранены. Linux-лаборатория debian_RE остаётся; новые инструменты не устанавливались.
+
+## Результат root-запуска 21:30
+
+Пользователь выполнил finish-workstation-audit: Completed, backup /var/backups/workstation-audit-20261018-213042. Wine/Winetricks удалены (592.01 MiB), paccache удалил 56 старых пакетов (429.78 MiB), pacman -Dk без ошибок. br0 отсутствует; SMART и scrub timer активны. Первый scrub запущен и на момент проверки ещё выполняется — итог пока не подтверждён. Отказавших системных/пользовательских служб не найдено.
+
+Три дополнительные socket-юнита networkd disabled, но пока active в текущем сеансе: systemd-networkd-varlink.socket, systemd-networkd-varlink-metrics.socket, systemd-networkd-resolve-hook.socket. Для немедленного завершения достаточно sudo systemctl stop с этими тремя именами; на следующей загрузке их автозапуск уже отключён. Драйвер 470 и LUKS/TRIM сохранены; backup/upload не запускались.
 
 ## Проверки
 
