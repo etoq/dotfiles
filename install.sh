@@ -245,6 +245,7 @@ fi
 if [ "$DO_CONFIGS" = "1" ]; then
     step "СИМЛИНКИ КОНФИГОВ"
     link "configs/applications/tiffany-image.desktop" "$HOME/.local/share/applications/tiffany-image.desktop"
+    link "configs/applications/org.keepassxc.KeePassXC.desktop" "$HOME/.local/share/applications/org.keepassxc.KeePassXC.desktop"
     link "configs/applications/com.ayugram.desktop.desktop" "$HOME/.local/share/applications/com.ayugram.desktop.desktop"
     link "configs/xdg-desktop-portal/portals.conf" "$HOME/.config/xdg-desktop-portal/portals.conf"
 
@@ -328,7 +329,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(keepassxc proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"
