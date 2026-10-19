@@ -30,6 +30,18 @@ class TransitionSafety(unittest.TestCase):
         self.assertEqual(calls[0], ['pacman', '-U', '--', Path('/test/package')])
         self.assertEqual(calls[1], ['/test/policy'])
 
+    def test_emergency_rollback_answers_conflicts_without_disabling_dependencies(self):
+        calls = []
+        transition.transaction(calls.append, [Path('/test/package')], '/test/policy', True)
+        self.assertEqual(calls[0], ['pacman', '-U', '--noconfirm', '--ask=4', '--', Path('/test/package')])
+        self.assertEqual(calls[1], ['/test/policy'])
+
+    def test_unattended_forward_action_is_rejected_before_machine_checks(self):
+        with patch.object(transition.os, 'geteuid', return_value=0), patch.object(transition, 'check_machine') as check:
+            with self.assertRaisesRegex(RuntimeError, 'restricted'):
+                transition.apply({}, False, unattended_rollback=True)
+            check.assert_not_called()
+
     def test_wrong_module_version_stops_before_rebuilding_boot_images(self):
         calls = []
         with patch.object(transition, 'output', return_value='470.256.02'):

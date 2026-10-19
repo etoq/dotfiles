@@ -130,11 +130,12 @@ class Runner:
                     raise RuntimeError('Command failed; see ' + str(self.log))
 
 
-def transaction(run, archives, policy):
+def transaction(run, archives, policy, unattended_rollback=False):
     # Normal interactive pacman: no forced dependency removal and no global --noconfirm.
     # Even on a partial failure, restore the explicitly selected sleep configuration.
     try:
-        run(['pacman', '-U', '--', *archives])
+        options = ['--noconfirm', '--ask=4'] if unattended_rollback else []
+        run(['pacman', '-U', *options, '--', *archives])
     finally:
         run([policy])
 
@@ -156,6 +157,21 @@ def publish_report(plan, report):
     temporary.chmod(0o640)
     os.chown(temporary, 0, account.pw_gid)
     temporary.replace(directory / 'report.json')
+    # Retain a non-secret root-owned result across an emergency reboot.
+    persistent = Path('/var/lib/workstation-driver-transition')
+    if persistent.is_symlink() or persistent.exists() and persistent.stat().st_uid != 0:
+        raise RuntimeError('Unsafe persistent transition report directory')
+    persistent.mkdir(mode=0o750, exist_ok=True)
+    persistent.chmod(0o750)
+    os.chown(persistent, 0, account.pw_gid)
+    temporary = persistent / 'report.json.new'
+    temporary.unlink(missing_ok=True)
+    with temporary.open('x') as stream:
+        json.dump(report, stream, indent=2)
+        stream.write('\n')
+    temporary.chmod(0o640)
+    os.chown(temporary, 0, account.pw_gid)
+    temporary.replace(persistent / 'report.json')
 
 
 def finish(run, plan, stage, version):
@@ -185,10 +201,12 @@ def finish(run, plan, stage, version):
             raise RuntimeError('EFI image differs: ' + name)
 
 
-def apply(plan, rollback, resume=False):
+def apply(plan, rollback, resume=False, unattended_rollback=False):
     if os.geteuid() != 0:
         raise RuntimeError('Run the selected action with sudo in your terminal')
-    if not sys.stdin.isatty():
+    if unattended_rollback and (not rollback or resume):
+        raise RuntimeError('Unattended mode is restricted to the pinned 470 rollback')
+    if not sys.stdin.isatty() and not unattended_rollback:
         raise RuntimeError('An interactive terminal is required for package confirmation')
     check_machine(plan)
     base = verify_backup(plan)
@@ -247,7 +265,7 @@ def apply(plan, rollback, resume=False):
         policy = '/usr/local/libexec/nvidia470-sleep-policy'
         run([policy])
         if not resume:
-            transaction(run, stable_archives, policy)
+            transaction(run, stable_archives, policy, unattended_rollback)
         installed_matches(records)
         finish(run, plan, stage, version)
         report['complete'] = True
@@ -265,10 +283,11 @@ def main():
     actions.add_argument('--apply580', action='store_true')
     actions.add_argument('--restore470', action='store_true')
     actions.add_argument('--resume580', action='store_true')
+    actions.add_argument('--restore470-unattended', action='store_true', help='Emergency: verified pinned rollback, auto-answer only package conflicts')
     args = parser.parse_args()
     plan = json.loads(PLAN.read_text())
-    if args.apply580 or args.restore470 or args.resume580:
-        apply(plan, args.restore470, args.resume580)
+    if args.apply580 or args.restore470 or args.resume580 or args.restore470_unattended:
+        apply(plan, args.restore470 or args.restore470_unattended, args.resume580, args.restore470_unattended)
         return
     check_machine(plan)
     verify_forward(plan)
