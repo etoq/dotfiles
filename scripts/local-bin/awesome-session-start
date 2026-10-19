@@ -33,7 +33,7 @@ keyboard_fields=dict(line.split(':',1) for line in keyboard.splitlines() if ':' 
 if keyboard_fields.get('layout','').strip()!='us,ru' or 'grp:alt_shift_toggle' not in keyboard_fields.get('options',''):
  call(['setxkbmap','-layout','us,ru','-option','grp:alt_shift_toggle'])
 call(['xrdb','-merge',H/'.Xresources'])
-call(['xset','s','600','600']);call(['xset','+dpms']);call(['xset','dpms','600','600','600'])
+call(['systemctl','--user','start','idle-screen-lock.service'])
 once('dunst',['dunst'])
 once('xsettingsd',['xsettingsd'])
 call(['systemctl','--user','start','throne.service'])
@@ -42,7 +42,6 @@ once('picom',['picom','--config',H/'.config/picom/picom.conf'])
 once('greenclip',['greenclip','daemon'])
 once('flameshot',['flameshot'])
 once('gammastep',['gammastep','-m','randr'])
-once('xss-lock',['xss-lock','--','sh','-c','xset dpms force off; betterlockscreen -l dimblur'])
 once('battery-alert',[H/'bin/battery-alert'])
 
 # One supervised audio service; keep an existing dictation session.

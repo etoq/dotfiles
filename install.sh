@@ -255,6 +255,7 @@ fi
 if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/applications/imhex.desktop" "$HOME/.local/share/applications/imhex.desktop"
     link "configs/udiskie/config.yml" "$HOME/.config/udiskie/config.yml"
+    link "configs/systemd/user/idle-screen-lock.service" "$HOME/.config/systemd/user/idle-screen-lock.service"
     link "configs/systemd/user/udiskie.service" "$HOME/.config/systemd/user/udiskie.service"
     link "configs/systemd/user/proton-quota.service" "$HOME/.config/systemd/user/proton-quota.service"
     link "configs/systemd/user/proton-quota.timer" "$HOME/.config/systemd/user/proton-quota.timer"

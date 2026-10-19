@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Lock before powering off the display; never suspend the computer."""
+from pathlib import Path
+import os
+import subprocess as sp
+import sys
+import time
+
+
+def watch():
+    session = os.environ.get('XDG_SESSION_ID')
+    if not session:
+        session = sp.check_output(['loginctl', 'show-user', str(os.getuid()),
+                                   '--property=Display', '--value'], text=True).strip()
+    if not session:
+        raise SystemExit('No graphical login session found')
+    details = sp.check_output(['loginctl', 'show-session', session, '--property=User',
+                               '--property=Type'], text=True)
+    props = dict(line.split('=', 1) for line in details.splitlines() if '=' in line)
+    if props.get('User') != str(os.getuid()) or props.get('Type') != 'x11':
+        raise SystemExit('The selected login session is not this user’s X11 session')
+    os.execvp('xss-lock', ['xss-lock', '--verbose', '--session=' + session, '--',
+                         str(Path.home() / '.local/bin/idle-screen-lock')])
+
+
+def main():
+    locker = sp.Popen(['betterlockscreen', '-l', 'dimblur'])
+    deadline = time.monotonic() + 10
+    while locker.poll() is None and time.monotonic() < deadline:
+        ready = sp.run(['pgrep', '-u', str(os.getuid()), '-x', 'i3lock'], stdout=sp.DEVNULL)
+        if ready.returncode == 0:
+            sp.run(['xset', 'dpms', 'force', 'off'], check=True)
+            break
+        time.sleep(0.05)
+    return locker.wait()
+
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ["--watch"]:
+        watch()
+    elif not sys.argv[1:]:
+        raise SystemExit(main())
+    else:
+        raise SystemExit("Usage: idle-screen-lock [--watch]")

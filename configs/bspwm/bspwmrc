@@ -85,18 +85,10 @@ pkill flameshot; flameshot &
 
 # --- ФИНАЛЬНЫЙ РАБОЧИЙ БЛОК ---
 
-# 1. Сбрасываем таймеры монитора
-xset s 600 600
-xset +dpms
-xset dpms 600 600 600
-
-# xss-lock handles the X11 idle timeout and logind sleep/lock events.
-# Do not run a second idle locker in parallel.
+# One supervised X11 idle/sleep locker; 10 minutes, monitor off, no automatic sleep.
 pkill -u "$(id -u)" -x xautolock 2>/dev/null || true
-
-# 3. Блокировка при закрытии крышки (Мгновенно)
-pkill xss-lock
-xss-lock -- sh -c 'xset dpms force off; betterlockscreen -l dimblur' &
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY
+systemctl --user start idle-screen-lock.service
 
 # 4. Теплые цвета
 pkill gammastep

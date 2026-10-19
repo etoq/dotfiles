@@ -1,0 +1,13 @@
+[Unit]
+Description=Lock and turn off the screen after 10 minutes of inactivity
+PartOf=graphical-session.target
+ConditionEnvironment=DISPLAY
+
+[Service]
+Type=exec
+ExecStartPre=/usr/bin/xset s 600 600
+ExecStartPre=/usr/bin/xset +dpms
+ExecStartPre=/usr/bin/xset dpms 600 600 600
+ExecStart=%h/.local/bin/idle-screen-lock --watch
+Restart=on-failure
+RestartSec=3
