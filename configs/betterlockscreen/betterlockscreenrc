@@ -1,0 +1,40 @@
+# Black Tiffany — obsidian hydra, calm centre for the clock and unlock ring.
+# All existing betterlockscreen entry points share this theme.
+dim_level=12
+blur_level=0.3
+solid_color=080D10
+loginbox=00000000
+loginshadow=00000000
+font="JetBrainsMono Nerd Font"
+locktext="Введите пароль"
+time_format="%H:%M"
+bgcolor=080D10ff
+ringcolor=0ABAB5bb
+insidecolor=080D1080
+separatorcolor=00000000
+ringvercolor=4DDDD5ff
+insidevercolor=101B20cc
+ringwrongcolor=D35F5Eff
+insidewrongcolor=080D10cc
+timecolor=A3F0E7ff
+greetercolor=C5D6D8cc
+layoutcolor=4DDDD5ff
+keyhlcolor=A3F0E7ff
+bshlcolor=C99070ff
+veriftext="Проверка…"
+verifcolor=4DDDD5ff
+wrongtext="Неверный пароль"
+wrongcolor=D35F5Eff
+modifcolor=C99070ff
+# Later arguments override betterlockscreen's default bottom-left placement.
+lockargs+=(
+    --ind-pos="x+w*0.62:y+h*0.58" --radius=44 --ring-width=2
+    --time-pos="ix:iy-150" --time-align=0 --time-size=48
+    --date-str="%d:%m:%Y" --date-pos="ix:iy-110"
+    --date-color=C5D6D8cc --date-font="$font" --date-size=16 --date-align=0
+    --greeter-pos="ix:iy+90" --greeter-align=0 --greeter-size=14
+    --layout-pos="ix:iy+120" --layout-align=0
+    --verif-pos="ix:iy+60" --verif-align=0
+    --wrong-pos="ix:iy+60" --wrong-align=0
+    --modif-pos="ix:iy+145" --modif-align=0
+)

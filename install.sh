@@ -324,6 +324,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/rofi/config.rasi"       "$HOME/.config/rofi/config.rasi"
     link "configs/rofi/tiffany.rasi"      "$HOME/.config/rofi/tiffany.rasi"
     link "configs/picom/picom.conf"       "$HOME/.config/picom/picom.conf"
+    link "configs/betterlockscreen/betterlockscreenrc" "$HOME/.config/betterlockscreen/betterlockscreenrc"
     link "configs/dunst/dunstrc"          "$HOME/.config/dunst/dunstrc"
     link "configs/fish/config.fish"       "$HOME/.config/fish/config.fish"
     link "configs/colors/tiffany.sh"      "$HOME/.config/colors/tiffany.sh"
@@ -338,8 +339,12 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/flameshot"              "$HOME/.config/flameshot"
     link "configs/calcurse"               "$HOME/.config/calcurse"
     # Preserve the personal wallpaper collection; install only the selected default.
+    link "Images/system/lockscreen.png" "$HOME/Images/system/lockscreen.png"
     link "Images/tiffany-re-37-ghidra-neon-emblem.png" "$HOME/Images/tiffany-re-37-ghidra-neon-emblem.png"
     link "configs/gtkrc-2.0"             "$HOME/.gtkrc-2.0"
+    if [[ -n ${DISPLAY:-} ]] && command -v betterlockscreen >/dev/null; then
+        betterlockscreen -u "$HOME/Images/system/lockscreen.png" --fx dim,dimblur || warn "Не удалось собрать кэш блокировки; повторите betterlockscreen -u ~/Images/system/lockscreen.png --fx dim,dimblur"
+    fi
     ok "Все конфиги подключены"
 fi
 

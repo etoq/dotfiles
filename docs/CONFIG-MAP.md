@@ -23,6 +23,7 @@
 | Dunst | ~/.config/dunst/dunstrc | configs/dunst/dunstrc |
 | Rofi | ~/.config/rofi/ | configs/rofi/; используется для отдельных функций/emoji |
 | Обои | ~/Images | Личная коллекция; установщик добавляет только текущие обои tiffany-re-37-ghidra-neon-emblem.png. Остальная галерея репозитория не навязывается |
+| Блокировка | ~/Images/system/lockscreen.png; ~/.config/betterlockscreen/betterlockscreenrc | Обсидиановая гидра Black Tiffany; кэш betterlockscreen, все способы блокировки используют dimblur; docs/LOCKSCREEN.md |
 
 ## Терминал и приложения
 
