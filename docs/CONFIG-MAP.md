@@ -32,6 +32,7 @@
 |---|---|---|
 | Kitty | ~/.config/kitty/kitty.conf | Источник configs/kitty/; текущая opacity 0.7 сохранена |
 | Fish | ~/.config/fish/config.fish, tiffany.fish | configs/fish/; fish_variables — локальное универсальное состояние, не версионируется |
+| LSD / ls | ~/.config/lsd/config.yaml и colors.yaml | Палитра Black Tiffany, color.theme: custom; устаревший themes/ удалён из рабочего конфига |
 | Neovim | ~/.config/nvim/ | configs/nvim/; lockfile сохраняет текущие версии плагинов |
 | Yazi | ~/.config/yazi/{yazi,keymap,theme,package}.toml и init.lua | configs/yazi/; ассоциации открытия также в mimeapps.list |
 | Btop | ~/.config/btop/btop.conf | configs/btop/; Black Tiffany theme |
