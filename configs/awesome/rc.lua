@@ -131,9 +131,18 @@ local function place_popup(c)
  gears.timer.delayed_call(center)
  gears.timer.start_new(.12,function()center();return false end)
 end
+-- Screenshot overlays must cover physical monitor geometry, including dock struts.
+local function place_capture(c)
+ local function cover()
+  if c.valid then c:geometry(c.screen.geometry);c:raise()end
+ end
+ cover();gears.timer.delayed_call(cover)
+ gears.timer.start_new(.12,function()cover();return false end)
+end
 awful.rules.rules={
  {rule={},properties={border_width=beautiful.border_width,border_color=beautiful.border_normal,focus=awful.client.focus.filter,raise=true,keys={},buttons=mouse,screen=awful.screen.preferred,placement=awful.placement.no_overlap+awful.placement.no_offscreen}},
  {rule_any={class={'otter','clipboard-manager','pkg-manager','sysmenu','panel-tool','panel-dashboard'},instance={'calendar','otter-tools'}},properties={floating=true,placement=awful.placement.centered}},
+ {rule={type='utility'},rule_any={class={'flameshot','Flameshot'}},properties={floating=true,fullscreen=true,ontop=true,border_width=0,skip_taskbar=true,placement=function(c)c:geometry(c.screen.geometry)end},callback=place_capture},
  {rule_any={type={'dock'}},properties={border_width=0,focus=false,focusable=false,skip_taskbar=true,buttons={}}},
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
