@@ -1,0 +1,117 @@
+{
+  "machine": "20EQS59J07",
+  "root_uuid": "c6838094-6e77-4446-bbb1-0a4acfd72b25",
+  "home": "/home/eto",
+  "repair_relative": "Documents/Workstation/2026-10-18/system-repair",
+  "backup": "/var/backups/nvidia470-recovery-20261019-074138",
+  "kernels": [
+    "6.18.57-1-lts",
+    "7.2.10-arch1-1"
+  ],
+  "forward": [
+    {
+      "path": "nvidia580-build/nvidia-580xx-utils-580.178.04-4-x86_64.pkg.tar.zst",
+      "sha256": "515d63b79e81b17d94e59e439eab55ae84c02e00085f387f37bdcdade4405fb5",
+      "name": "nvidia-580xx-utils",
+      "version": "580.178.04-4"
+    },
+    {
+      "path": "nvidia580-build/opencl-nvidia-580xx-580.178.04-4-x86_64.pkg.tar.zst",
+      "sha256": "f03fb16e44a5d77ec4a7589c6070bebf16767ec7ed9b7756aa4cdda1bc252b8c",
+      "name": "opencl-nvidia-580xx",
+      "version": "580.178.04-4"
+    },
+    {
+      "path": "nvidia580-build/nvidia-580xx-dkms-580.178.04-4-x86_64.pkg.tar.zst",
+      "sha256": "5ef8b249a4bf43c5c2494df2c7df714b3d9a6343c844b84ae03e26e17c1ff273",
+      "name": "nvidia-580xx-dkms",
+      "version": "580.178.04-4"
+    },
+    {
+      "path": "nvidia580-lib32/lib32-nvidia-580xx-utils-580.178.04-1-x86_64.pkg.tar.zst",
+      "sha256": "12a7961ade0f93d24d383fd67ca5186a709089895fb11d8be3c9ac7d59085394",
+      "name": "lib32-nvidia-580xx-utils",
+      "version": "580.178.04-1"
+    },
+    {
+      "path": "nvidia580-lib32/lib32-opencl-nvidia-580xx-580.178.04-1-x86_64.pkg.tar.zst",
+      "sha256": "023a3aeca75ac0f1872bdf9231ce0d97ccfe6ca899d29e7b8cbb1f41c5fa73c6",
+      "name": "lib32-opencl-nvidia-580xx",
+      "version": "580.178.04-1"
+    },
+    {
+      "path": "nvidia580-settings/nvidia-580xx-settings-580.178.04-1-x86_64.pkg.tar.zst",
+      "sha256": "56f6533ca84bc133d64ebaec0adb80e4fbc8ee9f4d05a443c2527795e329b29d",
+      "name": "nvidia-580xx-settings",
+      "version": "580.178.04-1"
+    },
+    {
+      "path": "nvidia580-settings/libxnvctrl-580xx-580.178.04-1-x86_64.pkg.tar.zst",
+      "sha256": "6c6550ce39ffd4efc8a12aeda30112efed9d9cd93bcc83a4af7060f962da8a4c",
+      "name": "libxnvctrl-580xx",
+      "version": "580.178.04-1"
+    },
+    {
+      "name": "egl-wayland2",
+      "version": "1.0.2-1",
+      "path": "nvidia580-dependencies/egl-wayland2-1.0.2-1-x86_64.pkg.tar.zst",
+      "sha256": "a891ac3f6c459185a54d463b87fc8924600893fd78d08b6e8bcd4a6b778c8d01"
+    },
+    {
+      "name": "egl-gbm",
+      "version": "1.1.4-1",
+      "path": "nvidia580-dependencies/egl-gbm-1.1.4-1-x86_64.pkg.tar.zst",
+      "sha256": "a05b572db0397e79e757d8177fd015016e78c7afc7f9c2e3631bc61ca38479e9"
+    },
+    {
+      "name": "egl-x11",
+      "version": "1.0.6-1",
+      "path": "nvidia580-dependencies/egl-x11-1.0.6-1-x86_64.pkg.tar.zst",
+      "sha256": "6baee009ba368501f52cdc48fbf9c45f9c8239d967cd41c2b225f2a7243f4efd"
+    }
+  ],
+  "reverse": [
+    {
+      "name": "nvidia-470xx-dkms",
+      "version": "470.256.02-8.02",
+      "file": "nvidia-470xx-dkms-470.256.02-8.02-x86_64.pkg.tar.zst",
+      "sha256": "237499bf9376f754c016fe56ec7188afd14e92d6bc426158a8d3493cf133df61"
+    },
+    {
+      "name": "nvidia-470xx-utils",
+      "version": "470.256.02-8.02",
+      "file": "nvidia-470xx-utils-470.256.02-8.02-x86_64.pkg.tar.zst",
+      "sha256": "02db2f63b1b51ffa428b48363fb49c932fda3b13fca9adcafaa8d077c206a837"
+    },
+    {
+      "name": "opencl-nvidia-470xx",
+      "version": "470.256.02-8.02",
+      "file": "opencl-nvidia-470xx-470.256.02-8.02-x86_64.pkg.tar.zst",
+      "sha256": "aab8f14d8f9c93f19b3b1e4f7a4f843998405ec7acdf26d224b66abaa7bd2643"
+    },
+    {
+      "name": "lib32-nvidia-470xx-utils",
+      "version": "470.256.02-1",
+      "file": "lib32-nvidia-470xx-utils-470.256.02-1-x86_64.pkg.tar.zst",
+      "sha256": "898220ceb890c4d7e4565a73b5f0cefb7d4af06bbe2f22d54dd424679ec23447"
+    },
+    {
+      "name": "lib32-opencl-nvidia-470xx",
+      "version": "470.256.02-1",
+      "file": "lib32-opencl-nvidia-470xx-470.256.02-1-x86_64.pkg.tar.zst",
+      "sha256": "192137554a364f88c99bf6e1acc30e404d2f6cedee1752feef21983e8ae41a31"
+    },
+    {
+      "name": "nvidia-470xx-settings",
+      "version": "470.256.02-3",
+      "file": "nvidia-470xx-settings-470.256.02-3-x86_64.pkg.tar.zst",
+      "sha256": "3b0f7e0bf64e90414a2e2a275dfeef49b60de93caa883c07c4a887fbb6a8d06b"
+    },
+    {
+      "name": "libxnvctrl-470xx",
+      "version": "470.256.02-3",
+      "file": "libxnvctrl-470xx-470.256.02-3-x86_64.pkg.tar.zst",
+      "sha256": "64b35ff20352bba8d20e18f2423751ec37c828e5bc3e6be190bc7798701c414d"
+    }
+  ]
+}

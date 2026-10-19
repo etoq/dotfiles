@@ -3,6 +3,22 @@ set -euo pipefail
 mountpoint -q /boot/efi || { echo 'EFI is not mounted; skipped copy' >&2; exit 0; }
 target=/boot/efi/EFI/ARCH
 [[ -d "$target" ]] || exit 0
+# Check the whole sequence before replacing any image. Each atomic replacement
+# temporarily needs room for the new file in addition to the existing copy.
+projected_free=$(df -PB1 "$target" | awk 'NR == 2 {print $4}')
+for kernel in linux linux-lts; do
+    for image in "vmlinuz-$kernel" "initramfs-$kernel.img"; do
+        [[ -f "/boot/$image" ]] || continue
+        new_size=$(stat -c %s "/boot/$image")
+        old_size=0
+        [[ ! -f "$target/$image" ]] || old_size=$(stat -c %s "$target/$image")
+        if (( projected_free < new_size + 8388608 )); then
+            echo "Not enough EFI space for atomic copy of $image; no images replaced" >&2
+            exit 1
+        fi
+        projected_free=$((projected_free + old_size - new_size))
+    done
+done
 for kernel in linux linux-lts; do
     for image in "vmlinuz-$kernel" "initramfs-$kernel.img"; do
         [[ -f "/boot/$image" ]] || continue
