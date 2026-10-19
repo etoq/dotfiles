@@ -6,6 +6,7 @@ Target = linux
 Target = linux-lts
 Target = mkinitcpio
 Target = nvidia-470xx-dkms
+Target = nvidia-580xx-dkms
 
 [Action]
 Description = Synchronize kernel and initramfs copies in EFI
