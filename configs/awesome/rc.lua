@@ -21,7 +21,7 @@ awesome.connect_signal('debug::error',function(err)
  io.stderr:write('AWESOME ERROR: '..tostring(err)..'\n')
  if not preview then notice('AwesomeWM · ошибка',tostring(err))end
 end)
-awful.layout.layouts={awful.layout.suit.tile,awful.layout.suit.tile.bottom,awful.layout.suit.fair,awful.layout.suit.max,awful.layout.suit.floating}
+awful.layout.layouts={awful.layout.suit.tile.left,awful.layout.suit.tile.bottom,awful.layout.suit.fair,awful.layout.suit.max,awful.layout.suit.floating}
 awful.screen.connect_for_each_screen(function(s)
  ui.screen(s)
  local wallpaper=home..'/Images/tiffany-re-37-ghidra-neon-emblem.png'
@@ -143,7 +143,7 @@ awful.rules.rules={
  {rule_any={type={'dialog'},role={'pop-up','GtkFileChooserDialog'}},properties={floating=true,placement=awful.placement.centered}},
 }
 client.connect_signal('manage',function(c)
- -- Keep the existing master on the left; append new tiled windows on the right.
+ -- Keep the larger master on the right; append new tiled windows to the left stack.
  if not awesome.startup and c.type=='normal' and not c.floating then awful.client.setslave(c)end
  if awesome.startup and not c.size_hints.user_position and not c.size_hints.program_position then awful.placement.no_offscreen(c)end
 end)

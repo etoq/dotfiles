@@ -33,7 +33,7 @@ function M.publish()
  end)
 end
 function M.screen(s)
- awful.tag({'1','2','3','4','5','6','7'},s,awful.layout.suit.tile)
+ awful.tag({'1','2','3','4','5','6','7'},s,awful.layout.suit.tile.left)
  s.padding={top=0,left=0,right=0,bottom=0};M.publish()
 end
 function M.view_tag(n,monitor)
