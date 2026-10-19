@@ -106,10 +106,10 @@
 |---|---|
 | Состояние обслуживания | Control Deck → Состояние; ~/.local/bin/workstation-status |
 | Размер Proton | ~/.local/bin/proton-quota; proton-quota.timer; приватный quota.json рядом со статусом backup |
-| Снимок SMART/scrub | /var/lib/workstation-health/status.json; root workstation-health-status.timer после системного шага |
+| Снимок SMART/scrub | /var/lib/workstation-health/status.json; root workstation-health-status.timer включён, снимок раз в 6 часов |
 | ImHex | ~/.local/bin/imhex → ~/.local/opt/imhex/1.38.1/squashfs-root/AppRun; локальный desktop entry |
 | Bibata | ~/.local/share/icons/Bibata-Modern-Classic; GTK/Xresources/xsettingsd; размер 24 |
 | udiskie | ~/.config/udiskie/config.yml; user udiskie.service, automount выключен |
-| bpftrace | /usr/bin/bpftrace после root-установки; отдельные программы трассировки по задаче |
+| bpftrace | /usr/bin/bpftrace установлен и проверен; отдельные программы трассировки по задаче |
 
 Состояние применения и команда системного шага — [DESKTOP-ENHANCEMENTS.md](DESKTOP-ENHANCEMENTS.md).
