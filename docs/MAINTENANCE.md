@@ -1,5 +1,10 @@
 # Финальная защита и очистка
 
+Актуальный профиль на 19 октября 2026: NVIDIA 580 preserve-vram, check-nvidia-sleep,
+недельный root-only TRIM и thinkfan-wait-ready. Сводка — WORKSTATION-2026-10-18.md,
+восстановление — RECOVERY.md. Ниже сохранена история обслуживания 16 октября;
+упоминания 470/callback и старых помощников в ней не являются текущими командами.
+
 ## Утверждённые изменения
 
 Список пакетов — cleanup-packages.txt. Пользователь выбрал Firefox, Chromium, Evince, Redshift, xidlehook, xbacklight, Gpick, Scrot, SimpleScreenRecorder, Helvum, qpwgraph, Timeshift, VirtualBox, Happ, v2rayA, Blueman и OBS Studio. Вместе с VirtualBox удаляется его virtualbox-host-dkms. Используется pacman -R: общие/невыбранные зависимости не удаляются рекурсивно.

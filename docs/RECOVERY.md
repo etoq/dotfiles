@@ -51,11 +51,25 @@ git clone https://github.com/etoq/dotfiles.git "$HOME/dotfiles"
 ```bash
 systemctl --failed
 systemctl --user --failed
-~/.local/bin/check-sleep-callback
+~/.local/bin/check-nvidia-sleep
 ~/.local/bin/wispr-a11y-guard
 workstation-backup
 ```
 
-`check-sleep-callback` проверяет конфигурацию, не усыпляет компьютер. `workstation-backup` без параметров не загружает данные. Ручная полная копия: `workstation-backup --run-once`. Автоматически полная копия выполняется по воскресеньям в 20:00, KeePassXC — ежедневно в 19:00; пропущенный запуск догоняется после входа. Политика хранения и управление таймерами — [PROTON-BACKUP.md](PROTON-BACKUP.md).
+`check-nvidia-sleep` проверяет выбранный профиль конфигурации, не усыпляет компьютер. `workstation-backup` без параметров не загружает данные. Ручная полная копия: `workstation-backup --run-once`. Автоматически полная копия выполняется по воскресеньям в 20:00, KeePassXC — ежедневно в 19:00; пропущенный запуск догоняется после входа. Политика хранения и управление таймерами — [PROTON-BACKUP.md](PROTON-BACKUP.md).
 
 Состояние ремонта и оставшиеся решения — [WORKSTATION-2026-10-18.md](WORKSTATION-2026-10-18.md).
+
+
+## Текущая графика и загрузка
+
+Рабочий вариант: NVIDIA 580.178.04, Linux LTS, preserve-vram. Откат на 470
+делается отдельным защищённым комплектом из /var/backups; исходники и история
+в NVIDIA-RECOVERY.md. Не применять старые одноразовые helpers из архивов.
+Текущий restore-system.sh рассчитан на уже установленную ветку 580 и не
+переключает драйвер. Его --check не заменяет проверку реальной загрузки/сна.
+
+Восстановитель также содержит настройки недельного TRIM только системного
+Btrfs и запуска thinkfan по готовности датчиков. Он не заменяет crypttab,
+LUKS-заголовки, NVRAM BootOrder или диски VM. После --apply нужен ручной
+запуск LTS; автоматического сна/перезагрузки нет.

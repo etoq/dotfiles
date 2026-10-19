@@ -1,0 +1,25 @@
+# Static information about the filesystems.
+# See fstab(5) for details.
+
+# <file system> <dir> <type> <options> <dump> <pass>
+# /dev/mapper/cryptroot LABEL=archlinux
+UUID=c6838094-6e77-4446-bbb1-0a4acfd72b25	/         	btrfs     	rw,noatime,compress=zstd:3,ssd,space_cache=v2,autodefrag,subvol=/@,nodiscard	0 0
+
+# /dev/mapper/cryptroot LABEL=archlinux
+UUID=c6838094-6e77-4446-bbb1-0a4acfd72b25	/home     	btrfs     	rw,noatime,compress=zstd:3,ssd,space_cache=v2,autodefrag,subvol=/@home,nodiscard	0 0
+
+# /dev/mapper/cryptroot LABEL=archlinux
+UUID=c6838094-6e77-4446-bbb1-0a4acfd72b25	/var      	btrfs     	rw,noatime,compress=zstd:3,ssd,space_cache=v2,autodefrag,subvol=/@var,nodiscard	0 0
+
+# /dev/mapper/cryptroot LABEL=archlinux
+UUID=c6838094-6e77-4446-bbb1-0a4acfd72b25	/var/log  	btrfs     	rw,noatime,compress=zstd:3,ssd,space_cache=v2,autodefrag,subvol=/@log,nodiscard	0 0
+
+# /dev/mapper/cryptroot LABEL=archlinux
+UUID=c6838094-6e77-4446-bbb1-0a4acfd72b25	/tmp      	btrfs     	rw,noatime,compress=zstd:3,ssd,space_cache=v2,autodefrag,subvol=/@tmp,nodiscard	0 0
+
+# /dev/mapper/cryptroot LABEL=archlinux
+UUID=c6838094-6e77-4446-bbb1-0a4acfd72b25	/.snapshots	btrfs     	rw,noatime,compress=zstd:3,ssd,space_cache=v2,autodefrag,subvol=/@snapshots,nodiscard	0 0
+
+# /dev/nvme0n1p1 LABEL=EFI
+UUID=34A2-4202      	/boot/efi 	vfat      	rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
+/dev/mapper/cryptvms      /vms            ext4           defaults,noatime                                                                 0 2

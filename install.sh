@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  zer0 dotfiles installer · Arch Linux · BSPWM · Black Tiffany          ║
-# ║  ThinkPad P50 · nvidia-470xx                                     ║
+# ║  ThinkPad P50 · AwesomeWM · NVIDIA managed separately             ║
 # ╚══════════════════════════════════════════════════════════════════╝
 # Usage:
 #   git clone https://github.com/etoq/dotfiles ~/dotfiles
@@ -25,6 +25,10 @@ ask()  { echo -e "${CYN}[?]${R} $1 [y/N] "; read -r ans; [[ "$ans" =~ ^[Yy]$ ]];
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
+if [[ ${1:-} == --check ]]; then
+    exec python "$DOTFILES_DIR/scripts/maintenance/audit-dotfiles.py"
+fi
+[[ $# == 0 ]] || { echo 'Usage: install.sh [--check]'; exit 2; }
 
 # ── Баннер ─────────────────────────────────────────────────────────
 clear
@@ -38,7 +42,7 @@ cat << 'BANNER'
  ╚═════╝  ╚═════╝    ╚═╝   ╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝
 BANNER
 echo -e "${R}"
-echo -e "${DIM}  zer0@p50 · Arch Linux · BSPWM · Black Tiffany${R}"
+echo -e "${DIM}  zer0@p50 · Arch Linux · AwesomeWM + Polybar · Black Tiffany${R}"
 echo -e "${DIM}  ────────────────────────────────────────────${R}\n"
 
 # ── Проверки ───────────────────────────────────────────────────────
@@ -55,12 +59,6 @@ if ! command -v pacman &>/dev/null; then
     exit 1
 fi
 ok "Arch Linux обнаружен"
-
-if ! ping -c1 archlinux.org &>/dev/null; then
-    err "Нет интернета. Проверь подключение"
-    exit 1
-fi
-ok "Интернет есть"
 
 # ── Меню установки ─────────────────────────────────────────────────
 step "ЧТО УСТАНОВИТЬ"
@@ -81,13 +79,15 @@ case "$CHOICE" in
 esac
 
 # ── Авторизация sudo ───────────────────────────────────────────────
-step "АВТОРИЗАЦИЯ SUDO"
-info "Введи пароль sudo"
-# Запрашиваем пароль заранее
-sudo -v
-# Фоновый процесс: обновляет таймер sudo каждую минуту, пока жив основной скрипт
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
-ok "Пароль принят!"
+sudo_keepalive=
+cleanup() { if [[ -n "$sudo_keepalive" ]]; then kill "$sudo_keepalive" 2>/dev/null || true; fi; }
+trap cleanup EXIT
+if [[ "$DO_PKGS" == 1 || "$DO_SERVICES" == 1 ]]; then
+    step "АВТОРИЗАЦИЯ SUDO"
+    sudo -v
+    while kill -0 "$$" 2>/dev/null; do sudo -n true || exit; sleep 45; done 2>/dev/null &
+    sudo_keepalive=$!
+fi
 
 # ── Функция симлинка с бэкапом ─────────────────────────────────────
 link() {
@@ -95,6 +95,14 @@ link() {
     local dst="$2"
     local dir
     dir="$(dirname "$dst")"
+
+    if [[ ! -e "$src" ]]; then
+        warn "Исходник не найден, существующий файл сохранён: $src"
+        return
+    fi
+    if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
+        return
+    fi
 
     [ ! -d "$dir" ] && mkdir -p "$dir"
 
@@ -155,7 +163,7 @@ if [ "$DO_PKGS" = "1" ]; then
         ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-fira-code ttf-iosevka-nerd ttf-dejavu
         noto-fonts noto-fonts-cjk noto-fonts-emoji terminus-font
         nvidia-prime vulkan-intel lib32-vulkan-intel mesa-utils
-        pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer easyeffects python-gobject
+        pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer easyeffects python-gobject python-yaml
         networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils bolt
         dnsmasq openresolv
         htop btop s-tui fastfetch cpufetch tlp tlp-rdw brightnessctl
@@ -163,7 +171,7 @@ if [ "$DO_PKGS" = "1" ]; then
         qemu-full libvirt virt-manager virt-viewer swtpm
         wireshark-qt tcpdump python-scapy
         radare2 gdb pwndbg binwalk foremost volatility3
-        yara python-yara python-pefile python-capstone python-unicorn python-pycryptodome
+        python-pefile python-capstone python-unicorn python-pycryptodome
         strace ltrace elfutils file binutils ripgrep hexyl python-pwntools
         neovim python-pip python-pipx python-pynvim git lazygit tmux shellcheck jq clang gdb luarocks
         keepassxc obsidian rofi libqalculate tesseract vim
@@ -185,16 +193,16 @@ if [ "$DO_PKGS" = "1" ]; then
 
     step "ПАКЕТЫ AUR"
     AUR_PKGS=(
-        nvidia-470xx-dkms nvidia-470xx-utils nvidia-470xx-settings
-        lib32-nvidia-470xx-utils lib32-opencl-nvidia-470xx opencl-nvidia-470xx
-        acpilight thinkfan python-yaml
+        thinkfan
         bluetuith impala rmtrash ptpython hyx snapper-rollback btrfs-assistant
         papirus-icon-theme ttf-material-symbols-variable-git ttf-symbola
         i3lock-color rofi-greenclip apparmor.d-git
-        ayugram-desktop-bin otter-launcher lazydocker-bin termdown light
+        ayugram-desktop-bin otter-launcher termdown light
         woff2-font-awesome betterlockscreen
         cutter-bin detect-it-easy-bin capa-bin
     )
+
+    info "Драйвер NVIDIA сохраняется установленный. Переход ветки — отдельной проверенной процедурой."
 
     info "Устанавливаю AUR пакеты..."
     for pkg in "${AUR_PKGS[@]}"; do
@@ -321,14 +329,9 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/greenclip.toml"         "$HOME/.config/greenclip.toml"
     link "configs/flameshot"              "$HOME/.config/flameshot"
     link "configs/calcurse"               "$HOME/.config/calcurse"
-    link "Images"                         "$HOME/Images"
+    # Preserve the personal wallpaper collection; install only the selected default.
+    link "Images/tiffany-re-37-ghidra-neon-emblem.png" "$HOME/Images/tiffany-re-37-ghidra-neon-emblem.png"
     link "configs/gtkrc-2.0"             "$HOME/.gtkrc-2.0"
-    # Snapper
-    if [ -d "$DOTFILES_DIR/configs/snapper" ]; then
-        sudo cp "$DOTFILES_DIR/configs/snapper/root" /etc/snapper/configs/root
-        ok "Snapper конфиг"
-    fi
-
     ok "Все конфиги подключены"
 fi
 
@@ -355,7 +358,9 @@ if [ "$DO_SCRIPTS" = "1" ]; then
             chmod +x "$HOME/bin/$s"
         fi
     done
-    "$HOME/.local/bin/otter-install-assets" || warn "Ресурсы Otter: повтори otter-install-assets при доступном интернете"
+    if [[ "$DO_PKGS" == 1 ]]; then
+        "$HOME/.local/bin/otter-install-assets" || warn "Ресурсы Otter: повтори otter-install-assets при доступном интернете"
+    fi
     ok "Скрипты установлены"
 
 
@@ -366,7 +371,7 @@ fi
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_SERVICES" = "1" ]; then
     step "ПРОВЕРЕННЫЕ СИСТЕМНЫЕ НАСТРОЙКИ"
-    # This payload is machine-specific. It preserves the tested callback sleep,
+    # This payload is machine-specific. It preserves the tested 580 full-VRAM sleep,
     # modular libvirt and EFI hooks and does not replace DNS configuration.
     sudo bash "$DOTFILES_DIR/restore-system.sh" --apply
 
@@ -412,12 +417,9 @@ if [ -d "$BACKUP_DIR" ]; then
 fi
 
 echo -e "${DIM}  Следующие шаги:${R}"
-echo -e "  ${CYN}1.${R} Скопировать картинку: cp image.png ~/.config/otter-launcher/image.png"
-echo -e "  ${CYN}2.${R} Перезапустить BSPWM: bspc wm -r"
-echo -e "  ${CYN}3.${R} Перезагрузиться: sudo reboot"
-echo -e "  ${RED}4. СДЕЛАТЬ БЭКАП LUKS: sudo cryptsetup luksHeaderBackup /dev/nvme0n1p2 --header-backup-file ~/luks-header.img${R}"
+echo -e "  ${CYN}1.${R} Проверить соответствие: bash install.sh --check"
+echo -e "  ${CYN}2.${R} Восстановление и приватные данные: docs/RECOVERY.md"
+echo -e "  ${CYN}3.${R} Если применялась системная часть — сохранить работу и перезагрузиться вручную в LTS"
 echo ""
 
-# Очистка: убиваем фоновый процесс sudo и сбрасываем кэш пароля
-kill $(jobs -p) 2>/dev/null || true
-sudo -k
+# The EXIT trap stops only this installer's sudo keepalive.

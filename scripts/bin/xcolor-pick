@@ -2,7 +2,7 @@
 set -euo pipefail
 # Original Gpick floating picker; Win+Shift+X keeps its historical command name.
 if ! command -v gpick >/dev/null 2>&1; then
-    notify-send 'Пипетка Gpick' 'Установи gpick: sudo ~/.local/bin/finish-color-picker' || true
+    notify-send 'Пипетка Gpick' 'Нужен пакет gpick: sudo pacman -S gpick' || true
     exit 1
 fi
 color=$(gpick -pso --no-newline) || exit 0

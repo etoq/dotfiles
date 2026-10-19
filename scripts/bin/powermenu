@@ -8,7 +8,7 @@ choice="$(printf '  reboot\n  poweroff\n  suspend\n  lock\n  logout' \
 case "$choice" in
   *reboot)   systemctl reboot ;;
   *poweroff) systemctl poweroff ;;
-  *suspend)  systemctl suspend || notify-send "Сон не выполнен" "Проверь настройки: ~/.local/bin/check-sleep-callback" ;;
+  *suspend)  systemctl suspend || notify-send "Сон не выполнен" "Проверь настройки: ~/.local/bin/check-nvidia-sleep" ;;
   *lock)     betterlockscreen -l dimblur;;
   *logout)
     if [[ "${PANEL_WM:-${XDG_CURRENT_DESKTOP:-bspwm}}" == *awesome* ]]; then

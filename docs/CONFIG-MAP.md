@@ -1,6 +1,6 @@
 # Карта окружения Black Tiffany
 
-Актуализировано 18 октября 2026. Рабочий WM — AwesomeWM с новым Polybar; bspwm сохранён как альтернативный сеанс. `~` — /home/eto. Пользовательские конфиги ниже подключены файлами или каталогами к ~/dotfiles. Некоторые приложения при сохранении через GUI могут заменить symlink обычным файлом: перед следующим коммитом сверять такую копию с источником, сохраняя актуальные пользовательские настройки.
+Актуализировано 19 октября 2026. Рабочий WM — AwesomeWM с новым Polybar; bspwm сохранён как альтернативный сеанс. `~` — /home/eto. Пользовательские конфиги ниже подключены файлами или каталогами к ~/dotfiles. Некоторые приложения при сохранении через GUI могут заменить symlink обычным файлом: перед следующим коммитом сверять такую копию с источником, сохраняя актуальные пользовательские настройки.
 
 ## Интерфейс и управление
 
@@ -15,14 +15,14 @@
 | Runtime Polybar в Awesome | /run/user/1000/panel-lab-awesome/polybar.ini | Генерируется panel-switch; редактировать основной конфиг |
 | Данные и клики панели | ~/.local/bin/panel-data, panel-action | scripts/local-bin/; музыка закреплена за Yandex Music |
 | Рабочие столы Polybar | ~/.local/bin/polybar-workspaces | События Awesome, без периодической задержки переключения |
-| Control Deck | ~/.config/panel-lab/dashboard.js и dashboard.css | configs/panel-lab/; Super+Shift+B, звук/яркость/устройства/VM/backup |
+| Control Deck | ~/.config/panel-lab/dashboard.js и dashboard.css | configs/panel-lab/; Super+Shift+B, звук/яркость/устройства/VM; Last Backup: DD:MM:YYYY без подсказок |
 | Otter | ~/.config/otter-launcher/config.toml | configs/otter-launcher/; Super+D |
 | Команды Otter | ~/.local/bin/otter-tools, otter-apps, otter-new-note и другие otter-* | scripts/local-bin/ |
 | Оформление окна Otter | ~/.config/kitty/otter.conf | configs/kitty/otter.conf; фиксированные пользовательские размеры |
 | Picom | ~/.config/picom/picom.conf | configs/picom/picom.conf; старый bspwm/picom_configurations/1.conf — ссылка на него же |
 | Dunst | ~/.config/dunst/dunstrc | configs/dunst/dunstrc |
 | Rofi | ~/.config/rofi/ | configs/rofi/; используется для отдельных функций/emoji |
-| Обои | ~/Images | Изображения и исходники темы в dotfiles/Images; дополнительные личные файлы могут храниться отдельно |
+| Обои | ~/Images | Личная коллекция; установщик добавляет только текущие обои tiffany-re-37-ghidra-neon-emblem.png. Остальная галерея репозитория не навязывается |
 
 ## Терминал и приложения
 
@@ -47,8 +47,8 @@
 | Zen | ~/.config/zen/ | Приватный профиль, не переносить в публичный Git |
 | AyuGram | ~/.local/share/AyuGramDesktop/ | Приватные данные; launcher ~/.local/bin/AyuGram |
 | Yandex Music | ~/.config/YandexMusic/ | Приватный профиль; MPRIS-модуль configs/panel-lab/yandex_media.py |
-| Wispr Flow | ~/.config/Wispr Flow/ | Приватный профиль; autostart и команда wf в Otter |
-| EasyEffects | ~/.config/easyeffects/ | Локальная база параметров db/; запуск --service-mode |
+| Wispr Flow | ~/.config/Wispr Flow/ | Приватный профиль; autostart с --hidden, ручная команда wf; wrapper wispr-flow сохраняет WISPR_DISABLE_GPU=1 |
+| EasyEffects | ~/.config/easyeffects/ | Локальная база параметров db/; user-служба easyeffects.service, --service-mode --hide-window |
 | Throne | ~/.config/Throne/, ~/.config/systemd/user/throne.service | Приватные профили прокси; не коммитить URI/ключи |
 
 ## Системная часть Arch
@@ -58,14 +58,14 @@
 | Ethernet/Wi-Fi | NetworkManager; iwd может обслуживать backend Wi-Fi | Секретные connection profiles вне публичного Git |
 | Старый br0/networkd | br0 удалён, networkd/socket activation отключены | Прежние файлы в /var/backups/workstation-audit-* |
 | Firewall | /etc/nftables.conf | configs/etc/nftables.conf; отдельные таблицы Throne/libvirt не очищать |
-| Вентиляторы | /etc/thinkfan.conf, thinkfan-normal.conf, thinkfan-silent.conf | configs/etc/; thinkfan.service, текущая задержка старта 5 секунд сохранена |
+| Вентиляторы | /etc/thinkfan.conf, thinkfan-normal.conf, thinkfan-silent.conf | configs/etc/; thinkfan.service и scripts/system/thinkfan-wait-ready: ожидание датчиков вместо фиксированных 5 секунд |
 | Питание | /etc/tlp.conf | configs/etc/tlp.conf; tlp.service |
-| NVIDIA / сон | /etc/modprobe.d/, /etc/workstation/nvidia-sleep-mode | configs/etc/ и scripts/system/; рабочая ветка 470, callback сна |
+| NVIDIA / сон | /etc/modprobe.d/, /etc/workstation/nvidia-sleep-mode | configs/etc/ и scripts/system/; 580.178.04, preserve-vram, /var/tmp, специальные службы сна и поздняя загрузка NVIDIA; docs/NVIDIA-RECOVERY.md |
 | Initramfs / загрузчик | /etc/mkinitcpio.conf, /etc/default/grub | configs/etc/; machine-specific UUID, не переносить на другой диск вслепую |
 | SDDM | /etc/sddm.conf, /usr/share/sddm/themes/black-tiffany/ | configs/etc/sddm.conf и themes/sddm/ |
 | SMART | /etc/smartd.conf, smartd.service | configs/etc/smartd.conf; scripts/system/workstation-health-notify |
 | Btrfs scrub | btrfs-scrub@-.timer/service | configs/etc/systemd/system/btrfs-scrub@-.service.d/; ежемесячно |
-| TRIM | fstrim.timer выключен; LUKS discard не разрешён | Политика оставлена без изменений |
+| TRIM | fstrim.timer enabled/active; cryptroot:allow-discards | Недельный fstrim только /, nodiscard в fstab; /vms не менялся; docs/STORAGE-AND-BOOT.md |
 | Пакетные обновления | ~/.local/bin/sys-update, verify-kernel-stack | scripts/local-bin/; логи ~/.local/state/workstation-updates/ |
 | Локальные снимки | Snapper root | /etc/snapper/configs/root; не замена внешнему backup |
 
@@ -84,3 +84,17 @@
 После правок конфигурации: git diff --check; для Awesome — awesome -k. git status должен показывать осмысленные пользовательские правки. Ничего автоматически не публикуется и не отправляется в Git remote.
 
 Защита очереди Wispr Flow: `~/.local/bin/wispr-a11y-guard` и `~/.config/systemd/user/wispr-a11y-guard.{service,timer}`; источники в scripts/local-bin и configs/systemd/user. Проверяет только счётчики AT-SPI; см. docs/KEEPASSXC.md.
+
+
+## Сверка и установщик
+
+`bash ~/dotfiles/install.sh --check` — только сравнение управляемых пользовательских
+файлов, без sudo, сети и изменений. Обычная совпадающая копия допустима;
+посторонние личные файлы в каталогах не удаляются. JSON-отчёт:
+`python ~/dotfiles/scripts/maintenance/audit-dotfiles.py --json`.
+
+Режимы «только конфиги» и «только скрипты» не требуют sudo. Общий установщик
+не меняет ветку NVIDIA; восстановитель системной части требует уже установленную
+580. Нативные системные файлы являются копиями, не ссылками в HOME.
+Текущие списки пакетов — docs/packages-explicit.txt и packages-aur.txt;
+это снимки состояния, а не команды повторной установки всего списка.
