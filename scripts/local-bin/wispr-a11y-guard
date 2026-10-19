@@ -94,10 +94,7 @@ def main():
         if old.get('start') == info['start'] and 5 <= now - old.get('time', 0) <= 35:
             if recover(int(pid), info['start']):
                 print(f'Recovered Wispr helper PID {pid}: stalled AT-SPI queue {info["bytes"]} bytes', flush=True)
-                subprocess.run([
-                    'notify-send', '--app-name=Wispr Flow', 'Wispr Flow',
-                    'Помощник перезапущен: переполнилась очередь доступности. Если шла диктовка, повтори её.',
-                ], timeout=3, check=False)
+                # Recovery is logged by the user service, without a desktop popup.
         info['time'] = now
     if candidates:
         # Runtime directory is private and removed at logout.
