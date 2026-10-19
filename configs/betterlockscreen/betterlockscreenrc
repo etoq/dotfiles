@@ -1,7 +1,7 @@
 # Black Tiffany — obsidian hydra, calm centre for the clock and unlock ring.
 # All existing betterlockscreen entry points share this theme.
 dim_level=12
-blur_level=0.3
+blur_level=0.1
 solid_color=080D10
 loginbox=00000000
 loginshadow=00000000
