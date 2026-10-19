@@ -74,6 +74,11 @@ def main():
     transition.installed_matches(plan['forward'])
     transition.verify_backup(plan)
     efi = Path('/boot/efi')
+    # Verify the actual GRUB binary's embedded config prefix, not only a potentially
+    # unrelated grub.cfg on disk. This workstation loads the encrypted root config.
+    prefix = b'(cryptouuid/d0394e8524b444d9883af92a6f2b8ac8)/@/boot/grub'
+    if prefix not in (efi / 'EFI/ARCH/grubx64.efi').read_bytes():
+        raise RuntimeError('Embedded GRUB config location changed; inspect the boot loader first')
     normal, stale, updated = preflight(efi, Path('/.snapshots'),
         Path('/boot/grub/grub.cfg').read_text(), transition.output(['efibootmgr', '-v']))
     available = shutil.disk_usage(efi).free + sum((efi / name).stat().st_size for name in NAMES)
