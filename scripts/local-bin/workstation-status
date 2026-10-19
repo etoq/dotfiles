@@ -1,9 +1,13 @@
 #!/usr/bin/python
 """Read cached maintenance state; opening the page starts no privileged jobs."""
+from os import geteuid as os_geteuid
+import argparse
 import datetime as dt
 import json
 from pathlib import Path
 import subprocess as sp
+import sys
+import time
 
 HOME = Path.home()
 
@@ -28,7 +32,35 @@ def unit(name, *properties):
     return dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
 
 
+def refresh_disk():
+    """Run only the installed read-only collector, using native administrator auth."""
+    agent = None
+    try:
+        if os_geteuid() != 0:
+            agent_path = Path('/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1')
+            if agent_path.is_file():
+                # An existing registered agent causes this temporary one to exit.
+                agent = sp.Popen([str(agent_path)], stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+                time.sleep(0.5)
+            command = ['/usr/bin/pkexec', '--disable-internal-agent', '/usr/bin/systemctl',
+                       'start', 'workstation-health-status.service']
+        else:
+            command = ['/usr/bin/systemctl', 'start', 'workstation-health-status.service']
+        result = sp.run(command, capture_output=True, text=True, timeout=150)
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or 'Обновление отменено или не разрешено.')
+    finally:
+        if agent is not None and agent.poll() is None:
+            agent.terminate()
+            agent.wait(timeout=5)
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--refresh", action="store_true", help="Refresh the read-only root health snapshot; may request administrator authentication")
+    args = parser.parse_args()
+    if args.refresh:
+        refresh_disk()
     backup = read(HOME / '.local/state/workstation-backup/status.json')
     quota = read(HOME / '.local/state/workstation-backup/quota.json')
     disk = read(Path('/var/lib/workstation-health/status.json'))
@@ -65,4 +97,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (OSError, RuntimeError, sp.SubprocessError) as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)

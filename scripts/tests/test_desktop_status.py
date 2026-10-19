@@ -22,6 +22,7 @@ def load(name, path):
 
 quota = load('quota_test', ROOT / 'local-bin/proton-quota')
 health = load('health_test', ROOT / 'system/workstation-health-status')
+status = load('status_test', ROOT / 'local-bin/workstation-status')
 
 
 class DesktopStatus(unittest.TestCase):
@@ -54,6 +55,26 @@ class DesktopStatus(unittest.TestCase):
         before = {'notified_at': (now - dt.timedelta(hours=25)).isoformat(), 'notified_level': 90}
         self.assertTrue(quota.should_notify(90, before, now))
         self.assertFalse(quota.should_notify(0, before, now))
+
+    def test_refresh_requests_only_readonly_collector(self):
+        with patch.object(status, 'os_geteuid', return_value=1000), \
+                patch.object(status.Path, 'is_file', return_value=False), \
+                patch.object(status.sp, 'run', return_value=SimpleNamespace(returncode=0, stderr='')) as run:
+            status.refresh_disk()
+        self.assertEqual(run.call_args.args[0], ['/usr/bin/pkexec', '--disable-internal-agent',
+                         '/usr/bin/systemctl', 'start', 'workstation-health-status.service'])
+
+    def test_cancelled_refresh_reports_failure_and_closes_temporary_agent(self):
+        agent = SimpleNamespace(poll=lambda: None, terminate=lambda: None, wait=lambda **kw: None)
+        with patch.object(status, 'os_geteuid', return_value=1000), \
+                patch.object(status.Path, 'is_file', return_value=True), \
+                patch.object(status.sp, 'Popen', return_value=agent), \
+                patch.object(status.time, 'sleep'), \
+                patch.object(status.sp, 'run', return_value=SimpleNamespace(returncode=126, stderr='Authentication cancelled')), \
+                patch.object(agent, 'terminate') as terminate:
+            with self.assertRaisesRegex(RuntimeError, 'Authentication cancelled'):
+                status.refresh_disk()
+            terminate.assert_called_once()
 
     def test_readonly_smart_json_is_not_truncated(self):
         data = json.dumps({'padding': 'x' * 6000, 'smart_status': {'passed': True}})
