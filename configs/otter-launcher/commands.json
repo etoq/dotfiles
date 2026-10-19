@@ -50,7 +50,7 @@
     "raw_argument": false
   },
   "wf": {
-    "command": "exec /usr/bin/wispr-flow",
+    "command": "exec \"$HOME/.local/bin/wispr-flow\"",
     "url_encoded": false,
     "raw_argument": false
   },

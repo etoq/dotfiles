@@ -45,4 +45,4 @@ once('battery-alert',[H/'bin/battery-alert'])
 
 # Both applications are single-instance; keep existing audio/dictation sessions.
 once('easyeffects',['easyeffects','--service-mode'])
-once('wispr-flow',['wispr-flow'])
+once('wispr-flow',[H/'.local/bin/wispr-flow'])

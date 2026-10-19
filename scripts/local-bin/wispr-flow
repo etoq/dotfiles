@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Scope the packaged launcher's supported software-rendering workaround to Wispr.
+set -euo pipefail
+export WISPR_DISABLE_GPU=1
+exec /usr/bin/wispr-flow "$@"
