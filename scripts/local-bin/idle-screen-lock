@@ -1,26 +1,218 @@
 #!/usr/bin/env python3
 """Lock before powering off the display; never suspend the computer."""
 from pathlib import Path
+import ctypes as ct
+import ctypes.util
 import os
+import re
+import select
 import subprocess as sp
 import sys
 import time
+from urllib.parse import urlsplit
 
 
-def watch():
+IDLE_SECONDS = 600
+
+
+class RawInput:
+    """Read only event presence, never key codes, typed text or pointer coordinates."""
+    class Cookie(ct.Structure):
+        _fields_ = [('type', ct.c_int), ('serial', ct.c_ulong), ('send_event', ct.c_int),
+                    ('display', ct.c_void_p), ('extension', ct.c_int), ('evtype', ct.c_int),
+                    ('cookie', ct.c_uint), ('data', ct.c_void_p)]
+
+    class Mask(ct.Structure):
+        _fields_ = [('deviceid', ct.c_int), ('mask_len', ct.c_int),
+                    ('mask', ct.POINTER(ct.c_ubyte))]
+
+    def __init__(self):
+        class Event(ct.Union):
+            _fields_ = [('cookie', RawInput.Cookie), ('pad', ct.c_long * 24)]
+        self.Event = Event
+        self.x = ct.CDLL(ctypes.util.find_library('X11'))
+        self.xi = ct.CDLL(ctypes.util.find_library('Xi'))
+        self.x.XOpenDisplay.argtypes = [ct.c_char_p]
+        self.x.XOpenDisplay.restype = ct.c_void_p
+        self.x.XDefaultRootWindow.argtypes = [ct.c_void_p]
+        self.x.XDefaultRootWindow.restype = ct.c_ulong
+        self.x.XConnectionNumber.argtypes = [ct.c_void_p]
+        self.x.XConnectionNumber.restype = ct.c_int
+        self.x.XPending.argtypes = [ct.c_void_p]
+        self.x.XNextEvent.argtypes = [ct.c_void_p, ct.POINTER(Event)]
+        self.x.XFlush.argtypes = [ct.c_void_p]
+        self.x.XCloseDisplay.argtypes = [ct.c_void_p]
+        self.x.XQueryExtension.argtypes = [ct.c_void_p, ct.c_char_p,
+                                           ct.POINTER(ct.c_int), ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
+        self.xi.XIQueryVersion.argtypes = [ct.c_void_p, ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
+        self.xi.XISelectEvents.argtypes = [ct.c_void_p, ct.c_ulong, ct.POINTER(self.Mask), ct.c_int]
+        self.display = self.x.XOpenDisplay(None)
+        if not self.display:
+            raise RuntimeError('Cannot open the X11 display')
+        major, minor = ct.c_int(2), ct.c_int(0)
+        if self.xi.XIQueryVersion(self.display, ct.byref(major), ct.byref(minor)) != 0:
+            raise RuntimeError('XInput2 is required for the idle timer')
+        self.opcode, event, error = ct.c_int(), ct.c_int(), ct.c_int()
+        if not self.x.XQueryExtension(self.display, b'XInputExtension', ct.byref(self.opcode), ct.byref(event), ct.byref(error)):
+            raise RuntimeError('XInput extension is unavailable')
+        # XI_RawKeyPress/Release, RawButtonPress/Release and RawMotion.
+        self.types = {13, 14, 15, 16, 17}
+        mask = (ct.c_ubyte * 3)()
+        for kind in self.types:
+            mask[kind // 8] |= 1 << (kind % 8)
+        events = self.Mask(1, len(mask), mask)  # XIAllMasterDevices
+        self.xi.XISelectEvents(self.display, self.x.XDefaultRootWindow(self.display), ct.byref(events), 1)
+        self.x.XFlush(self.display)
+        self.fd = self.x.XConnectionNumber(self.display)
+
+    def wait(self, timeout):
+        if not self.x.XPending(self.display):
+            select.select([self.fd], [], [], timeout)
+        active = False
+        while self.x.XPending(self.display):
+            event = self.Event()
+            self.x.XNextEvent(self.display, ct.byref(event))
+            cookie = event.cookie
+            if cookie.type == 35 and cookie.extension == self.opcode.value and cookie.evtype in self.types:
+                active = True
+            # Cookie payload is deliberately never requested or decoded.
+        return active
+
+    def close(self):
+        self.x.XCloseDisplay(self.display)
+
+
+def graphical_session():
     session = os.environ.get('XDG_SESSION_ID')
     if not session:
         session = sp.check_output(['loginctl', 'show-user', str(os.getuid()),
                                    '--property=Display', '--value'], text=True).strip()
     if not session:
-        raise SystemExit('No graphical login session found')
+        raise RuntimeError('No graphical login session found')
     details = sp.check_output(['loginctl', 'show-session', session, '--property=User',
                                '--property=Type'], text=True)
     props = dict(line.split('=', 1) for line in details.splitlines() if '=' in line)
     if props.get('User') != str(os.getuid()) or props.get('Type') != 'x11':
-        raise SystemExit('The selected login session is not this user’s X11 session')
-    os.execvp('xss-lock', ['xss-lock', '--verbose', '--session=' + session, '--',
+        raise RuntimeError('The selected login session is not this user’s X11 session')
+    return session
+
+
+def is_video_player(name, identity, props):
+    if props.get('PlaybackStatus') != 'Playing':
+        return False
+    normalize = lambda text: re.sub(r'[^a-zа-я0-9]', '', str(text).casefold())
+    identities = [normalize(identity.get(key, '')) for key in ('Identity', 'DesktopEntry')]
+    music = ('yandexmusic', 'яндексмузыка', 'spotify', 'ncspot', 'mpd', 'rhythmbox',
+             'clementine', 'strawberry', 'quodlibet', 'audacious', 'deadbeef', 'lollypop', 'amberol')
+    if any(any(item in value for item in music) for value in identities):
+        return False
+    metadata = props.get('Metadata', {})
+    url = urlsplit(str(metadata.get('xesam:url', '')))
+    host = (url.hostname or '').casefold()
+    if host in ('music.youtube.com', 'music.yandex.ru', 'music.yandex.com') or any(host == domain or host.endswith('.' + domain) for domain in ('spotify.com', 'soundcloud.com', 'deezer.com', 'bandcamp.com')):
+        return False
+    suffix = Path(url.path).suffix.casefold()
+    if suffix in ('.mp3', '.flac', '.wav', '.ogg', '.opus', '.m4a', '.aac', '.aiff'):
+        return False
+    if suffix in ('.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v', '.mpg', '.mpeg', '.ogv', '.flv', '.wmv', '.ts', '.m2ts'):
+        return True
+    if any(key.startswith('xesam:video') for key in metadata):
+        return True
+    # MPRIS has no universal audio/video discriminator. Treat active browser
+    # media or a video player's unknown stream conservatively as video.
+    text = normalize(name) + ''.join(identities)
+    return any(token in text for token in ('firefox', 'zen', 'chromium', 'chrome', 'brave',
+                                           'vivaldi', 'vlc', 'mpv', 'smplayer', 'celluloid',
+                                           'totem', 'parole', 'haruna', 'dragonplayer', 'clapper'))
+
+
+class VideoPlayback:
+    def __init__(self):
+        self.bus = None
+
+    def active(self):
+        try:
+            from gi.repository import Gio, GLib
+            if self.bus is None:
+                self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            def call(name, path, interface, method, args=None):
+                return self.bus.call_sync(name, path, interface, method, args, None,
+                                          Gio.DBusCallFlags.NO_AUTO_START, 600, None).unpack()[0]
+            names = call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                         'org.freedesktop.DBus', 'ListNames')
+            for name in names:
+                if not name.startswith('org.mpris.MediaPlayer2.'):
+                    continue
+                try:
+                    identity = call(name, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties',
+                                    'GetAll', GLib.Variant('(s)', ('org.mpris.MediaPlayer2',)))
+                    props = call(name, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties',
+                                 'GetAll', GLib.Variant('(s)', ('org.mpris.MediaPlayer2.Player',)))
+                    if is_video_player(name, identity, props):
+                        return True
+                except GLib.Error:
+                    continue
+        except (ImportError, OSError, ValueError, RuntimeError):
+            return False
+        except Exception:
+            # An unavailable media bus must not permanently disable the lock.
+            self.bus = None
+        return False
+
+
+def monitor(events, observer, timeout=IDLE_SECONDS, locker_command=None, video_check=None):
+    command = locker_command or [str(Path.home() / '.local/bin/idle-screen-lock')]
+    last_activity = time.monotonic()
+    requested = False
+    locker = None
+    next_video_check, video_active = 0, False
+    print(f'Input idle timer ready: {timeout}s; playing-video exception enabled', flush=True)
+    try:
+        while observer.poll() is None:
+            now = time.monotonic()
+            if video_check is not None and now >= next_video_check:
+                current = bool(video_check())
+                if current != video_active:
+                    print('Playing video: idle timer paused' if current else 'Video paused/stopped: new idle countdown started', flush=True)
+                    last_activity = now
+                video_active = current
+                next_video_check = time.monotonic() + 5
+            if video_active:
+                last_activity = time.monotonic()
+            # Keep consuming events while a locker is running; no input backlog.
+            if events.wait(0.25):
+                last_activity = time.monotonic()
+                requested = False
+            if locker is not None and locker.poll() is not None:
+                code = locker.returncode
+                locker = None
+                if code:
+                    print(f'Idle locker exited with status {code}; retry after 30s if still idle', flush=True)
+                    requested = False
+                    last_activity = time.monotonic() - timeout + 30
+            if not requested and locker is None and time.monotonic() - last_activity >= timeout:
+                print('Input idle deadline reached: requesting lock and monitor off', flush=True)
+                locker = sp.Popen(command)
+                requested = True
+        raise RuntimeError('The logind lock observer exited unexpectedly')
+    finally:
+        # Do not terminate a running locker when the monitor fails.
+        events.close()
+
+
+def watch():
+    session = graphical_session()
+    events = RawInput()
+    # xss-lock still handles manual logind locks and sleep, but cannot be the
+    # inactivity clock: browsers/recorders can suspend its screensaver events.
+    observer = sp.Popen(['xss-lock', '--verbose', '--ignore-xss', '--session=' + session, '--',
                          str(Path.home() / '.local/bin/idle-screen-lock')])
+    try:
+        monitor(events, observer, video_check=VideoPlayback().active)
+    finally:
+        if observer.poll() is None:
+            observer.terminate()
+            observer.wait(timeout=5)
 
 
 def main():
@@ -29,6 +221,8 @@ def main():
     while locker.poll() is None and time.monotonic() < deadline:
         ready = sp.run(['pgrep', '-u', str(os.getuid()), '-x', 'i3lock'], stdout=sp.DEVNULL)
         if ready.returncode == 0:
+            # Let the locker's initial drawing and grabs finish before DPMS off.
+            time.sleep(0.3)
             sp.run(['xset', 'dpms', 'force', 'off'], check=True)
             break
         time.sleep(0.05)

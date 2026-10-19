@@ -1,4 +1,6 @@
 """Idle locker must not blank the screen before starting the locker."""
+from contextlib import redirect_stdout
+import io
 import importlib.machinery
 import importlib.util
 from pathlib import Path
@@ -32,9 +34,37 @@ class IdleLock(unittest.TestCase):
         run.assert_not_called()
 
     def test_user_service_selects_graphical_session_explicitly(self):
-        with patch.dict(idle.os.environ, {}, clear=True), patch.object(idle.os, 'getuid', return_value=1000), patch.object(idle.sp, 'check_output', side_effect=['2\n', 'User=1000\nType=x11\n']), patch.object(idle.os, 'execvp') as execute:
-            idle.watch()
-        self.assertIn('--session=2', execute.call_args.args[1])
+        with patch.dict(idle.os.environ, {}, clear=True), patch.object(idle.os, 'getuid', return_value=1000), patch.object(idle.sp, 'check_output', side_effect=['2\n', 'User=1000\nType=x11\n']):
+            self.assertEqual(idle.graphical_session(), '2')
+
+    def test_video_exceptions_do_not_include_yandex_or_paused_media(self):
+        playing = {'PlaybackStatus': 'Playing', 'Metadata': {}}
+        self.assertFalse(idle.is_video_player('chromium.instance1', {'Identity': 'YandexMusic'}, playing))
+        self.assertTrue(idle.is_video_player('firefox.instance1', {'Identity': 'Zen'}, playing))
+        self.assertFalse(idle.is_video_player('firefox.instance1', {'Identity': 'Zen'}, {'PlaybackStatus': 'Paused'}))
+        audio = {'PlaybackStatus': 'Playing', 'Metadata': {'xesam:url': 'file:///music/song.flac'}}
+        self.assertFalse(idle.is_video_player('vlc', {'Identity': 'VLC media player'}, audio))
+        video = {'PlaybackStatus': 'Playing', 'Metadata': {'xesam:url': 'file:///movies/movie.mp4'}}
+        self.assertTrue(idle.is_video_player('vlc', {'Identity': 'VLC media player'}, video))
+
+    def test_video_pause_starts_a_fresh_full_countdown(self):
+        clock = {'now': 0.0}
+        def wait(timeout):
+            clock['now'] += timeout
+            return False
+        events = SimpleNamespace(wait=wait, close=lambda: None)
+        observer = SimpleNamespace(poll=lambda: None if clock['now'] < 14 else 0)
+        starts = []
+        def start(command):
+            starts.append(clock['now'])
+            return SimpleNamespace(poll=lambda: None)
+        with patch.object(idle.time, 'monotonic', side_effect=lambda: clock['now']), patch.object(idle.sp, 'Popen', side_effect=start), redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError, 'observer exited'):
+                idle.monitor(events, observer, timeout=2, video_check=lambda: clock['now'] < 6)
+        # Playback is checked at 0, 5 and 10 seconds; after detecting pause at
+        # 10 the entire two-second inactivity interval must still elapse.
+        self.assertEqual(len(starts), 1)
+        self.assertGreaterEqual(starts[0], 12)
 
 
 if __name__ == '__main__':

@@ -5,9 +5,9 @@ ConditionEnvironment=DISPLAY
 
 [Service]
 Type=exec
-ExecStartPre=/usr/bin/xset s 600 600
+ExecStartPre=/usr/bin/xset s off
 ExecStartPre=/usr/bin/xset +dpms
-ExecStartPre=/usr/bin/xset dpms 600 600 600
+ExecStartPre=/usr/bin/xset dpms 0 0 0
 ExecStart=%h/.local/bin/idle-screen-lock --watch
 Restart=on-failure
 RestartSec=3
