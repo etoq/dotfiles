@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=Easy Effects
-Exec=easyeffects --service-mode
+Exec=systemctl --user start easyeffects.service
 Terminal=false
 X-GNOME-Autostart-enabled=true

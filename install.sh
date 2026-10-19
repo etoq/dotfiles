@@ -258,6 +258,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/gammastep" "$HOME/.config/gammastep"
     link "configs/systemd/user/clean-screenshots.timer" "$HOME/.config/systemd/user/clean-screenshots.timer"
     link "configs/systemd/user/throne.service" "$HOME/.config/systemd/user/throne.service"
+    link "configs/systemd/user/easyeffects.service" "$HOME/.config/systemd/user/easyeffects.service"
     link "configs/systemd/user/wispr-a11y-guard.service" "$HOME/.config/systemd/user/wispr-a11y-guard.service"
     link "configs/systemd/user/wispr-a11y-guard.timer" "$HOME/.config/systemd/user/wispr-a11y-guard.timer"
     for unit in workstation-backup@.service workstation-backup-full.timer workstation-backup-keepass.timer workstation-backup-warning.service; do

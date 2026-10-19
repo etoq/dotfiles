@@ -43,6 +43,6 @@ once('gammastep',['gammastep','-m','randr'])
 once('xss-lock',['xss-lock','--','sh','-c','xset dpms force off; betterlockscreen -l dimblur'])
 once('battery-alert',[H/'bin/battery-alert'])
 
-# Both applications are single-instance; keep existing audio/dictation sessions.
-once('easyeffects',['easyeffects','--service-mode'])
+# One supervised audio service; keep an existing dictation session.
+call(['systemctl','--user','start','easyeffects.service'])
 once('wispr-flow',[H/'.local/bin/wispr-flow'])

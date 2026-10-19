@@ -66,7 +66,7 @@ xrdb -merge ~/.Xresources 2>/dev/null
 # Import this X11 session before starting the supervised proxy.
 dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP
 systemctl --user start throne.service
-pgrep -u "$(id -u)" -x easyeffects >/dev/null || easyeffects --service-mode &
+systemctl --user start easyeffects.service &
 pgrep -u "$(id -u)" -x wispr-flow >/dev/null || wispr-flow &
 
 # Обои
