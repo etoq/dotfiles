@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=Wispr Flow
-Exec=wispr-flow
+Exec=wispr-flow --hidden
 Terminal=false
 X-GNOME-Autostart-enabled=true

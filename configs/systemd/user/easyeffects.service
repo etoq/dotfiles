@@ -9,7 +9,7 @@ StartLimitBurst=3
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/easyeffects --service-mode
+ExecStart=/usr/bin/easyeffects --service-mode --hide-window
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=15

@@ -67,7 +67,7 @@ xrdb -merge ~/.Xresources 2>/dev/null
 dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP
 systemctl --user start throne.service
 systemctl --user start easyeffects.service &
-pgrep -u "$(id -u)" -x wispr-flow >/dev/null || wispr-flow &
+pgrep -u "$(id -u)" -x wispr-flow >/dev/null || "$HOME/.local/bin/wispr-flow" --hidden &
 
 # Обои
 sh $HOME/bin/random_wallpaper &

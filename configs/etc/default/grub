@@ -4,7 +4,7 @@ GRUB_DEFAULT=0
 GRUB_TIMEOUT=5
 GRUB_DISTRIBUTOR="Arch"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash audit=0 systemd.tpm2_wait=false initcall_blacklist=crb_acpi_driver_init,init_tis"
-GRUB_CMDLINE_LINUX='cryptdevice=UUID=d0394e85-24b4-44d9-883a-f92a6f2b8ac8:cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ nvidia-drm.modeset=1 iommu=pt intel_iommu=on apparmor=1 security=apparmor'
+GRUB_CMDLINE_LINUX='cryptdevice=UUID=d0394e85-24b4-44d9-883a-f92a6f2b8ac8:cryptroot:allow-discards root=/dev/mapper/cryptroot rootflags=subvol=@ nvidia-drm.modeset=1 iommu=pt intel_iommu=on apparmor=1 security=apparmor'
 
 # Preload both GPT and MBR modules so that they are not missed
 GRUB_PRELOAD_MODULES="part_gpt part_msdos"

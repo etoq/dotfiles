@@ -45,4 +45,4 @@ once('battery-alert',[H/'bin/battery-alert'])
 
 # One supervised audio service; keep an existing dictation session.
 call(['systemctl','--user','start','easyeffects.service'])
-once('wispr-flow',[H/'.local/bin/wispr-flow'])
+once('wispr-flow',[H/'.local/bin/wispr-flow','--hidden'])
