@@ -1,0 +1,60 @@
+#!/usr/bin/python
+"""Wait briefly for configured sensors; never write to the fan controller."""
+from pathlib import Path
+import sys
+import time
+import yaml
+
+
+def ready(config):
+    for sensor in config['sensors']:
+        if set(sensor) != {'hwmon', 'name', 'indices'}:
+            raise ValueError('Unsupported sensor definition')
+        candidates = [p for p in Path(sensor['hwmon']).glob('hwmon*')
+                      if (p / 'name').read_text().strip() == sensor['name']]
+        if len(candidates) != 1:
+            return False
+        for index in sensor['indices']:
+            int((candidates[0] / f'temp{index}_input').read_text().strip())
+    for fan in config['fans']:
+        if set(fan) != {'tpacpi'}:
+            raise ValueError('Unsupported fan definition')
+        if 'status:' not in Path(fan['tpacpi']).read_text():
+            return False
+    return bool(config['sensors'] and config['fans'])
+
+
+def wait(config, timeout=10, clock=time.monotonic, sleep=time.sleep):
+    until = clock() + timeout
+    while True:
+        try:
+            if ready(config):
+                return True
+        except (OSError, ValueError):
+            pass
+        if clock() >= until:
+            return False
+        sleep(.1)
+
+
+def main():
+    try:
+        config = yaml.safe_load(Path('/etc/thinkfan.conf').read_text())
+        if sys.argv[1:] == ['--check']:
+            if not ready(config):
+                raise SystemExit('Thinkfan sensors are not ready')
+            print('Thinkfan sensors and fan interface are ready')
+            return
+        if wait(config):
+            print('Thinkfan sensors and fan interface are ready')
+            return
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as error:
+        if sys.argv[1:] == ['--check']:
+            raise SystemExit('Thinkfan readiness check failed: ' + str(error))
+        print('Thinkfan readiness check:', error, file=sys.stderr)
+    # Delegate final validation/failsafe handling to thinkfan, as with the old sleep.
+    print('Readiness wait ended; thinkfan will validate its configuration', file=sys.stderr)
+
+
+if __name__ == '__main__':
+    main()

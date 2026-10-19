@@ -187,7 +187,7 @@ if [ "$DO_PKGS" = "1" ]; then
     AUR_PKGS=(
         nvidia-470xx-dkms nvidia-470xx-utils nvidia-470xx-settings
         lib32-nvidia-470xx-utils lib32-opencl-nvidia-470xx opencl-nvidia-470xx
-        acpilight thinkfan
+        acpilight thinkfan python-yaml
         bluetuith impala rmtrash ptpython hyx snapper-rollback btrfs-assistant
         papirus-icon-theme ttf-material-symbols-variable-git ttf-symbola
         i3lock-color rofi-greenclip apparmor.d-git

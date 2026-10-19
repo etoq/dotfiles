@@ -39,8 +39,8 @@ app.connect('activate',()=>{
  const controls=box(true,8);controls.get_style_context().add_class('controls');root.pack_start(controls,false,false,0);
  function request(args,callback=()=>{}){
   try{const proc=Gio.Subprocess.new(args,Gio.SubprocessFlags.STDOUT_PIPE|Gio.SubprocessFlags.STDERR_PIPE);
-   proc.communicate_utf8_async(null,null,(p,r)=>{try{const [,out,err]=p.communicate_utf8_finish(r);if(p.get_successful())callback(out.trim());else controls.set_tooltip_text(err.trim()||'Не удалось применить настройку');}catch(e){controls.set_tooltip_text(String(e));}});
-  }catch(e){controls.set_tooltip_text(String(e));}
+   proc.communicate_utf8_async(null,null,(p,r)=>{try{const [,out,err]=p.communicate_utf8_finish(r);if(p.get_successful())callback(out.trim());else console.error(err.trim()||'Не удалось применить настройку');}catch(e){console.error(String(e));}});
+  }catch(e){console.error(String(e));}
  }
  function slider(title,command,minimum,query,parse){
   const row=box(false,12);const caption=label(title,'tool-title');caption.set_size_request(120,-1);row.pack_start(caption,false,false,0);
@@ -70,7 +70,7 @@ app.connect('activate',()=>{
  }
  const output=deviceSelector('󰕾 Выход','set-sink','sinks','default_sink');
  const input=deviceSelector('󰍬 Микрофон','set-source','sources','default_source');
- const systemState=box(true,4);const vmState=label('VM: проверка…','description');const backupState=label('Копия: проверка…','description');
+ const systemState=box(true,4);const vmState=label('VM: проверка…','description');const backupState=label('Last Backup: —','description');
  for(const w of [vmState,backupState]){w.set_ellipsize(Pango.EllipsizeMode.END);w.set_max_width_chars(65);systemState.pack_start(w,false,false,0);}
  controls.pack_start(systemState,false,false,0);
  let systemPending=false;
@@ -84,9 +84,11 @@ app.connect('activate',()=>{
     if(deviceOptions[item.key]!==opts){item.combo.remove_all();for(const d of data[item.key]||[])item.combo.append(d.id,d.label);deviceOptions[item.key]=opts;}
     if(GLib.get_monotonic_time()-deviceEdited>1200000)item.combo.set_active_id(data[item.selectedKey]||'');
    }
-   deviceSync=false;const names=(data.vms||[]).join(', ');vmState.set_text(data.vm_available===false?'VM: служба недоступна':(names?`VM: ${names}`:'VM: все выключены'));vmState.set_tooltip_text(names||'Нет запущенных виртуальных машин');
-   const last=data.backup?.last_success;const backupLabels={awaiting_destination:'ждёт выбора облака',awaiting_authentication:'Proton — нужен вход',not_configured:'не настроена',ready:'Proton подключён, копии ещё нет',running:'выполняется',error:'ошибка'};const state=data.backup?.state;backupState.set_text(['running','error'].includes(state)?`Копия: ${backupLabels[state]}`:(last?`Копия: ${last}${data.backup?.scope==='partial'?' · дополнение':''}`:`Копия: ${backupLabels[state]||'не запущена'}`));backupState.set_tooltip_text([data.backup?.message,data.backup?.last_full_success?`Полная копия: ${data.backup.last_full_success}`:null].filter(Boolean).join('\n')||'Резервирование пока не запущено');
-  }catch(e){deviceSync=false;controls.set_tooltip_text(String(e));}});
+   deviceSync=false;const names=(data.vms||[]).join(', ');vmState.set_text(data.vm_available===false?'VM: служба недоступна':(names?`VM: ${names}`:'VM: все выключены'));
+   const last=data.backup?.last_success;
+   const date=last?GLib.DateTime.new_from_iso8601(last,GLib.TimeZone.new_local()):null;
+   backupState.set_text(`Last Backup: ${date?date.to_local().format('%d:%m:%Y'):'—'}`);
+  }catch(e){deviceSync=false;console.error(String(e));}});
  }
  refreshSystem();
  const systemRefreshId=GLib.timeout_add(GLib.PRIORITY_DEFAULT,3000,()=>{refreshSystem();return GLib.SOURCE_CONTINUE;});
