@@ -50,7 +50,7 @@ def main():
           not any(lock.get('who') == 'workstation-nvidia-transition' for lock in inhibitors))
     if not all(checks):
         raise RuntimeError('Profile configuration incomplete; do not test sleep')
-    print('Full-VRAM profile configuration verified. Actual sleep/resume is NOT tested.')
+    print('Full-VRAM profile configuration verified. This check does not perform or validate a sleep/resume cycle.')
     print('Save work before a separately agreed manual sleep test.')
 
 
