@@ -178,8 +178,18 @@ def finish(run, plan, stage, version):
     for kernel in plan['kernels']:
         run(['dkms', 'autoinstall', '-k', kernel])
         for name in ('nvidia', 'nvidia_drm', 'nvidia_modeset', 'nvidia_uvm'):
-            if output(['modinfo', '-k', kernel, '-F', 'version', name]) != version:
+            module_version = output(['modinfo', '-k', kernel, '-F', 'version', name])
+            if version == '470.256.02' and name == 'nvidia_uvm' and not module_version:
+                # 470 UVM has no MODULE_VERSION. Verify its installed bytes against
+                # the artifact belonging to this exact DKMS version and kernel.
+                installed = Path(output(['modinfo', '-k', kernel, '-F', 'filename', name]))
+                artifact = Path('/var/lib/dkms/nvidia') / version / kernel / 'x86_64/module' / installed.name
+                if not artifact.is_file() or sha(installed) != sha(artifact):
+                    raise RuntimeError('470 UVM differs from its DKMS artifact: ' + kernel)
+            elif module_version != version:
                 raise RuntimeError('Wrong installed module version: ' + kernel + ' ' + name)
+            if not output(['modinfo', '-k', kernel, '-F', 'vermagic', name]).startswith(kernel + ' '):
+                raise RuntimeError('Wrong module kernel ABI: ' + kernel + ' ' + name)
     run(['mkinitcpio', '-P'])
     run(['/usr/local/libexec/sync-efi-kernels'])
     run([stage / 'assets/verify-kernel-stack'])
@@ -201,7 +211,7 @@ def finish(run, plan, stage, version):
             raise RuntimeError('EFI image differs: ' + name)
 
 
-def apply(plan, rollback, resume=False, unattended_rollback=False):
+def apply(plan, rollback, resume=False, unattended_rollback=False, finish_only=False):
     if os.geteuid() != 0:
         raise RuntimeError('Run the selected action with sudo in your terminal')
     if unattended_rollback and (not rollback or resume):
@@ -219,6 +229,8 @@ def apply(plan, rollback, resume=False, unattended_rollback=False):
     if rollback:
         archives = [base / 'packages' / item['file'] for item in plan['reverse']]
         records, version = plan['reverse'], '470.256.02'
+        if finish_only:
+            installed_matches(records)
     else:
         installed_matches(plan['forward'] if resume else plan['reverse'])
         if not resume and Path('/sys/module/nvidia/version').read_text().strip() != '470.256.02':
@@ -236,7 +248,7 @@ def apply(plan, rollback, resume=False, unattended_rollback=False):
         shutil.copyfile(path, stage / 'assets' / name)
         (stage / 'assets' / name).chmod(ASSETS[name][2])
     stable_archives = []
-    for path, item in ([] if resume else zip(archives, records)):
+    for path, item in ([] if resume or finish_only else zip(archives, records)):
         stable = stage / 'packages' / path.name
         shutil.copyfile(path, stable)
         stable.chmod(0o600)
@@ -256,7 +268,7 @@ def apply(plan, rollback, resume=False, unattended_rollback=False):
         temporary.chmod(mode)
         temporary.replace(dest)
     run = Runner(stage / 'transition.log')
-    report = {'complete': False, 'action': 'restore470' if rollback else ('resume580' if resume else 'apply580'),
+    report = {'complete': False, 'action': ('finish470' if finish_only else 'restore470') if rollback else ('resume580' if resume else 'apply580'),
               'stage': str(stage), 'reboot_performed': False,
               'created': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
               'target_version': version, 'kernels': plan['kernels']}
@@ -264,7 +276,7 @@ def apply(plan, rollback, resume=False, unattended_rollback=False):
     try:
         policy = '/usr/local/libexec/nvidia470-sleep-policy'
         run([policy])
-        if not resume:
+        if not resume and not finish_only:
             transaction(run, stable_archives, policy, unattended_rollback)
         installed_matches(records)
         finish(run, plan, stage, version)
@@ -284,10 +296,12 @@ def main():
     actions.add_argument('--restore470', action='store_true')
     actions.add_argument('--resume580', action='store_true')
     actions.add_argument('--restore470-unattended', action='store_true', help='Emergency: verified pinned rollback, auto-answer only package conflicts')
+    actions.add_argument('--finish470-unattended', action='store_true', help='Finish verification and images for an already installed pinned 470 cohort')
     args = parser.parse_args()
     plan = json.loads(PLAN.read_text())
-    if args.apply580 or args.restore470 or args.resume580 or args.restore470_unattended:
-        apply(plan, args.restore470 or args.restore470_unattended, args.resume580, args.restore470_unattended)
+    if args.apply580 or args.restore470 or args.resume580 or args.restore470_unattended or args.finish470_unattended:
+        apply(plan, args.restore470 or args.restore470_unattended or args.finish470_unattended,
+              args.resume580, args.restore470_unattended or args.finish470_unattended, args.finish470_unattended)
         return
     check_machine(plan)
     verify_forward(plan)
