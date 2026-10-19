@@ -39,6 +39,7 @@ class FakeProton:
         self.events = []
         self.corrupt_download = False
         self.fail_delete = False
+        self.lose_delete_response = False
         self.wrong_parent = None
         self.used_override = None
         self.foreign = {'uid': 't~foreign', 'type': 'file'}
@@ -46,7 +47,8 @@ class FakeProton:
     def resolve(self, path):
         leaf = path.removeprefix(self.remote + '/').removeprefix('/trash/')
         key, _, filename = leaf.partition('/')
-        node = next((n for n in self.nodes.values() if key in (n['uid'], n['name']['value'])), None)
+        node = next((n for n in self.nodes.values() if key in (
+            (n['name']['value'],) if path.startswith('/trash/') else (n['uid'], n['name']['value']))), None)
         if node is None:
             raise KeyError(path)
         return node, filename
@@ -97,7 +99,7 @@ class FakeProton:
             self.trashed.add(node['uid'])
         elif action == 'delete':
             node, _ = self.resolve(args[3])
-            assert args[3] == '/trash/' + node['uid'] and node['uid'] in self.trashed
+            assert args[3] == '/trash/' + node['name']['value'] and node['uid'] in self.trashed
             if self.fail_delete:
                 status = 1
             else:
@@ -105,6 +107,8 @@ class FakeProton:
                 shutil.rmtree(self.root / node['uid'])
                 self.trashed.remove(node['uid'])
                 del self.nodes[node['name']['value']]
+                if self.lose_delete_response:
+                    status = 1
         else:
             raise AssertionError('Unexpected Proton command: ' + str(args))
         return subprocess.CompletedProcess(args, status, json.dumps(result) if result is not None else '')
@@ -144,11 +148,11 @@ class BackupTests(unittest.TestCase):
         self.stack.enter_context(patch.object(self.backup.os, 'geteuid', return_value=1000))
         self.stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
 
-    def run_backup(self, day, *arguments):
+    def run_backup(self, day, *arguments, minute=0):
         class Clock(REAL_DATETIME):
             @classmethod
             def now(cls, tz=None):
-                return cls(2026, 10, day, 12, 0, 0, tzinfo=datetime.timezone.utc)
+                return cls(2026, 10, day, 12, minute, 0, tzinfo=datetime.timezone.utc)
         with patch.object(self.backup.datetime, 'datetime', Clock), patch('sys.argv', ['backup', *(arguments or ['--run-once'])]):
             self.backup.main()
         return json.loads((self.backup.STATE / 'status.json').read_text())
@@ -219,6 +223,46 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(daily['sources'], ['passwords.kdbx', '.config/keepassxc'])
         self.assertIn(first['run_id'], self.cloud.nodes)
         self.assertEqual(daily['last_full_verified_remote'], first['remote'])
+
+    def test_lost_delete_response_does_not_target_another_folder(self):
+        first = self.run_backup(1)
+        self.cloud.lose_delete_response = True
+        with self.assertRaisesRegex(RuntimeError, 'Proton command failed'):
+            self.run_backup(2)
+        self.assertNotIn(first['run_id'], self.cloud.nodes)
+        self.cloud.lose_delete_response = False
+        latest = self.run_backup(3)
+        self.assertEqual(list(self.cloud.nodes), [latest['run_id']])
+        self.assertEqual(self.cloud.foreign['uid'], 't~foreign')
+
+    def test_changed_root_uid_stops_before_upload(self):
+        first = self.run_backup(1)
+        plan = json.loads(self.backup.PLAN.read_text())
+        plan['destination']['folder_uid'] = 't~different'
+        self.backup.PLAN.write_text(json.dumps(plan))
+        with self.assertRaisesRegex(RuntimeError, 'root UID changed'):
+            self.run_backup(2)
+        self.assertEqual(list(self.cloud.nodes), [first['run_id']])
+        self.assertFalse(self.cloud.deleted)
+
+    def test_ambiguous_trash_name_is_never_deleted(self):
+        first = self.run_backup(1)
+        self.cloud.foreign['name'] = {'ok': True, 'value': first['run_id']}
+        with self.assertRaisesRegex(RuntimeError, 'Ambiguous trash name'):
+            self.run_backup(2)
+        self.assertFalse(self.cloud.deleted)
+        self.assertIn(first['run_id'], self.cloud.nodes)
+
+    def test_timer_resumes_cleanup_without_reuploading(self):
+        first = self.run_backup(1)
+        self.cloud.fail_delete = True
+        with self.assertRaises(RuntimeError):
+            self.run_backup(2)
+        uploads = len([e for e in self.cloud.events if e[1] == 'upload'])
+        self.cloud.fail_delete = False
+        result = self.run_backup(2, '--scheduled', 'full', minute=1)
+        self.assertIn(first['run_id'], result['retired_versions'])
+        self.assertEqual(uploads, len([e for e in self.cloud.events if e[1] == 'upload']))
 
     def test_disabled_schedule_does_not_contact_proton(self):
         plan = json.loads(self.backup.PLAN.read_text())

@@ -148,10 +148,20 @@ def prune_verified(plan,stage,cli,cli_json):
             if verify_remote_record(old,plan,stage,cli,cli_json)!=uid:raise RuntimeError('Backup UID changed')
             cli('filesystem','trash',plan['destination']['remote_directory'].rstrip('/')+'/'+uid)
             entry['state']='trashed';atomic_json(journal,entry)
-            node=cli_json('filesystem','info','/trash/'+uid,'--json')
+            trashed=cli_json('filesystem','list','/trash','--json')
+            node=next((n for n in trashed if n.get('uid')==uid),None)
+        if node is None:raise RuntimeError('Backup was not moved to trash')
         if node.get('uid')!=uid or node.get('type')!='folder':raise RuntimeError('Unexpected trash identity; permanent deletion refused')
-        # Never empty the global trash. Delete only this verified retired UID.
-        cli('filesystem','delete','/trash/'+uid)
+        # CLI 0.9.0 resolves trash entries by name, unlike normal UID paths.
+        # Require a unique name AND recheck UID/parent before deleting that path.
+        matches=[n for n in trashed if n.get('name')=={'ok':True,'value':old['id']}]
+        if len(matches)!=1 or matches[0].get('uid')!=uid:raise RuntimeError('Ambiguous trash name; deletion refused')
+        trash_path='/trash/'+old['id']
+        checked=cli_json('filesystem','info',trash_path,'--json')
+        if checked.get('uid')!=uid or checked.get('parentUid')!=entry['root_uid'] or checked.get('type')!='folder':raise RuntimeError('Trash identity changed; deletion refused')
+        # Never empty the global trash. Only this checked retired folder is removed.
+        cli('filesystem','delete',trash_path)
+        if any(n.get('uid')==uid for n in cli_json('filesystem','list','/trash','--json')):raise RuntimeError('Retired backup remains in trash; cleanup will retry')
         entry['state']='deleted';atomic_json(journal,entry);deleted.append(old['id'])
     return deleted
 
@@ -234,7 +244,21 @@ def run_backup(resources):
             if plan['destination'].get('folder_uid',node['uid'])!=node['uid']:raise RuntimeError('Backup root UID changed; retention stopped')
             plan['destination']['folder_uid']=node['uid'];atomic_json(PLAN,plan)
             phase('retention','Повтор незавершённой очистки только проверенных старых версий')
-            prune_verified(plan,stage,cli,cli_json)
+            retired=prune_verified(plan,stage,cli,cli_json)
+            # A recent timer retry after a cleanup error can reuse its fully
+            # verified snapshot instead of uploading another large archive.
+            if args.scheduled and previous.get('state')=='error':
+                records=verified_records(plan)
+                pending=next((r for r in records if r['id']==previous.get('run_id') and r['scope']==scope
+                              and r['manifest']['sources']==sources),None)
+                if pending:
+                    age=(datetime.datetime.now().astimezone()-datetime.datetime.fromisoformat(pending['result']['last_success'])).total_seconds()
+                    if 0<=age<10800:
+                        verify_remote_record(pending,plan,stage,cli,cli_json)
+                        result=pending['result'];result['retired_versions']=sorted(set(result.get('retired_versions',[])+retired))
+                        atomic_json(pending['folder']/'result.json',result);atomic_json(status,result)
+                        print('SUCCESS: cleanup resumed; reusing verified snapshot',pending['id'],flush=True)
+                        return
         phase('archive','Создание локального архива выбранных папок')
         archive=stage/('zer0-'+run_id+'.tar.zst')
         for attempt in range(3):
