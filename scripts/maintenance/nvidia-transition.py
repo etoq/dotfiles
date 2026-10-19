@@ -185,7 +185,7 @@ def finish(run, plan, stage, version):
             raise RuntimeError('EFI image differs: ' + name)
 
 
-def apply(plan, rollback):
+def apply(plan, rollback, resume=False):
     if os.geteuid() != 0:
         raise RuntimeError('Run the selected action with sudo in your terminal')
     if not sys.stdin.isatty():
@@ -202,8 +202,8 @@ def apply(plan, rollback):
         archives = [base / 'packages' / item['file'] for item in plan['reverse']]
         records, version = plan['reverse'], '470.256.02'
     else:
-        installed_matches(plan['reverse'])
-        if Path('/sys/module/nvidia/version').read_text().strip() != '470.256.02':
+        installed_matches(plan['forward'] if resume else plan['reverse'])
+        if not resume and Path('/sys/module/nvidia/version').read_text().strip() != '470.256.02':
             raise RuntimeError('Loaded driver differs from the tested 470')
         archives = verify_forward(plan)
         records, version = plan['forward'], '580.178.04'
@@ -218,7 +218,7 @@ def apply(plan, rollback):
         shutil.copyfile(path, stage / 'assets' / name)
         (stage / 'assets' / name).chmod(ASSETS[name][2])
     stable_archives = []
-    for path, item in zip(archives, records):
+    for path, item in ([] if resume else zip(archives, records)):
         stable = stage / 'packages' / path.name
         shutil.copyfile(path, stable)
         stable.chmod(0o600)
@@ -238,7 +238,7 @@ def apply(plan, rollback):
         temporary.chmod(mode)
         temporary.replace(dest)
     run = Runner(stage / 'transition.log')
-    report = {'complete': False, 'action': 'restore470' if rollback else 'apply580',
+    report = {'complete': False, 'action': 'restore470' if rollback else ('resume580' if resume else 'apply580'),
               'stage': str(stage), 'reboot_performed': False,
               'created': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
               'target_version': version, 'kernels': plan['kernels']}
@@ -246,7 +246,8 @@ def apply(plan, rollback):
     try:
         policy = '/usr/local/libexec/nvidia470-sleep-policy'
         run([policy])
-        transaction(run, stable_archives, policy)
+        if not resume:
+            transaction(run, stable_archives, policy)
         installed_matches(records)
         finish(run, plan, stage, version)
         report['complete'] = True
@@ -263,10 +264,11 @@ def main():
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument('--apply580', action='store_true')
     actions.add_argument('--restore470', action='store_true')
+    actions.add_argument('--resume580', action='store_true')
     args = parser.parse_args()
     plan = json.loads(PLAN.read_text())
-    if args.apply580 or args.restore470:
-        apply(plan, args.restore470)
+    if args.apply580 or args.restore470 or args.resume580:
+        apply(plan, args.restore470, args.resume580)
         return
     check_machine(plan)
     verify_forward(plan)
