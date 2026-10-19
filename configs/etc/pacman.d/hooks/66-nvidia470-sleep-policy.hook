@@ -12,6 +12,6 @@ Target = linux-headers
 Target = linux-lts-headers
 
 [Action]
-Description = Preserve the selected NVIDIA callback sleep configuration
+Description = Preserve the selected NVIDIA sleep profile
 When = PostTransaction
 Exec = /usr/local/libexec/nvidia470-sleep-policy

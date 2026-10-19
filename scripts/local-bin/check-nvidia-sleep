@@ -1,0 +1,62 @@
+#!/usr/bin/python
+"""Read-only profile-aware NVIDIA sleep checks. Never suspends the system."""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess as sp
+import sys
+
+
+def output(args):
+    return sp.check_output(args, text=True, stderr=sp.DEVNULL).strip()
+
+
+def main():
+    profile = Path('/etc/workstation/nvidia-sleep-mode').read_text().strip()
+    if profile == 'callback':
+        helper = Path(__file__).resolve().parent / 'check-sleep-callback'
+        os.execv(str(helper), [str(helper)])
+    if profile != 'preserve-vram':
+        raise RuntimeError('Unknown sleep profile: ' + profile)
+    checks = []
+    def check(label, condition):
+        checks.append(bool(condition))
+        print(('OK: ' if condition else 'FAIL: ') + label)
+    parameters = dict(line.split(':', 1) for line in Path('/proc/driver/nvidia/params').read_text().splitlines() if ':' in line)
+    version = Path('/sys/module/nvidia/version').read_text().strip()
+    kernel = os.uname().release
+    check('NVIDIA 580 is loaded', version == '580.178.04')
+    check('Full VRAM preservation is loaded', parameters.get('PreserveVideoMemoryAllocations', '').strip() == '1')
+    check('VRAM backing path is /var/tmp', parameters.get('TemporaryFilePath', '').strip().strip('"') == '/var/tmp')
+    check('Installed NVIDIA matches loaded driver', output(['modinfo', '-F', 'version', 'nvidia']) == version)
+    check('Module matches the running kernel', output(['modinfo', '-F', 'vermagic', 'nvidia']).startswith(kernel + ' '))
+    check('Vendor resume hook is executable', os.access('/usr/lib/systemd/system-sleep/nvidia', os.X_OK))
+    check('NVIDIA procfs sleep interface is present', Path('/proc/driver/nvidia/suspend').is_file())
+    for unit in ('nvidia-suspend.service', 'nvidia-resume.service', 'nvidia-hibernate.service', 'nvidia-suspend-then-hibernate.service'):
+        result = sp.run(['systemctl', 'is-enabled', unit], capture_output=True, text=True)
+        check(unit + ' enabled', result.returncode == 0 and result.stdout.strip() == 'enabled')
+    required = output(['systemctl', 'show', 'systemd-suspend.service', '-p', 'Requires', '--value']).split()
+    after = output(['systemctl', 'show', 'systemd-suspend.service', '-p', 'After', '--value']).split()
+    resume_after = output(['systemctl', 'show', 'nvidia-resume.service', '-p', 'After', '--value']).split()
+    check('Suspend requires NVIDIA save/resume services', {'nvidia-suspend.service', 'nvidia-resume.service'} <= set(required))
+    check('VRAM is saved before system suspend', 'nvidia-suspend.service' in after)
+    check('NVIDIA resumes after system suspend', 'systemd-suspend.service' in resume_after)
+    check('Late NVIDIA loading profile is installed', Path('/etc/mkinitcpio.conf.d/95-workstation-nvidia-late.conf').is_file())
+    memory = sum(int(value) for value in output(['nvidia-smi', '--query-gpu=memory.total', '--format=csv,noheader,nounits']).splitlines()) * 1024 ** 2
+    check('Enough free disk space to save VRAM', shutil.disk_usage('/var/tmp').free >= (memory * 105 + 99) // 100)
+    inhibitors = json.loads(output(['systemd-inhibit', '--list', '--json=short', '--no-pager']))
+    check('No pending driver-transition reboot',
+          not any(lock.get('who') == 'workstation-nvidia-transition' for lock in inhibitors))
+    if not all(checks):
+        raise RuntimeError('Profile configuration incomplete; do not test sleep')
+    print('Full-VRAM profile configuration verified. Actual sleep/resume is NOT tested.')
+    print('Save work before a separately agreed manual sleep test.')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (RuntimeError, OSError, ValueError, sp.CalledProcessError) as error:
+        print('STOP:', error, file=sys.stderr)
+        sys.exit(1)

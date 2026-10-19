@@ -12,6 +12,22 @@ spec.loader.exec_module(transition)
 
 
 class TransitionSafety(unittest.TestCase):
+    def test_failed_profile_application_restores_marker_before_retry(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            marker = root / 'etc/workstation/nvidia-sleep-mode'
+            marker.parent.mkdir(parents=True)
+            marker.write_text('callback\n')
+            calls = []
+            def run(args):
+                calls.append(marker.read_text())
+                if len(calls) == 1:
+                    raise RuntimeError('simulated policy failure')
+            with self.assertRaisesRegex(RuntimeError, 'simulated policy failure'):
+                transition.select_profile(run, 'preserve-vram', root)
+            self.assertEqual(calls, ['preserve-vram\n', 'callback\n'])
+            self.assertEqual(marker.read_text(), 'callback\n')
+
     def test_sleep_policy_is_reapplied_after_failed_package_transaction(self):
         calls = []
 
@@ -40,6 +56,18 @@ class TransitionSafety(unittest.TestCase):
         with patch.object(transition.os, 'geteuid', return_value=0), patch.object(transition, 'check_machine') as check:
             with self.assertRaisesRegex(RuntimeError, 'restricted'):
                 transition.apply({}, False, unattended_rollback=True)
+            check.assert_not_called()
+
+    def test_previously_failed_580_callback_mode_is_blocked_before_mutation(self):
+        with patch.object(transition.os, 'geteuid', return_value=0), patch.object(transition, 'check_machine') as check:
+            with self.assertRaisesRegex(RuntimeError, 'callback failed'):
+                transition.apply({}, False)
+            check.assert_not_called()
+
+    def test_rollback_cannot_select_full_vram_profile(self):
+        with patch.object(transition.os, 'geteuid', return_value=0), patch.object(transition, 'check_machine') as check:
+            with self.assertRaisesRegex(RuntimeError, 'Invalid combination'):
+                transition.apply({}, True, preserve_vram=True)
             check.assert_not_called()
 
     def test_wrong_module_version_stops_before_rebuilding_boot_images(self):

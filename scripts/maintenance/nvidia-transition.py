@@ -54,7 +54,7 @@ def assets():
     return {name: repo / relative for name, (relative, _, _) in ASSETS.items()}
 
 
-def check_machine(plan):
+def check_machine(plan, allowed_profiles=('callback',)):
     if Path('/sys/class/dmi/id/product_name').read_text().strip() != plan['machine']:
         raise RuntimeError('Machine identity differs')
     if output(['findmnt', '-n', '-o', 'UUID', '/']) != plan['root_uuid']:
@@ -65,8 +65,79 @@ def check_machine(plan):
         raise RuntimeError('EFI is not mounted')
     if Path('/var/lib/pacman/db.lck').exists():
         raise RuntimeError('Package manager is busy')
-    if Path('/etc/workstation/nvidia-sleep-mode').read_text().strip() != 'callback':
-        raise RuntimeError('Sleep mode differs from the tested callback policy')
+    if Path('/etc/workstation/nvidia-sleep-mode').read_text().strip() not in allowed_profiles:
+        raise RuntimeError('Unexpected NVIDIA sleep profile')
+
+
+def preserve_preflight(plan):
+    memory = sum(int(value) for value in output(['nvidia-smi', '--query-gpu=memory.total',
+                                               '--format=csv,noheader,nounits']).splitlines()) * 1024 ** 2
+    needed = (memory * 105 + 99) // 100 + 8 * 1024 ** 3
+    if shutil.disk_usage('/var/tmp').free < needed:
+        raise RuntimeError('Not enough disk space for full VRAM plus the transition reserve')
+    fd = os.open('/var/tmp', os.O_TMPFILE | os.O_RDWR, 0o600)
+    try:
+        os.write(fd, b'workstation-nvidia-vram-check')
+        os.lseek(fd, 0, os.SEEK_SET)
+        if os.read(fd, 64) != b'workstation-nvidia-vram-check':
+            raise RuntimeError('VRAM backing filesystem failed a temporary-file check')
+    finally:
+        os.close(fd)
+    for kernel in plan['kernels']:
+        config = Path('/usr/lib/modules') / kernel / 'build/.config'
+        if 'CONFIG_DRM_SIMPLEDRM=y\n' not in config.read_text():
+            raise RuntimeError('Early boot framebuffer not verified for ' + kernel)
+    for preset in Path('/etc/mkinitcpio.d').glob('linux*.preset'):
+        if any(line.strip().startswith(('ALL_config=', 'default_config=')) for line in preset.read_text().splitlines()):
+            raise RuntimeError('Explicit preset config would bypass the managed mkinitcpio drop-in')
+    # The same pinned 580 cohort previously produced 288 MiB images. Budget 320
+    # MiB each even though late loading should make them smaller; do not depend
+    # on that reduction to fit the first atomic synchronization.
+    remaining = shutil.disk_usage('/boot/efi').free
+    for base in ('linux', 'linux-lts'):
+        for name in ('vmlinuz-' + base, 'initramfs-' + base + '.img'):
+            new_size = 320 * 1024 ** 2 if name.startswith('initramfs-') else (Path('/boot') / name).stat().st_size
+            old_size = (Path('/boot/efi/EFI/ARCH') / name).stat().st_size
+            if remaining < new_size + 8 * 1024 ** 2:
+                raise RuntimeError('Insufficient EFI space for the conservative 580 image budget')
+            remaining += old_size - new_size
+
+
+def inhibit_sleep(run):
+    unit = 'workstation-nvidia-transition-inhibit.service'
+    if sp.run(['systemctl', 'is-active', '--quiet', unit]).returncode:
+        run(['systemd-run', '--unit=' + unit, '--collect', '--property=Type=exec', '--',
+             '/usr/bin/systemd-inhibit', '--what=sleep', '--mode=block',
+             '--who=workstation-nvidia-transition', '--why=Reboot after driver transition',
+             '/usr/bin/sleep', 'infinity'])
+    for _ in range(30):
+        locks = json.loads(output(['systemd-inhibit', '--list', '--json=short', '--no-pager']))
+        if any(lock.get('who') == 'workstation-nvidia-transition'
+               and lock.get('mode') == 'block' and 'sleep' in lock.get('what', '').split(':')
+               for lock in locks):
+            return
+        time.sleep(.1)
+    raise RuntimeError('Could not establish the sleep inhibitor before changing the driver')
+
+
+def select_profile(run, profile, root=Path('/')):
+    marker = root / 'etc/workstation/nvidia-sleep-mode'
+    before = marker.read_bytes()
+    temporary = marker.with_name(marker.name + '.transition-new')
+    temporary.write_text(profile + '\n')
+    temporary.chmod(0o644)
+    temporary.replace(marker)
+    try:
+        run(['/usr/local/libexec/nvidia470-sleep-policy'])
+    except Exception:
+        temporary.write_bytes(before)
+        temporary.chmod(0o644)
+        temporary.replace(marker)
+        try:
+            run(['/usr/local/libexec/nvidia470-sleep-policy'])
+        except Exception as restore_error:
+            print('Previous profile marker restored; policy needs inspection:', restore_error, file=sys.stderr)
+        raise
 
 
 def verify_backup(plan):
@@ -174,7 +245,7 @@ def publish_report(plan, report):
     temporary.replace(persistent / 'report.json')
 
 
-def finish(run, plan, stage, version):
+def finish(run, plan, stage, version, profile='callback'):
     for kernel in plan['kernels']:
         run(['dkms', 'autoinstall', '-k', kernel])
         for name in ('nvidia', 'nvidia_drm', 'nvidia_modeset', 'nvidia_uvm'):
@@ -197,28 +268,47 @@ def finish(run, plan, stage, version):
     options = [line for line in effective.splitlines() if line.startswith('options nvidia ')]
     values = [word.split('=', 1)[1] for line in options for word in line.split()
               if word.startswith('NVreg_PreserveVideoMemoryAllocations=')]
-    if not values or set(values) != {'0'}:
-        raise RuntimeError('Effective callback sleep module options differ')
-    if os.access('/usr/lib/systemd/system-sleep/nvidia', os.X_OK):
-        raise RuntimeError('NVIDIA vendor sleep hook remains executable')
+    preserve = profile == 'preserve-vram'
+    if not values or set(values) != ({'1'} if preserve else {'0'}):
+        raise RuntimeError('Effective NVIDIA sleep module options differ')
+    if os.access('/usr/lib/systemd/system-sleep/nvidia', os.X_OK) != preserve:
+        raise RuntimeError('NVIDIA vendor sleep hook mode differs from the selected profile')
     for unit in UNITS:
         if (Path('/usr/lib/systemd/system') / unit).exists():
             result = sp.run(['systemctl', 'is-enabled', unit], capture_output=True, text=True)
-            if result.stdout.strip() != 'disabled':
-                raise RuntimeError('NVIDIA sleep service not disabled: ' + unit)
+            if result.stdout.strip() != ('enabled' if preserve else 'disabled'):
+                raise RuntimeError('NVIDIA sleep service state differs: ' + unit)
+    if preserve:
+        temporary_paths = [word.split('=', 1)[1] for line in options for word in line.split()
+                           if word.startswith('NVreg_TemporaryFilePath=')]
+        if not temporary_paths or set(temporary_paths) != {'/var/tmp'}:
+            raise RuntimeError('VRAM backing path differs')
+        required = output(['systemctl', 'show', 'systemd-suspend.service', '-p', 'Requires', '--value']).split()
+        if not {'nvidia-suspend.service', 'nvidia-resume.service'} <= set(required):
+            raise RuntimeError('Suspend is missing required NVIDIA dependencies')
+        for name in ('linux', 'linux-lts'):
+            listing = output(['lsinitcpio', '/boot/initramfs-' + name + '.img'])
+            if any('/nvidia.ko' in line or any('/nvidia' + separator + suffix + '.ko' in line
+                   for separator in ('-', '_') for suffix in ('uvm', 'drm', 'modeset', 'peermem'))
+                   for line in listing.splitlines()):
+                raise RuntimeError('NVIDIA was unexpectedly included in the early initramfs: ' + name)
     for name in ('vmlinuz-linux', 'vmlinuz-linux-lts', 'initramfs-linux.img', 'initramfs-linux-lts.img'):
         if sha(Path('/boot') / name) != sha(Path('/boot/efi/EFI/ARCH') / name):
             raise RuntimeError('EFI image differs: ' + name)
 
 
-def apply(plan, rollback, resume=False, unattended_rollback=False, finish_only=False):
+def apply(plan, rollback, resume=False, unattended_rollback=False, finish_only=False, preserve_vram=False):
     if os.geteuid() != 0:
         raise RuntimeError('Run the selected action with sudo in your terminal')
     if unattended_rollback and (not rollback or resume):
         raise RuntimeError('Unattended mode is restricted to the pinned 470 rollback')
+    if ((preserve_vram or resume) and rollback) or (finish_only and not rollback):
+        raise RuntimeError('Invalid combination of transition actions')
+    if not rollback and not preserve_vram:
+        raise RuntimeError('580 with callback failed the sleep test; use --apply580-preserve')
     if not sys.stdin.isatty() and not unattended_rollback:
         raise RuntimeError('An interactive terminal is required for package confirmation')
-    check_machine(plan)
+    check_machine(plan, ('callback', 'preserve-vram') if rollback or resume else ('callback',))
     base = verify_backup(plan)
     source_assets = assets()
     for path in source_assets.values():
@@ -237,6 +327,7 @@ def apply(plan, rollback, resume=False, unattended_rollback=False, finish_only=F
             raise RuntimeError('Loaded driver differs from the tested 470')
         archives = verify_forward(plan)
         records, version = plan['forward'], '580.178.04'
+        preserve_preflight(plan)
     # Retain a self-contained root-owned rollback command before any host changes.
     stage = Path('/var/backups') / time.strftime('nvidia-transition-%Y%m%d-%H%M%S')
     stage.mkdir(mode=0o700)
@@ -247,6 +338,18 @@ def apply(plan, rollback, resume=False, unattended_rollback=False, finish_only=F
     for name, path in source_assets.items():
         shutil.copyfile(path, stage / 'assets' / name)
         (stage / 'assets' / name).chmod(ASSETS[name][2])
+    # Keep the exact pre-transition marker and NVIDIA options alongside the rollback command.
+    previous_etc = stage / 'previous/etc'
+    previous_etc.mkdir(parents=True, exist_ok=True)
+    shutil.copytree('/etc/modprobe.d', previous_etc / 'modprobe.d', symlinks=True)
+    for relative in ('workstation/nvidia-sleep-mode',
+                     'mkinitcpio.conf.d/95-workstation-nvidia-late.conf',
+                     'systemd/system/systemd-suspend.service.d/60-workstation-nvidia-vram.conf'):
+        source = Path('/etc') / relative
+        if source.exists():
+            dest = previous_etc / relative
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
     stable_archives = []
     for path, item in ([] if resume or finish_only else zip(archives, records)):
         stable = stage / 'packages' / path.name
@@ -271,15 +374,17 @@ def apply(plan, rollback, resume=False, unattended_rollback=False, finish_only=F
     report = {'complete': False, 'action': ('finish470' if finish_only else 'restore470') if rollback else ('resume580' if resume else 'apply580'),
               'stage': str(stage), 'reboot_performed': False,
               'created': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
-              'target_version': version, 'kernels': plan['kernels']}
+              'target_version': version, 'kernels': plan['kernels'],
+              'sleep_profile': 'preserve-vram' if preserve_vram else 'callback'}
     print('Rollback command: sudo python', stage / 'nvidia-transition.py', '--restore470', flush=True)
     try:
         policy = '/usr/local/libexec/nvidia470-sleep-policy'
-        run([policy])
+        inhibit_sleep(run)
+        select_profile(run, report['sleep_profile'])
         if not resume and not finish_only:
             transaction(run, stable_archives, policy, unattended_rollback)
         installed_matches(records)
-        finish(run, plan, stage, version)
+        finish(run, plan, stage, version, report['sleep_profile'])
         report['complete'] = True
     finally:
         (stage / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -295,23 +400,27 @@ def main():
     actions.add_argument('--apply580', action='store_true')
     actions.add_argument('--restore470', action='store_true')
     actions.add_argument('--resume580', action='store_true')
+    actions.add_argument('--apply580-preserve', action='store_true', help='580 trial: full VRAM preservation, procfs sleep services, late GPU loading')
+    actions.add_argument('--resume580-preserve', action='store_true')
     actions.add_argument('--restore470-unattended', action='store_true', help='Emergency: verified pinned rollback, auto-answer only package conflicts')
     actions.add_argument('--finish470-unattended', action='store_true', help='Finish verification and images for an already installed pinned 470 cohort')
     args = parser.parse_args()
     plan = json.loads(PLAN.read_text())
-    if args.apply580 or args.restore470 or args.resume580 or args.restore470_unattended or args.finish470_unattended:
+    if args.apply580 or args.restore470 or args.resume580 or args.restore470_unattended or args.finish470_unattended or args.apply580_preserve or args.resume580_preserve:
         apply(plan, args.restore470 or args.restore470_unattended or args.finish470_unattended,
-              args.resume580, args.restore470_unattended or args.finish470_unattended, args.finish470_unattended)
+              args.resume580 or args.resume580_preserve, args.restore470_unattended or args.finish470_unattended,
+              args.finish470_unattended, args.apply580_preserve or args.resume580_preserve)
         return
     check_machine(plan)
     verify_forward(plan)
     installed_matches(plan['reverse'])
+    preserve_preflight(plan)
     for path in assets().values():
         if not path.is_file():
             raise RuntimeError('Missing helper: ' + str(path))
     print('OK: machine, kernels, 10 pinned packages, dependencies and module build proofs.')
     print('Root will additionally verify the complete protected rollback backup before installation.')
-    print('Check only: no system changes. Installation: sudo python', Path(__file__).resolve(), '--apply580')
+    print('Check only: no system changes. Installation: sudo python', Path(__file__).resolve(), '--apply580-preserve')
 
 
 if __name__ == '__main__':

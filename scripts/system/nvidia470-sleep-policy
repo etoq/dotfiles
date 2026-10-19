@@ -1,14 +1,63 @@
 #!/usr/bin/env python3
-"""Keep the explicitly selected NVIDIA callback sleep mode across upgrades."""
+"""Keep the explicitly selected NVIDIA sleep profile across package upgrades."""
 import os
 from pathlib import Path
 import re
 import stat
 import subprocess
 
+LATE_PATH = "etc/mkinitcpio.conf.d/95-workstation-nvidia-late.conf"
+LATE_CONFIG = """# Managed NVIDIA preserve-vram profile: load GPU after encrypted root is mounted.
+_workstation_modules=()
+for _workstation_module in "${MODULES[@]}"; do
+    case $_workstation_module in
+        nvidia|nvidia_modeset|nvidia-modeset|nvidia_uvm|nvidia-uvm|nvidia_drm|nvidia-drm|nvidia_peermem|nvidia-peermem) ;;
+        *) _workstation_modules+=("$_workstation_module") ;;
+    esac
+done
+MODULES=("${_workstation_modules[@]}")
+_workstation_hooks=()
+for _workstation_hook in "${HOOKS[@]}"; do
+    [[ $_workstation_hook == kms ]] || _workstation_hooks+=("$_workstation_hook")
+done
+HOOKS=("${_workstation_hooks[@]}")
+unset _workstation_modules _workstation_module _workstation_hooks _workstation_hook
+"""
+GATE_PATH = "etc/systemd/system/systemd-suspend.service.d/60-workstation-nvidia-vram.conf"
+GATE_CONFIG = """# Managed NVIDIA preserve-vram profile: abort sleep if VRAM saving fails.
+[Unit]
+Requires=nvidia-suspend.service nvidia-resume.service
+After=nvidia-suspend.service
+"""
 
-def enforce_files(root: Path) -> list[str]:
+
+def managed(root, relative, content, enabled, changes):
+    path = root / relative
+    if path.is_symlink():
+        raise RuntimeError('Managed sleep configuration must not be a symlink: ' + str(path))
+    if path.exists() and path.read_text() != content:
+        raise RuntimeError('Custom configuration occupies managed sleep path: ' + str(path))
+    if enabled and not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        path.chmod(0o644)
+        changes.append(str(path))
+    elif not enabled and path.exists():
+        path.unlink()
+        changes.append(str(path))
+
+
+def enforce_files(root: Path, profile="callback") -> list[str]:
+    if profile not in ("callback", "preserve-vram"):
+        raise RuntimeError('Unknown NVIDIA sleep profile')
+    preserve = profile == "preserve-vram"
+    value = "1" if preserve else "0"
     changes = []
+    # Reject collisions before changing any NVIDIA options.
+    for relative, content in ((LATE_PATH, LATE_CONFIG), (GATE_PATH, GATE_CONFIG)):
+        path = root / relative
+        if path.is_symlink() or path.exists() and path.read_text() != content:
+            raise RuntimeError('Custom configuration occupies managed sleep path: ' + str(path))
     config_dir = root / "etc/modprobe.d"
     config_dir.mkdir(parents=True, exist_ok=True)
     # 580 ships PreserveVideoMemoryAllocations=1 in a vendor configuration.
@@ -16,18 +65,22 @@ def enforce_files(root: Path) -> list[str]:
     vendor = root / "usr/lib/modprobe.d/nvidia-580xx-utils.conf"
     override = config_dir / vendor.name
     if vendor.is_file() and not override.exists():
-        override.write_text("# Local callback sleep policy; vendor defaults follow.\n" + vendor.read_text())
+        override.write_text("# Local NVIDIA sleep policy; vendor defaults follow.\n" + vendor.read_text())
         override.chmod(0o644)
         changes.append(str(override))
     for path in config_dir.glob("*.conf"):
         original = path.read_text()
         updated = re.sub(r"\bNVreg_PreserveVideoMemoryAllocations=\d+\b",
-                         "NVreg_PreserveVideoMemoryAllocations=0", original)
+                         "NVreg_PreserveVideoMemoryAllocations=" + value, original)
+        if preserve:
+            updated = re.sub(r"\bNVreg_TemporaryFilePath=\S+", "NVreg_TemporaryFilePath=/var/tmp", updated)
         if original != updated:
             path.write_text(updated)
             changes.append(str(path))
     path = config_dir / "90-nvidia-sleep-policy.conf"
-    expected = "# Managed callback sleep policy; see /etc/workstation/nvidia-sleep-mode.\noptions nvidia NVreg_PreserveVideoMemoryAllocations=0\n"
+    expected = "# Managed NVIDIA sleep policy; see /etc/workstation/nvidia-sleep-mode.\noptions nvidia NVreg_PreserveVideoMemoryAllocations=" + value + "\n"
+    if preserve:
+        expected += "options nvidia NVreg_TemporaryFilePath=/var/tmp\n"
     if not path.exists() or path.read_text() != expected:
         path.write_text(expected)
         path.chmod(0o644)
@@ -35,27 +88,31 @@ def enforce_files(root: Path) -> list[str]:
     hook = root / "usr/lib/systemd/system-sleep/nvidia"
     if hook.exists():
         mode = stat.S_IMODE(hook.stat().st_mode)
-        if mode & 0o111:
-            hook.chmod(mode & ~0o111)
+        wanted = (mode | 0o111) if preserve else (mode & ~0o111)
+        if mode != wanted:
+            hook.chmod(wanted)
             changes.append(str(hook))
+    managed(root, LATE_PATH, LATE_CONFIG, preserve, changes)
+    managed(root, GATE_PATH, GATE_CONFIG, preserve, changes)
     return changes
 
 
 def main() -> None:
     marker = Path("/etc/workstation/nvidia-sleep-mode")
-    if not marker.exists() or marker.read_text().strip() != "callback":
-        print("NVIDIA sleep policy is not set to callback; unchanged")
+    if not marker.exists():
+        print("No managed NVIDIA sleep profile selected; unchanged")
         return
     if os.geteuid() != 0:
         raise SystemExit("Root is required to enforce the NVIDIA sleep policy")
-    changes = enforce_files(Path("/"))
+    profile = marker.read_text().strip()
+    changes = enforce_files(Path("/"), profile)
     units = ["nvidia-suspend.service", "nvidia-resume.service", "nvidia-hibernate.service",
              "nvidia-suspend-then-hibernate.service"]
     units = [unit for unit in units if (Path("/usr/lib/systemd/system") / unit).exists()]
     if units:
-        subprocess.run(["systemctl", "disable", *units], check=True)
         subprocess.run(["systemctl", "daemon-reload"], check=True)
-    print("NVIDIA callback sleep policy preserved; file changes:", len(changes))
+        subprocess.run(["systemctl", "enable" if profile == "preserve-vram" else "disable", *units], check=True)
+    print("NVIDIA sleep profile preserved:", profile, "; file changes:", len(changes))
 
 
 if __name__ == "__main__":
