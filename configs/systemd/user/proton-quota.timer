@@ -1,0 +1,11 @@
+[Unit]
+Description=Warn before Proton storage budget is exhausted
+
+[Timer]
+OnCalendar=*-*-* 18:30:00
+OnStartupSec=5min
+Persistent=true
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

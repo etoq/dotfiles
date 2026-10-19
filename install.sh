@@ -158,13 +158,13 @@ if [ "$DO_PKGS" = "1" ]; then
         btrfs-progs smartmontools cryptsetup snap-pac snapper
         xorg-server xorg-xinit xorg-xrandr xorg-xsetroot xdotool
         xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs
-        bspwm awesome lua53-dkjson xorg-server-xephyr sxhkd picom polybar gjs gtk3 feh flameshot dunst libnotify playerctl
+        bspwm awesome xsettingsd lua53-dkjson xorg-server-xephyr sxhkd picom polybar gjs gtk3 feh flameshot dunst libnotify playerctl
         kitty fish zoxide fzf bat lsd fd duf
         ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-fira-code ttf-iosevka-nerd ttf-dejavu
         noto-fonts noto-fonts-cjk noto-fonts-emoji terminus-font
         nvidia-prime vulkan-intel lib32-vulkan-intel mesa-utils
         pipewire-alsa pipewire-jack pipewire-pulse wireplumber pamixer pavucontrol pulsemixer easyeffects python-gobject python-yaml
-        networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils bolt
+        networkmanager network-manager-applet networkmanager-openvpn openvpn bluez bluez-utils bolt udiskie
         dnsmasq openresolv
         htop btop s-tui fastfetch cpufetch tlp tlp-rdw brightnessctl
         apparmor chrony nftables reflector xss-lock
@@ -172,7 +172,7 @@ if [ "$DO_PKGS" = "1" ]; then
         wireshark-qt tcpdump python-scapy
         radare2 gdb pwndbg binwalk foremost volatility3
         python-pefile python-capstone python-unicorn python-pycryptodome
-        strace ltrace elfutils file binutils ripgrep hexyl python-pwntools
+        strace ltrace elfutils file binutils ripgrep hexyl python-pwntools bpftrace
         neovim python-pip python-pipx python-pynvim git lazygit tmux shellcheck jq clang gdb luarocks
         keepassxc obsidian rofi libqalculate tesseract vim
         qbittorrent mpv libreoffice-fresh zathura zathura-pdf-mupdf
@@ -201,6 +201,8 @@ if [ "$DO_PKGS" = "1" ]; then
         woff2-font-awesome betterlockscreen
         cutter-bin detect-it-easy-bin capa-bin
     )
+
+    python "$DOTFILES_DIR/scripts/maintenance/install-desktop-assets.py" --apply
 
     info "Драйвер NVIDIA сохраняется установленный. Переход ветки — отдельной проверенной процедурой."
 
@@ -251,6 +253,12 @@ fi
 # КОНФИГИ — симлинки
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_CONFIGS" = "1" ]; then
+    link "configs/applications/imhex.desktop" "$HOME/.local/share/applications/imhex.desktop"
+    link "configs/udiskie/config.yml" "$HOME/.config/udiskie/config.yml"
+    link "configs/systemd/user/udiskie.service" "$HOME/.config/systemd/user/udiskie.service"
+    link "configs/systemd/user/proton-quota.service" "$HOME/.config/systemd/user/proton-quota.service"
+    link "configs/systemd/user/proton-quota.timer" "$HOME/.config/systemd/user/proton-quota.timer"
+    link "configs/autostart/udiskie.desktop" "$HOME/.config/autostart/udiskie.desktop"
     step "СИМЛИНКИ КОНФИГОВ"
     link "configs/applications/tiffany-image.desktop" "$HOME/.local/share/applications/tiffany-image.desktop"
     link "configs/applications/com.ayugram.desktop.desktop" "$HOME/.local/share/applications/com.ayugram.desktop.desktop"
@@ -343,7 +351,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"
@@ -380,6 +388,7 @@ if [ "$DO_SERVICES" = "1" ]; then
     done
     sudo usermod -aG wheel,audio,video,storage,optical,libvirt,kvm "$USER"
     systemctl --user daemon-reload
+    systemctl --user enable --now proton-quota.timer
     systemctl --user enable clean-screenshots.timer
     systemctl --user enable --now wispr-a11y-guard.timer
     if python3 -c 'import json,sys; from pathlib import Path; p=Path(sys.argv[1]); sys.exit(0 if p.exists() and json.loads(p.read_text()).get("enabled") is True else 1)' "$HOME/.config/workstation-backup/plan.json"; then
@@ -396,6 +405,8 @@ if [ "$DO_CONFIGS" = "1" ]; then
     gsettings set org.gnome.desktop.interface gtk-theme "Black-Tiffany" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface font-name "JetBrainsMono Nerd Font 11" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface cursor-theme "Bibata-Modern-Classic" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface cursor-size 24 2>/dev/null || true
     gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
     ok "GTK: Black Tiffany + Papirus-Dark"
 

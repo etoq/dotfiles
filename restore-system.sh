@@ -11,6 +11,8 @@ files=(
     systemd/system/systemd-suspend.service.d/60-workstation-nvidia-vram.conf
     systemd/system/thinkfan.service.d/override.conf
     systemd/system/fstrim.service.d/60-workstation-root.conf
+    systemd/system/workstation-health-status.service
+    systemd/system/workstation-health-status.timer
     systemd/system/workstation-storage-warning.service
     systemd/system/btrfs-scrub@-.service.d/maintenance.conf
     tlp.conf thinkfan.conf thinkfan-normal.conf thinkfan-silent.conf keyd/default.conf
@@ -26,7 +28,7 @@ files=(
     initcpio/post/95-sync-efi
 )
 for rel in "${files[@]}"; do test -s "$repo_dir/configs/etc/$rel"; done
-helpers=(sync-efi-kernels nvidia470-sleep-policy workstation-health-notify thinkfan-wait-ready)
+helpers=(sync-efi-kernels nvidia470-sleep-policy workstation-health-notify thinkfan-wait-ready workstation-health-status)
 for name in "${helpers[@]}"; do
     test -s "$repo_dir/scripts/system/$name"
 done
@@ -38,7 +40,7 @@ test "$(findmnt -n -o UUID /)" = c6838094-6e77-4446-bbb1-0a4acfd72b25 || {
     echo 'Root filesystem UUID differs. Adapt GRUB/EFI settings before restoring.'; exit 1;
 }
 if [[ "$mode" == --check ]]; then
-    printf 'Payload present: %s configs, 4 helpers and SDDM theme; NVIDIA 580 preserve-vram.\n' "${#files[@]}"
+    printf 'Payload present: %s configs, 5 helpers and SDDM theme; NVIDIA 580 preserve-vram.\n' "${#files[@]}"
     echo 'Machine identity matches. No files or services changed.'
     exit 0
 fi
@@ -96,7 +98,7 @@ systemctl enable virtqemud.service virtnetworkd.service virtstoraged.service
 systemctl enable virtqemud.socket virtnetworkd.socket virtstoraged.socket
 systemctl enable virtnodedevd.socket virtsecretd.socket virtproxyd.socket virtlogd.socket virtlockd.socket
 systemctl daemon-reload
-systemctl enable smartd.service btrfs-scrub@-.timer fstrim.timer
+systemctl enable smartd.service btrfs-scrub@-.timer fstrim.timer workstation-health-status.timer
 sysctl -p /etc/sysctl.d/90-sysrq-recovery.conf
 for pkgbase_file in /usr/lib/modules/*/pkgbase; do
     [[ -f "$pkgbase_file" ]] || continue

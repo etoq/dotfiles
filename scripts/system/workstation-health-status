@@ -1,0 +1,51 @@
+#!/usr/bin/python
+"""Capture selected disk health data without disk tests or maintenance writes."""
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import pwd
+import subprocess as sp
+
+
+def run(args):
+    try:
+        result = sp.run(args, text=True, capture_output=True, timeout=30)
+        return {'code': result.returncode, 'text': result.stdout.strip()}
+    except (OSError, sp.SubprocessError) as error:
+        return {'code': -1, 'text': str(error)}
+
+
+def main():
+    if os.geteuid() != 0:
+        raise SystemExit('Run as root; no passwords or device serial numbers are collected')
+    smart = run(['smartctl', '-a', '-j', '/dev/nvme0n1'])
+    try:
+        raw = json.loads(smart['text'])
+    except ValueError:
+        raw = {}
+    nvme = raw.get('nvme_smart_health_information_log', {})
+    data = {'checked_at': dt.datetime.now().astimezone().isoformat(),
+            'smart': {'passed': raw.get('smart_status', {}).get('passed'), 'exit_code': smart['code'],
+                      **{key: nvme.get(key) for key in ['temperature', 'percentage_used', 'media_errors', 'critical_warning']}},
+            'scrub': run(['btrfs', 'scrub', 'status', '/']),
+            'btrfs': run(['btrfs', 'device', 'stats', '/'])}
+    directory = Path('/var/lib/workstation-health')
+    if directory.is_symlink() or directory.exists() and directory.stat().st_uid != 0:
+        raise SystemExit('Unsafe health status directory')
+    directory.mkdir(mode=0o750, exist_ok=True)
+    gid = pwd.getpwnam('eto').pw_gid
+    os.chown(directory, 0, gid)
+    directory.chmod(0o750)
+    temporary = directory / 'status.new'
+    if temporary.is_symlink():
+        raise SystemExit('Unsafe temporary status path')
+    temporary.write_text(json.dumps(data, indent=2) + '\n')
+    os.chown(temporary, 0, gid)
+    temporary.chmod(0o640)
+    temporary.replace(directory / 'status.json')
+    print('Read-only SMART/Btrfs status updated; no tests, scrub or TRIM started.')
+
+
+if __name__ == '__main__':
+    main()

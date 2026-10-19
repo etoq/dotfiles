@@ -1,0 +1,68 @@
+#!/usr/bin/python
+"""Read cached maintenance state; opening the page starts no privileged jobs."""
+import datetime as dt
+import json
+from pathlib import Path
+import subprocess as sp
+
+HOME = Path.home()
+
+
+def read(path):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def when(value):
+    try:
+        return dt.datetime.fromisoformat(value).astimezone().strftime('%d:%m:%Y %H:%M')
+    except (ValueError, TypeError):
+        return 'нет данных'
+
+
+def unit(name, *properties):
+    result = sp.run(['systemctl', 'show', name, *['--property=' + x for x in properties]],
+                    capture_output=True, text=True, timeout=4)
+    return dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+
+
+def main():
+    backup = read(HOME / '.local/state/workstation-backup/status.json')
+    quota = read(HOME / '.local/state/workstation-backup/quota.json')
+    disk = read(Path('/var/lib/workstation-health/status.json'))
+    trim = unit('fstrim.service', 'Result', 'ExecMainExitTimestamp')
+    timer = unit('fstrim.timer', 'ActiveState', 'NextElapseUSecRealtime')
+    rows = [['Полная копия', when(backup.get('last_full_success'))],
+            ['Последняя копия', when(backup.get('last_success'))],
+            ['Резервирование', {'success': 'проверено восстановлением', 'running': 'выполняется', 'error': 'ошибка'}.get(backup.get('state'), 'нет данных')]]
+    if all(key in quota for key in ('percent', 'used_bytes', 'budget_bytes')):
+        rows += [['Proton Drive', f"{quota['percent']:.1f}% · {quota['used_bytes']/1024**2:.0f} / {quota['budget_bytes']/1024**2:.0f} МиБ"],
+                 ['Проверка облака', when(quota.get('checked_at'))]]
+    else:
+        rows.append(['Proton Drive', 'размер ещё не проверен'])
+    if quota.get('check_state') in ('keyring_or_login', 'error'):
+        rows.append(['Доступ к облаку', 'нужна разблокировка ключей или повторный вход' if quota['check_state'] == 'keyring_or_login' else 'последняя проверка не удалась'])
+    smart = disk.get('smart', {})
+    smart_text = {True: 'PASSED', False: 'требует внимания', None: 'нет данных SMART' if disk else 'ожидает системной настройки'}.get(smart.get('passed'))
+    rows.append(['SMART NVMe', smart_text])
+    if smart.get('media_errors') is not None:
+        rows.append(['Ошибки носителя', str(smart['media_errors'])])
+    counters = disk.get('btrfs', {})
+    if counters.get('code') == 0:
+        values = [int(line.split()[-1]) for line in counters.get('text', '').splitlines() if line.split() and line.split()[-1].isdigit()]
+        rows.append(['Ошибки Btrfs', str(sum(values)) if values else 'нет данных'])
+    scrub = disk.get('scrub', {}).get('text', '')
+    for key, title in [('Status:', 'Btrfs scrub'), ('Error summary:', 'Ошибки scrub'), ('Scrub started:', 'Последний scrub')]:
+        value = next((line.split(key, 1)[1].strip() for line in scrub.splitlines() if key in line), None)
+        rows.append([title, value or 'нет данных'])
+    rows += [['Обновление SMART/scrub', when(disk.get('checked_at'))],
+             ['TRIM', ('успешно · ' if trim.get('Result') == 'success' else trim.get('Result', '') + ' · ') + trim.get('ExecMainExitTimestamp', '') if trim.get('ExecMainExitTimestamp') else 'ещё не выполнялся'],
+             ['Недельный TRIM', 'включён' if timer.get('ActiveState') == 'active' else 'не активен'],
+             ['Следующий TRIM', timer.get('NextElapseUSecRealtime') or 'нет данных']]
+    print(json.dumps({'rows': rows, 'needs_unlock': quota.get('check_state') == 'keyring_or_login'}, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ImHex
+Comment=Binary structures and hex analysis
+Exec=imhex %F
+Icon=imhex
+Terminal=false
+Categories=Development;

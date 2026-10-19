@@ -36,3 +36,7 @@
 ! White
 *color7:  #C5D6D8
 *color15: #FFFFFF
+
+! Desktop pointer
+Xcursor.theme: Bibata-Modern-Classic
+Xcursor.size: 24

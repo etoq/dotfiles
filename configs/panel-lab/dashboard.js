@@ -36,11 +36,32 @@ app.connect('activate',()=>{
  const header=box(false,12);const title=box(true,5);title.set_hexpand(true);
  title.pack_start(label('󰕮  ZER0 / CONTROL DECK','hero'),false,false,0);
  header.pack_start(title,true,true,0);const close=new Gtk.Button({label:'×'});close.connect('clicked',()=>app.quit());header.pack_end(close,false,false,0);root.pack_start(header,false,false,0);
- const controls=box(true,8);controls.get_style_context().add_class('controls');root.pack_start(controls,false,false,0);
- function request(args,callback=()=>{}){
-  try{const proc=Gio.Subprocess.new(args,Gio.SubprocessFlags.STDOUT_PIPE|Gio.SubprocessFlags.STDERR_PIPE);
-   proc.communicate_utf8_async(null,null,(p,r)=>{try{const [,out,err]=p.communicate_utf8_finish(r);if(p.get_successful())callback(out.trim());else console.error(err.trim()||'Не удалось применить настройку');}catch(e){console.error(String(e));}});
+ const pages=new Gtk.Stack({transition_type:Gtk.StackTransitionType.CROSSFADE,transition_duration:120});root.pack_start(pages,true,true,0);
+ const main=box(true,14);pages.add_named(main,'main');
+ const healthButton=new Gtk.Button({label:'Состояние'});header.pack_end(healthButton,false,false,0);
+ const health=box(true,12);pages.add_named(health,'health');
+ health.pack_start(label('ОБСЛУЖИВАНИЕ','section'),false,false,0);
+ const healthScroll=new Gtk.ScrolledWindow({hscrollbar_policy:Gtk.PolicyType.NEVER,vscrollbar_policy:Gtk.PolicyType.AUTOMATIC});
+ const healthRows=box(true,8);healthScroll.add(healthRows);health.pack_start(healthScroll,true,true,0);
+ const healthActions=box(false,8);const refreshHealth=new Gtk.Button({label:'Обновить'});const refreshQuota=new Gtk.Button({label:'Проверить место Proton'});
+ healthActions.pack_start(refreshHealth,false,false,0);healthActions.pack_start(refreshQuota,false,false,0);health.pack_end(healthActions,false,false,0);
+ const unlockKeys=new Gtk.Button({label:'Разблокировать ключи'});health.pack_end(unlockKeys,false,false,0);
+ function loadHealth(){request([`${H}/.local/bin/workstation-status`],out=>{
+  try{const data=JSON.parse(out);unlockKeys.set_visible(Boolean(data.needs_unlock));for(const child of healthRows.get_children())child.destroy();
+   for(const [title,value] of data.rows){const item=box(true,4);item.get_style_context().add_class('controls');item.pack_start(label(title,'section'),false,false,0);
+    const text=label(value,'tool-title');text.set_line_wrap(true);text.set_max_width_chars(58);text.set_selectable(true);item.pack_start(text,false,false,0);healthRows.pack_start(item,false,false,0);}
+   healthRows.show_all();
   }catch(e){console.error(String(e));}
+ });}
+ healthButton.connect('clicked',()=>{const show=pages.get_visible_child_name()!=='health';pages.set_visible_child_name(show?'health':'main');healthButton.set_label(show?'Назад':'Состояние');if(show)loadHealth();});
+ refreshHealth.connect('clicked',loadHealth);
+ refreshQuota.connect('clicked',()=>request([`${H}/.local/bin/proton-quota`,'--refresh'],loadHealth,loadHealth));
+ unlockKeys.connect('clicked',()=>request([`${H}/.local/bin/proton-quota`,'--unlock'],()=>request([`${H}/.local/bin/proton-quota`,'--refresh'],loadHealth,loadHealth),loadHealth));
+ const controls=box(true,8);controls.get_style_context().add_class('controls');main.pack_start(controls,false,false,0);
+ function request(args,callback=()=>{},onError=()=>{}){
+  try{const proc=Gio.Subprocess.new(args,Gio.SubprocessFlags.STDOUT_PIPE|Gio.SubprocessFlags.STDERR_PIPE);
+   proc.communicate_utf8_async(null,null,(p,r)=>{try{const [,out,err]=p.communicate_utf8_finish(r);if(p.get_successful())callback(out.trim());else{console.error(err.trim()||'Не удалось применить настройку');onError();}}catch(e){console.error(String(e));onError();}});
+  }catch(e){console.error(String(e));onError();}
  }
  function slider(title,command,minimum,query,parse){
   const row=box(false,12);const caption=label(title,'tool-title');caption.set_size_request(120,-1);row.pack_start(caption,false,false,0);
@@ -95,8 +116,8 @@ app.connect('activate',()=>{
  app.connect('shutdown',()=>GLib.source_remove(systemRefreshId));
  const refreshId=GLib.timeout_add(GLib.PRIORITY_DEFAULT,1000,()=>{refreshVolume();refreshBrightness();return GLib.SOURCE_CONTINUE;});
  app.connect('shutdown',()=>GLib.source_remove(refreshId));
- const search=new Gtk.SearchEntry({placeholder_text:'Найти инструмент…'});root.pack_start(search,false,false,0);
- const catalog=box(true,14);const scroll=new Gtk.ScrolledWindow({hscrollbar_policy:Gtk.PolicyType.NEVER,vscrollbar_policy:Gtk.PolicyType.AUTOMATIC});scroll.set_min_content_height(230);scroll.add(catalog);root.pack_start(scroll,true,true,0);
+ const search=new Gtk.SearchEntry({placeholder_text:'Найти инструмент…'});main.pack_start(search,false,false,0);
+ const catalog=box(true,14);const scroll=new Gtk.ScrolledWindow({hscrollbar_policy:Gtk.PolicyType.NEVER,vscrollbar_policy:Gtk.PolicyType.AUTOMATIC});scroll.set_min_content_height(230);scroll.add(catalog);main.pack_start(scroll,true,true,0);
  const sections=[];const tiles=[];
  for(const [name,items] of groups){
   const section=box(true,8);section.pack_start(label(name,'section'),false,false,0);
@@ -104,13 +125,13 @@ app.connect('activate',()=>{
   items.forEach(([icon,name,description,command],i)=>{
    const tile=new Gtk.Button();tile.get_style_context().add_class('tile');tile.set_size_request(186,62);
    const row=box(false,10);row.pack_start(label(icon,'icon'),false,false,0);const copy=box(true,5);
-   copy.pack_start(label(name,'tool-title'),false,false,0);copy.pack_start(label(description,'description'),false,false,0);
+   for(const [text,cls] of [[name,'tool-title'],[description,'description']]){const caption=label(text,cls);caption.set_ellipsize(Pango.EllipsizeMode.END);caption.set_max_width_chars(18);copy.pack_start(caption,false,false,0);}
    row.pack_start(copy,true,true,0);tile.add(row);tile.connect('clicked',()=>action(command));grid.attach(tile,i%3,Math.floor(i/3),1,1);
    tiles.push({tile,key:`${name} ${description} ${command}`.toLowerCase(),section});
   });sections.push(section);catalog.pack_start(section,false,false,0);
  }
  const footer=box(false,12);
- const power=new Gtk.Button({label:'󰐥  Питание'});power.get_style_context().add_class('power');power.connect('clicked',()=>action('power'));footer.pack_end(power,false,false,0);root.pack_start(footer,false,false,0);
+ const power=new Gtk.Button({label:'󰐥  Питание'});power.get_style_context().add_class('power');power.connect('clicked',()=>action('power'));footer.pack_end(power,false,false,0);main.pack_start(footer,false,false,0);
  search.connect('search-changed',()=>{const q=search.get_text().toLowerCase().trim();for(const t of tiles)t.tile.set_visible(t.key.includes(q));for(const section of sections)section.set_visible(tiles.some(t=>t.section===section&&t.tile.get_visible()));});
  search.connect('activate',()=>{const found=tiles.find(t=>t.tile.get_visible());if(found)found.tile.clicked();});
  win.show_all();search.grab_focus();

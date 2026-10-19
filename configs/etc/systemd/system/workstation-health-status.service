@@ -1,0 +1,16 @@
+[Unit]
+Description=Read-only SMART and Btrfs health snapshot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/workstation-health-status
+TimeoutStartSec=2min
+UMask=0077
+Nice=10
+StateDirectory=workstation-health
+StateDirectoryMode=0750
+Group=eto
+ProtectSystem=strict
+ProtectHome=true
+PrivateNetwork=true
+NoNewPrivileges=true

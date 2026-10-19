@@ -1,19 +1,19 @@
-window.deck { background: #080D10; color: #C5D6D8; border: 1px solid #0ABAB5; border-radius: 14px; font-family: 'JetBrainsMono Nerd Font'; font-size: 12px; }
+window.deck { background: #080D10; color: #C5D6D8; border: 1px solid #0ABAB5; border-radius: 8px; font-family: 'JetBrainsMono Nerd Font'; font-size: 11pt; }
 .deck button { background: #101B20; color: #C5D6D8; border: 1px solid #183039; border-radius: 8px; padding: 8px; box-shadow: none; text-shadow: none; }
 .deck button:hover, .deck button:focus { background: #183039; border-color: #0ABAB5; color: #A3F0E7; }
 .deck .hero { color: #4DDDD5; font-weight: bold; font-size: 18px; }
-.deck .subtitle { color: #7E999F; font-size: 11px; }
-.deck .section { color: #0ABAB5; font-size: 11px; letter-spacing: 1px; }
-.deck .tile { padding: 10px; }
+.deck .subtitle { color: #7E999F; font-size: 10pt; }
+.deck .section { color: #0ABAB5; font-size: 10pt; letter-spacing: 1px; }
+.deck .tile { padding: 12px; }
 .deck .icon { color: #0ABAB5; font-size: 23px; }
 .deck .tool-title { color: #A3F0E7; font-weight: bold; }
-.deck .description { color: #7E999F; font-size: 11px; }
+.deck .description { color: #7E999F; font-size: 10pt; }
 .deck .power { color: #D8B77B; }
-.deck entry { background: #101B20; color: #C5D6D8; caret-color: #0ABAB5; border: 1px solid #183039; border-radius: 8px; padding: 10px; box-shadow: none; }
+.deck entry { background: #101B20; color: #C5D6D8; caret-color: #0ABAB5; border: 1px solid #183039; border-radius: 8px; padding: 12px; box-shadow: none; }
 .deck entry:focus { border-color: #0ABAB5; }
 .deck entry selection { background: #0ABAB5; color: #080D10; }
 
-.deck .controls { background: #101B20; border: 1px solid #183039; border-radius: 9px; padding: 10px; }
+.deck .controls { background: #101B20; border: 1px solid #183039; border-radius: 8px; padding: 12px; }
 .deck scale trough { background: #183039; min-height: 5px; border-radius: 4px; }
 .deck scale highlight { background: #0ABAB5; border-radius: 4px; }
 .deck scale slider { background: #4DDDD5; border: none; box-shadow: none; min-height: 13px; min-width: 13px; border-radius: 12px; }

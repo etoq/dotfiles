@@ -1,0 +1,136 @@
+#!/usr/bin/python
+"""Read Proton usage and warn at 80/90 percent; never upload or delete files."""
+import argparse
+import datetime as dt
+import fcntl
+import json
+from pathlib import Path
+import subprocess as sp
+import sys
+
+HOME = Path.home()
+STATE = HOME / '.local/state/workstation-backup'
+CACHE = STATE / 'quota.json'
+
+
+def warning_level(percent):
+    return 90 if percent >= 90 else 80 if percent >= 80 else 0
+
+
+def should_notify(level, previous, now):
+    if not level:
+        return False
+    try:
+        elapsed = (now - dt.datetime.fromisoformat(previous['notified_at'])).total_seconds()
+    except (KeyError, ValueError, TypeError):
+        return True
+    return level > previous.get('notified_level', 0) or elapsed >= 86400
+
+
+def read():
+    try:
+        return json.loads(CACHE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save(result):
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    temporary = CACHE.with_suffix('.new')
+    temporary.write_text(json.dumps(result, indent=2) + '\n')
+    temporary.chmod(0o600)
+    temporary.replace(CACHE)
+
+
+def unlock():
+    from gi.repository import Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    def call(path, interface, method, args):
+        return bus.call_sync('org.freedesktop.secrets', path, interface, method, args, None, Gio.DBusCallFlags.NONE, 5000, None).unpack()
+    collection = call('/org/freedesktop/secrets', 'org.freedesktop.Secret.Service', 'ReadAlias', GLib.Variant('(s)', ('default',)))[0]
+    reply = call('/org/freedesktop/secrets', 'org.freedesktop.Secret.Service', 'Unlock', GLib.Variant('(ao)', ([collection],)))
+    if reply[1] == '/':
+        return
+    loop = GLib.MainLoop()
+    result = {'cancelled': True}
+    def completed(connection, sender, path, interface, signal, params, *unused):
+        result['cancelled'] = params.unpack()[0]
+        loop.quit()
+    subscription = bus.signal_subscribe('org.freedesktop.secrets', 'org.freedesktop.Secret.Prompt', 'Completed', reply[1], None, Gio.DBusSignalFlags.NONE, completed)
+    call(reply[1], 'org.freedesktop.Secret.Prompt', 'Prompt', GLib.Variant('(s)', ('',)))
+    timeout = GLib.timeout_add_seconds(120, lambda: (loop.quit(), False)[1])
+    loop.run()
+    bus.signal_unsubscribe(subscription)
+    # Prompt cancellation is a normal user action, not an authentication bypass.
+    if result['cancelled']:
+        raise RuntimeError('Keyring unlock was cancelled or timed out')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument('--refresh', action='store_true')
+    actions.add_argument('--unlock', action='store_true')
+    args = parser.parse_args()
+    if args.unlock:
+        unlock()
+        return
+    previous = read()
+    if not args.refresh:
+        print(json.dumps(previous))
+        return
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (STATE / 'quota.lock').open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print('A quota check is already running.')
+            return
+        refresh(read())
+
+
+def refresh(previous):
+    plan = json.loads((HOME / '.config/workstation-backup/plan.json').read_text())
+    if not plan.get('destination', {}).get('connected'):
+        print('Proton is not connected; no quota query made.')
+        return
+    budget = plan.get('storage', {}).get('budget_bytes')
+    if type(budget) is not int or budget <= 0:
+        raise RuntimeError('A positive private storage budget is required')
+    proc = sp.run([str(HOME / '.local/bin/proton-drive'), 'filesystem', 'size', '/my-files', '--json'],
+                  capture_output=True, text=True, timeout=90)
+    if proc.returncode:
+        now = dt.datetime.now().astimezone()
+        locked = 'You need to login first' in proc.stderr
+        result = dict(previous, check_state='keyring_or_login' if locked else 'error', last_attempt=now.isoformat())
+        if locked and should_notify(1, {'notified_at': previous.get('auth_notified_at'), 'notified_level': 1}, now):
+            sp.run(['notify-send', '--app-name=Proton Drive', 'Доступ к Proton Drive', 'Разблокируйте хранилище ключей. Control Deck → Состояние → Разблокировать ключи.'], timeout=5, check=False)
+            result['auth_notified_at'] = now.isoformat()
+        save(result)
+        raise RuntimeError('Unlock the desktop keyring or sign in to Proton again' if locked else 'Cloud size query failed')
+    used = json.loads(proc.stdout).get('size')
+    if type(used) is not int or used < 0:
+        raise RuntimeError('Proton returned an invalid size')
+    now = dt.datetime.now().astimezone()
+    percent = used * 100 / budget
+    level = warning_level(percent)
+    result = dict(previous, check_state='ok', used_bytes=used, budget_bytes=budget, percent=round(percent, 1),
+                  checked_at=now.isoformat(), warning_level=level)
+    if should_notify(level, previous, now):
+        sp.run(['notify-send', '--app-name=Proton Drive', '--urgency=normal',
+                'Место в Proton Drive', f'Занято {percent:.0f}% выбранного бюджета. Подробности: Control Deck → Состояние.'],
+               check=False, timeout=5)
+        result.update(notified_level=level, notified_at=now.isoformat())
+    elif not level:
+        result.pop('notified_at', None)
+        result['notified_level'] = 0
+    save(result)
+    print(f'Proton: {used / 1024**2:.1f} MiB / {budget / 1024**2:.1f} MiB ({percent:.1f}%)')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, sp.SubprocessError) as error:
+        print('Proton quota check failed:', error, file=sys.stderr)
+        sys.exit(1)

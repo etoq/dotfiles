@@ -1,0 +1,11 @@
+[Unit]
+Description=Removable media tray for the graphical session
+PartOf=graphical-session.target
+ConditionEnvironment=DISPLAY
+ConditionPathExists=/usr/bin/udiskie
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/udiskie --no-automount --tray
+Restart=on-failure
+RestartSec=5

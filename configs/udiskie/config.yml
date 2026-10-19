@@ -1,0 +1,5 @@
+program_options:
+  automount: false
+  notify: true
+  tray: true
+  file_manager: 'kitty -e yazi'

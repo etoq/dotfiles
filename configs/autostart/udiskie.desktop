@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Removable media
+Exec=systemctl --user start udiskie.service
+Terminal=false
+X-GNOME-Autostart-enabled=true

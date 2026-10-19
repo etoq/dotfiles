@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export APPDIR="$HOME/.local/opt/imhex/1.38.1/squashfs-root"
+[[ -x "$APPDIR/AppRun" ]] || { echo 'Run: python ~/dotfiles/scripts/maintenance/install-desktop-assets.py --apply' >&2; exit 1; }
+exec "$APPDIR/AppRun" "$@"

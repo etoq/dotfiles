@@ -1,6 +1,8 @@
 #!/bin/sh
 exec kitty --class calendar \
  --override font_size=18 \
+ --override 'font_family=JetBrainsMono Nerd Font' \
+ --override window_padding_width=12 \
  --override remember_window_size=no \
  --override initial_window_width=1400 \
  --override initial_window_height=900 \

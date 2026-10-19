@@ -1,0 +1,8 @@
+[Unit]
+Description=Read-only Proton storage budget check
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/proton-quota --refresh
+TimeoutStartSec=2min
+UMask=0077
