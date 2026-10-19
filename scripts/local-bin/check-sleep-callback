@@ -13,17 +13,25 @@ for unit in nvidia-suspend.service nvidia-resume.service nvidia-hibernate.servic
     state=$(systemctl is-enabled "$unit" 2>/dev/null || true)
     check "$unit disabled" test "$state" = disabled
 done
+if [[ -f /usr/lib/systemd/system/nvidia-suspend-then-hibernate.service ]]; then
+    state=$(systemctl is-enabled nvidia-suspend-then-hibernate.service 2>/dev/null || true)
+    check 'nvidia-suspend-then-hibernate.service disabled' test "$state" = disabled
+fi
 is_supported_kernel() {
     local kernel pkgbase
     kernel=$(uname -r)
     [[ -r "/usr/lib/modules/$kernel/pkgbase" ]] || return 1
     pkgbase=$(cat "/usr/lib/modules/$kernel/pkgbase")
     case "$pkgbase" in
-        linux|linux-lts) [[ $(modinfo -F vermagic nvidia) == "$kernel "* ]] ;;
+        linux|linux-lts)
+            [[ $(modinfo -F vermagic nvidia) == "$kernel "* ]] &&
+            [[ $(modinfo -F version nvidia) == "$(cat /sys/module/nvidia/version)" ]]
+            ;;
         *) return 1 ;;
     esac
 }
 check 'Arch linux/linux-lts with matching NVIDIA module' is_supported_kernel
 if (( failed )); then echo 'Configuration incomplete: do not test sleep.'; exit 1; fi
 echo 'Callback configuration verified. Actual sleep/resume is NOT tested.'
-echo 'Use systemctl suspend. The normal route has been tested successfully.'
+echo 'Use systemctl suspend only for a manual test after saving work.'
+echo 'Sleep must be confirmed separately for the current driver and kernel.'
