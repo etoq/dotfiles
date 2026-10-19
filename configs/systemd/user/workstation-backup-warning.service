@@ -1,0 +1,6 @@
+[Unit]
+Description=Notify about a backup failure
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/notify-send --app-name=Резервирование --urgency=normal "Резервирование Proton" "Копирование не завершено. Предыдущая проверенная версия сохранена. Подробности: Control Deck и journalctl --user -u 'workstation-backup@*'."

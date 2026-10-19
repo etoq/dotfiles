@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily verified KeePassXC backup to Proton Drive
+
+[Timer]
+OnCalendar=*-*-* 19:00:00
+Persistent=true
+RandomizedDelaySec=5min
+Unit=workstation-backup@keepass.service
+
+[Install]
+WantedBy=timers.target

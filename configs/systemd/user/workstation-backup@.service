@@ -1,0 +1,18 @@
+[Unit]
+Description=Verified Proton backup (%i)
+OnFailure=workstation-backup-warning.service
+StartLimitIntervalSec=3h
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/workstation-backup --scheduled %i
+Restart=on-failure
+RestartSec=30min
+TimeoutStartSec=6h
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

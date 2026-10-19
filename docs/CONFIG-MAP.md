@@ -74,8 +74,8 @@
 ## Резервирование и отчёты
 
 - План Proton: ~/.config/workstation-backup/plan.json (0600); официальный клиент ~/.local/bin/proton-drive. Секреты сессии — OS keychain.
-- Ручная копия: workstation-backup --run-once. Без параметров — только показать план. Автоматического расписания нет.
-- Последний подтверждённый результат и манифесты: ~/.local/state/workstation-backup/ (0700). Первая копия полностью проверена обратным скачиванием и восстановлением.
+- Ручная копия: workstation-backup --run-once. Без параметров — только показать план. Таймеры: workstation-backup-full.timer (воскресенье 20:00), workstation-backup-keepass.timer (ежедневно 19:00).
+- Последний подтверждённый результат и манифесты: ~/.local/state/workstation-backup/ (0700). Каждая успешная версия проверяется обратным скачиванием и восстановлением; хранится одна полная и до 14 разных дневных версий KeePassXC.
 - Инструкция: docs/PROTON-BACKUP.md. Backup пользовательских папок не включает всё HOME, весь /etc и диски VM.
 - Логи и резервные файлы текущего ремонта: ~/Documents/Workstation/2026-10-18/system-repair/.
 - Завершённые одноразовые helpers: system-repair/retired-helpers/. Рабочие команды обновления, проверки и backup остаются в ~/.local/bin.

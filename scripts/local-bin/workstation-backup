@@ -1,8 +1,8 @@
 #!/usr/bin/python
-"""Manual, versioned Proton backup with a complete round-trip restore check.
-Default is local plan inspection. --run-once is explicit upload authorization.
+"""Versioned Proton backup with complete restore verification and scoped retention.
+Default is local plan inspection. Timers use --scheduled with an enabled plan.
 """
-import argparse,datetime,fcntl,hashlib,json,os,shutil,stat,subprocess as sp,sys,tarfile,tempfile,time
+import argparse,contextlib,datetime,fcntl,hashlib,json,os,re,shutil,stat,subprocess as sp,sys,tarfile,tempfile,time
 from pathlib import Path,PurePosixPath
 H=Path.home();STATE=H/'.local/state/workstation-backup';PLAN=H/'.config/workstation-backup/plan.json'
 os.umask(0o077)
@@ -60,16 +60,135 @@ def restore_verify(archive,entries,dest):
         if kind!='symlink' and stat.S_IMODE(st.st_mode)!=item['mode']:raise RuntimeError('Restored permissions differ')
     return verified
 
+def verified_records(plan):
+    """Only our locally recorded, restore-verified versions can be retired."""
+    records=[];remote=plan['destination']['remote_directory'].rstrip('/')
+    for folder in sorted((STATE/'runs').iterdir()):
+        if not folder.is_dir() or not re.fullmatch(r'\d{8}T\d{6}Z(?:-partial)?',folder.name):continue
+        try:
+            result=json.loads((folder/'result.json').read_text())
+            manifest=json.loads((folder/'manifest.json').read_text())
+            retirement=json.loads((folder/'retention.json').read_text()) if (folder/'retention.json').exists() else {}
+        except (OSError,ValueError):continue
+        if retirement.get('state')=='deleted':continue
+        if result.get('state')!='success' or result.get('restore_verified') is not True:continue
+        if result.get('run_id')!=folder.name or result.get('remote')!=remote+'/'+folder.name:continue
+        if manifest.get('created_utc')!=folder.name or manifest.get('sha256')!=result.get('archive_sha256'):continue
+        if manifest.get('archive')!=result.get('archive'):continue
+        scope=manifest.get('scope','partial' if folder.name.endswith('-partial') else 'full')
+        records.append(dict(folder=folder,id=folder.name,result=result,manifest=manifest,retirement=retirement,scope=scope))
+    return records
+
+def retention_targets(records,plan):
+    policy=plan.get('retention',{})
+    full_keep=policy.get('full_versions',1);daily_keep=policy.get('keepass_daily_versions',14)
+    if type(full_keep) is not int or type(daily_keep) is not int or full_keep<1 or daily_keep<1:raise RuntimeError('Retention must preserve at least one version')
+    full=[r for r in records if r['scope']=='full']
+    targets=[]
+    if len(full)>full_keep:
+        latest=full[-1]
+        for old in full[:-full_keep]:
+            # Do not erase the only backup of a source removed from the plan.
+            if set(old['manifest']['sources'])<=set(latest['manifest']['sources']):targets.append((old,latest))
+    sources=set(plan.get('keepass_sources',[]))
+    if sources:
+        daily=[r for r in records if r['scope']=='partial' and set(r['manifest']['sources'])==sources]
+        by_day={}
+        for record in daily:
+            day=datetime.datetime.fromisoformat(record['result']['last_success']).date().isoformat()
+            by_day[day]=record
+        keep={record['id'] for _day,record in sorted(by_day.items())[-daily_keep:]}
+        if daily:
+            targets.extend((r,daily[-1]) for r in daily if r['id'] not in keep)
+    return targets
+
+def valid_uid(uid):
+    return isinstance(uid,str) and re.fullmatch(r'[A-Za-z0-9_-]+~[A-Za-z0-9_-]+',uid) is not None
+
+def verify_remote_record(record,plan,stage,cli,cli_json):
+    remote=record['result']['remote']
+    node=cli_json('filesystem','info',remote,'--json')
+    expected=plan['destination']['folder_uid']
+    if (not valid_uid(node.get('uid')) or node.get('parentUid')!=expected or node.get('type')!='folder'
+            or node.get('name')!={'ok':True,'value':record['id']} or node.get('isShared') is not False
+            or node.get('isSharedByUrl') is not False):raise RuntimeError('Unexpected backup folder identity; retention stopped')
+    # Pin all subsequent operations to this UID, not a possibly reused name.
+    pinned=plan['destination']['remote_directory'].rstrip('/')+'/'+node['uid']
+    dest=stage/('retention-check-'+record['id']);dest.mkdir(mode=0o700,exist_ok=True)
+    (dest/'manifest.json').unlink(missing_ok=True)
+    cli('filesystem','download',pinned+'/manifest.json',str(dest))
+    if json.loads((dest/'manifest.json').read_text())!=record['manifest']:raise RuntimeError('Remote manifest differs; retention stopped')
+    return node['uid']
+
+def prune_verified(plan,stage,cli,cli_json):
+    if not plan.get('retention',{}).get('enabled'):return []
+    targets=retention_targets(verified_records(plan),plan)
+    anchors=set();deleted=[]
+    for old,new in targets:
+        if new['id'] not in anchors:
+            verify_remote_record(new,plan,stage,cli,cli_json);anchors.add(new['id'])
+        journal=old['folder']/'retention.json';entry=old['retirement']
+        if entry.get('state') not in ('prepared','trashed'):
+            uid=verify_remote_record(old,plan,stage,cli,cli_json)
+            entry={'state':'prepared','uid':uid,'root_uid':plan['destination']['folder_uid'],
+                   'manifest_sha256':old['manifest']['sha256'],'replacement':new['id']}
+            atomic_json(journal,entry)
+        uid=entry.get('uid')
+        if (not valid_uid(uid) or entry.get('root_uid')!=plan['destination']['folder_uid']
+                or entry.get('manifest_sha256')!=old['manifest']['sha256']):raise RuntimeError('Invalid retention journal')
+        trashed=cli_json('filesystem','list','/trash','--json')
+        node=next((n for n in trashed if n.get('uid')==uid),None)
+        if node is None:
+            active=cli_json('filesystem','list',plan['destination']['remote_directory'],'--json')
+            if not any(n.get('uid')==uid for n in active):
+                # A previous delete can succeed before its response/journal write.
+                # The old UID is absent; never substitute a new folder by name.
+                entry['state']='deleted';atomic_json(journal,entry);deleted.append(old['id']);continue
+            # Recheck identity when resuming an interrupted trash operation.
+            if verify_remote_record(old,plan,stage,cli,cli_json)!=uid:raise RuntimeError('Backup UID changed')
+            cli('filesystem','trash',plan['destination']['remote_directory'].rstrip('/')+'/'+uid)
+            entry['state']='trashed';atomic_json(journal,entry)
+            node=cli_json('filesystem','info','/trash/'+uid,'--json')
+        if node.get('uid')!=uid or node.get('type')!='folder':raise RuntimeError('Unexpected trash identity; permanent deletion refused')
+        # Never empty the global trash. Delete only this verified retired UID.
+        cli('filesystem','delete','/trash/'+uid)
+        entry['state']='deleted';atomic_json(journal,entry);deleted.append(old['id'])
+    return deleted
+
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run-once',action='store_true');parser.add_argument('--only',action='append',help='Back up only this exact configured source (repeatable)');args=parser.parse_args()
+    with contextlib.ExitStack() as resources:
+        return run_backup(resources)
+
+def run_backup(resources):
+    parser=argparse.ArgumentParser(description=__doc__)
+    execution=parser.add_mutually_exclusive_group()
+    execution.add_argument('--run-once',action='store_true')
+    execution.add_argument('--scheduled',choices=['full','keepass'])
+    parser.add_argument('--only',action='append',help='Back up only this exact configured source (repeatable)');args=parser.parse_args()
     if os.geteuid()==0:raise RuntimeError('Run as your normal desktop user, without sudo')
-    plan=json.loads(PLAN.read_text());sources=args.only or plan['sources']
+    if args.scheduled and args.only:raise RuntimeError('--only cannot be combined with --scheduled')
+    if args.run_once or args.scheduled:
+        STATE.mkdir(parents=True,exist_ok=True);STATE.chmod(0o700)
+        lock=resources.enter_context((STATE/'backup.lock').open('a'))
+        # Timers can overlap after login. Wait without reading an outdated plan.
+        deadline=time.monotonic()+1800
+        while True:
+            try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+            except BlockingIOError:
+                if time.monotonic()>=deadline:raise RuntimeError('Another backup is still running; retry later')
+                time.sleep(2)
+    plan=json.loads(PLAN.read_text())
+    if args.scheduled and not plan.get('enabled'):
+        print('Scheduled backup is disabled in the private plan.');return
+    sources=(plan.get('keepass_sources') if args.scheduled=='keepass' else args.only) or plan['sources']
+    if args.scheduled=='keepass' and not plan.get('keepass_sources'):raise RuntimeError('KeePass sources are not configured')
+    if args.scheduled=='keepass' and not any(name.lower().endswith('.kdbx') for name in sources):raise RuntimeError('KeePass schedule must include the password database')
     if any(name not in plan['sources'] for name in sources):raise RuntimeError('--only source is not in the configured plan')
-    scope='partial' if args.only else 'full'
+    scope='partial' if args.only or args.scheduled=='keepass' else 'full'
     for name in sources:
         safe_name(name)
         if not (H/name).exists():raise RuntimeError('A configured source is missing: '+name)
-    if not args.run_once:
+    if not (args.run_once or args.scheduled):
         print('Local plan only. Provider:',plan['destination']['provider'])
         print('Sources:',', '.join(sources));print('Schedule:',plan.get('schedule'))
         print('Use --run-once to create, upload, download and restore-check one version.');return
@@ -77,13 +196,11 @@ def main():
     if plan.get('encryption')!='Proton Drive client-side end-to-end encryption':raise RuntimeError('Expected official Proton client encryption')
     for command in ['tar','zstd']:
         if not shutil.which(command):raise RuntimeError('Missing dependency: '+command)
-    STATE.mkdir(parents=True,exist_ok=True);STATE.chmod(0o700)
-    lock=(STATE/'backup.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     status=STATE/'status.json'
     previous=json.loads(status.read_text()) if status.exists() else {}
-    run_id=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+('-partial' if args.only else '')
+    run_id=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+('-partial' if scope=='partial' else '')
     record=STATE/'runs'/run_id;record.mkdir(parents=True,mode=0o700)
-    client=str(H/'.local/bin/proton-drive');log=(record/'client.log').open('a')
+    client=str(H/'.local/bin/proton-drive');log=resources.enter_context((record/'client.log').open('a'))
     last=previous.get('last_success');remote=plan['destination']['remote_directory'].rstrip('/')
     history={'last_success':last,
              'last_full_success':plan.get('last_full_success',previous.get('last_full_success')),
@@ -101,9 +218,23 @@ def main():
         log.flush()
         if check and p.returncode:raise RuntimeError('Proton command failed; private log: '+str(record/'client.log'))
         return p.returncode
+    def cli_json(*args):
+        p=sp.run([client,*args],stdout=sp.PIPE,stderr=log,text=True,timeout=120)
+        log.flush()
+        if p.returncode:raise RuntimeError('Proton metadata request failed; private log: '+str(record/'client.log'))
+        return json.loads(p.stdout)
     try:
         phase('connection','Проверка доступа к Proton Drive')
         cli('filesystem','info','/my-files','--json')
+        if cli('filesystem','info',remote,'--json',check=False):
+            parent,name=remote.rsplit('/',1);cli('filesystem','create-folder',parent,name)
+        if plan.get('retention',{}).get('enabled'):
+            node=cli_json('filesystem','info',remote,'--json')
+            if not valid_uid(node.get('uid')) or node.get('type')!='folder' or node.get('isShared') is not False or node.get('isSharedByUrl') is not False:raise RuntimeError('Unexpected backup root identity')
+            if plan['destination'].get('folder_uid',node['uid'])!=node['uid']:raise RuntimeError('Backup root UID changed; retention stopped')
+            plan['destination']['folder_uid']=node['uid'];atomic_json(PLAN,plan)
+            phase('retention','Повтор незавершённой очистки только проверенных старых версий')
+            prune_verified(plan,stage,cli,cli_json)
         phase('archive','Создание локального архива выбранных папок')
         archive=stage/('zer0-'+run_id+'.tar.zst')
         for attempt in range(3):
@@ -116,6 +247,8 @@ def main():
             if p.returncode!=1 or attempt==2:raise RuntimeError('Source files changed or tar failed; archive was not uploaded. See '+str(record/'archive.log'))
             time.sleep(2)
         archive.chmod(0o600)
+        policy=plan.get('storage',{})
+        if policy.get('max_archive_bytes') and archive.stat().st_size>policy['max_archive_bytes']:raise RuntimeError('Archive exceeds the configured size limit; previous cloud backup preserved')
         phase('manifest','Хеширование файлов из готового архива')
         entries=inspect_archive(archive);digest=sha(archive)
         manifest=stage/'manifest.json'
@@ -124,8 +257,11 @@ def main():
         (stage/'SHA256SUMS').write_text(digest+'  '+archive.name+'\n')
         # All archive names and symlink ancestors were validated before upload/extraction.
         phase('upload',f'Загрузка версии {run_id} ({archive.stat().st_size//1024**2} МиБ)')
-        if cli('filesystem','info',remote,'--json',check=False):
-            parent,name=remote.rsplit('/',1);cli('filesystem','create-folder',parent,name)
+        if policy.get('budget_bytes'):
+            used=cli_json('filesystem','size','/my-files','--json').get('size')
+            if type(used) is not int or used<0:raise RuntimeError('Could not establish cloud storage usage')
+            payload=sum(p.stat().st_size for p in [archive,manifest,stage/'SHA256SUMS'])
+            if used+payload+policy.get('reserve_bytes',0)>policy['budget_bytes']:raise RuntimeError('Not enough budget for a verified replacement; previous backup preserved')
         run_remote=remote+'/'+run_id
         cli('filesystem','create-folder',remote,run_id)
         cli('filesystem','upload','--skip-thumbnails','--file-conflict-strategy','skip',str(archive),str(manifest),str(stage/'SHA256SUMS'),run_remote)
@@ -145,7 +281,11 @@ def main():
         atomic_json(record/'result.json',result);atomic_json(status,result)
         plan['last_success']=finished;plan['last_verified_remote']=run_remote
         if scope=='full':plan['last_full_success']=finished;plan['last_full_verified_remote']=run_remote
-        plan['note']='Manual backup uploaded, downloaded and restore-verified. Check scope: partial versions supplement the last full backup. Automatic schedule remains disabled.';atomic_json(PLAN,plan)
+        plan['note']='Uploaded, downloaded and restore-verified. Full copies and standalone KeePass supplements have separate retention.';atomic_json(PLAN,plan)
+        history={k:result.get(k) for k in history}
+        phase('retention','Удаление только устаревших версий после проверки восстановления новой')
+        result['retired_versions']=prune_verified(plan,stage,cli,cli_json)
+        atomic_json(record/'result.json',result);atomic_json(status,result)
         print('SUCCESS:',run_remote,flush=True);print('SHA256:',digest,flush=True);print('Restored and verified files:',count,flush=True)
     except BaseException as e:
         atomic_json(status,dict(history,state='error',scope=scope,run_id=run_id,uploaded=uploaded,message=str(e)))

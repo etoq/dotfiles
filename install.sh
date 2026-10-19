@@ -260,6 +260,9 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/systemd/user/throne.service" "$HOME/.config/systemd/user/throne.service"
     link "configs/systemd/user/wispr-a11y-guard.service" "$HOME/.config/systemd/user/wispr-a11y-guard.service"
     link "configs/systemd/user/wispr-a11y-guard.timer" "$HOME/.config/systemd/user/wispr-a11y-guard.timer"
+    for unit in workstation-backup@.service workstation-backup-full.timer workstation-backup-keepass.timer workstation-backup-warning.service; do
+        link "configs/systemd/user/$unit" "$HOME/.config/systemd/user/$unit"
+    done
     # Retire only our former KeePass workaround; preserve unrelated user files.
     for old in "$HOME/.local/bin/keepassxc" "$HOME/.local/share/applications/org.keepassxc.KeePassXC.desktop"; do
         case "$(readlink "$old" 2>/dev/null || true)" in
@@ -373,6 +376,9 @@ if [ "$DO_SERVICES" = "1" ]; then
     systemctl --user daemon-reload
     systemctl --user enable clean-screenshots.timer
     systemctl --user enable --now wispr-a11y-guard.timer
+    if python3 -c 'import json,sys; from pathlib import Path; p=Path(sys.argv[1]); sys.exit(0 if p.exists() and json.loads(p.read_text()).get("enabled") is True else 1)' "$HOME/.config/workstation-backup/plan.json"; then
+        systemctl --user enable --now workstation-backup-full.timer workstation-backup-keepass.timer
+    fi
     ok "Системные настройки восстановлены; сеть и графический сеанс не перезапускались"
 fi
 

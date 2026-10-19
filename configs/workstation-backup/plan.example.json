@@ -24,9 +24,22 @@
     "**/__pycache__",
     "**/node_modules",
     "**/.venv",
-    "**/.cache"
+    "**/.cache",
+    "dotfiles/.git"
   ],
   "schedule": null,
-  "note": "Add the private path to your .kdbx database and any required key file locally. Never commit a vault or keys. No backup until connected and explicitly launched.",
-  "encryption": "Proton Drive client-side end-to-end encryption"
+  "note": "Add the private .kdbx path to sources and keepass_sources locally. Timers require enabled=true; retention requires retention.enabled=true. Never commit vaults or authentication data.",
+  "encryption": "Proton Drive client-side end-to-end encryption",
+  "keepass_sources": [],
+  "storage": {
+    "budget_bytes": 2000000000,
+    "reserve_bytes": 100000000,
+    "max_archive_bytes": 900000000
+  },
+  "retention": {
+    "enabled": false,
+    "full_versions": 1,
+    "keepass_daily_versions": 14,
+    "delete_only_after_restore_verification": true
+  }
 }

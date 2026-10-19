@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly verified full backup to Proton Drive
+
+[Timer]
+OnCalendar=Sun *-*-* 20:00:00
+Persistent=true
+RandomizedDelaySec=5min
+Unit=workstation-backup@full.service
+
+[Install]
+WantedBy=timers.target
