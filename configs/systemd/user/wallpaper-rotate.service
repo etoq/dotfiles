@@ -1,0 +1,7 @@
+[Unit]
+Description=Choose the next Black Tiffany wallpaper
+ConditionEnvironment=DISPLAY
+
+[Service]
+Type=oneshot
+ExecStart=%h/bin/random_wallpaper

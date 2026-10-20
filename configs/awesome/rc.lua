@@ -28,14 +28,21 @@ tag.connect_signal('property::master_width_factor',function(t)
  local factor=math.max(.30,math.min(.70,t.master_width_factor))
  if factor~=t.master_width_factor then t.master_width_factor=factor end
 end)
+-- One wallpaper owner for manual switching, timer, login and monitor changes.
+local wallpaper_timer
+local function restore_wallpaper()
+ if preview then return end
+ if wallpaper_timer then wallpaper_timer:stop()end
+ wallpaper_timer=gears.timer.start_new(.3,function()
+  spawn({home..'/bin/random_wallpaper','--restore'})
+  return false
+ end)
+end
 awful.screen.connect_for_each_screen(function(s)
  ui.screen(s)
- local wallpaper=home..'/Images/tiffany-re-37-ghidra-neon-emblem.png'
- if gears.filesystem.file_readable(wallpaper)then gears.wallpaper.maximized(wallpaper,s,true)end
+ restore_wallpaper()
 end)
-screen.connect_signal('property::geometry',function(s)
- if gears.filesystem.file_readable(home..'/Images/tiffany-re-37-ghidra-neon-emblem.png')then gears.wallpaper.maximized(home..'/Images/tiffany-re-37-ghidra-neon-emblem.png',s,true)end
-end)
+screen.connect_signal('property::geometry',restore_wallpaper)
 local keys={}
 local mod='Mod4'
 local physical={q=24,w=25,e=26,r=27,t=28,y=29,u=30,i=31,o=32,p=33,a=38,s=39,d=40,f=41,g=42,h=43,j=44,k=45,l=46,z=52,x=53,c=54,v=55,b=56,n=57,m=58,grave=49}

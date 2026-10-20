@@ -256,6 +256,8 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/applications/imhex.desktop" "$HOME/.local/share/applications/imhex.desktop"
     link "configs/udiskie/config.yml" "$HOME/.config/udiskie/config.yml"
     link "configs/systemd/user/idle-screen-lock.service" "$HOME/.config/systemd/user/idle-screen-lock.service"
+    link "configs/systemd/user/wallpaper-rotate.service" "$HOME/.config/systemd/user/wallpaper-rotate.service"
+    link "configs/systemd/user/wallpaper-rotate.timer" "$HOME/.config/systemd/user/wallpaper-rotate.timer"
     link "configs/systemd/user/udiskie.service" "$HOME/.config/systemd/user/udiskie.service"
     link "configs/systemd/user/proton-quota.service" "$HOME/.config/systemd/user/proton-quota.service"
     link "configs/systemd/user/proton-quota.timer" "$HOME/.config/systemd/user/proton-quota.timer"
@@ -357,7 +359,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(workstation-away idle-screen-lock imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(wallpaper-rotate workstation-away idle-screen-lock imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"

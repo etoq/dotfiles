@@ -72,7 +72,8 @@ systemctl --user start udiskie.service &
 pgrep -u "$(id -u)" -x wispr-flow >/dev/null || "$HOME/.local/bin/wispr-flow" --hidden &
 
 # Обои
-sh $HOME/bin/random_wallpaper &
+"$HOME/bin/random_wallpaper" --restore &
+systemctl --user start wallpaper-rotate.timer
 
 # Polybar
 "$HOME/.local/bin/panel-autostart" &
