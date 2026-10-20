@@ -318,5 +318,10 @@
     "command": "xdg-open 'https://www.google.com/search?q={}'",
     "url_encoded": true,
     "raw_argument": false
+  },
+  "ol": {
+    "command": "exec \"$HOME/.local/bin/workstation-away\" --apply",
+    "url_encoded": false,
+    "raw_argument": false
   }
 }

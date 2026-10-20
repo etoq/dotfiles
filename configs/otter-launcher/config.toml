@@ -455,6 +455,12 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module ports"
 unbind_proc = false
 
 [[modules]]
+description = "Ухожу · закрыть приложения и выключить ВМ"
+prefix = "ol"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ol"
+unbind_proc = false
+
+[[modules]]
 description = "Сон"
 prefix = "sl"
 cmd = "systemctl suspend"

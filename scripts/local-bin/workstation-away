@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Return the desktop to idle using WM_DELETE_WINDOW and guest shutdown only."""
+import argparse
+import ctypes as C
+import ctypes.util
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess as sp
+import time
+
+KEEP_FAMILY = ('throne', 'flameshot', 'udiskie', 'easyeffects', 'wispr', 'ayugram')
+KEEP = KEEP_FAMILY + ('awesome', 'polybar', 'picom', 'i3lock', 'betterlockscreen',
+        'idle-screen-lock', 'otter-launcher', 'otter-run')
+VM_URI = 'qemu:///system'
+TRAY_APPS = {'discord': 'Discord', 'keepassxc': 'KeePassXC',
+             'yandexmusic': 'Yandex Music', 'obsidian': 'Obsidian'}
+
+
+def run(argv, timeout=10):
+    return sp.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
+
+
+def process_info(pid):
+    """Read identity and ancestry without logging command lines or document names."""
+    try:
+        root = Path('/proc') / str(pid)
+        if root.stat().st_uid != os.getuid():
+            return None
+        fields = dict(line.split(':', 1) for line in (root / 'status').read_text().splitlines() if ':' in line)
+        return {'parent': int(fields['PPid']), 'name': fields['Name'].strip(),
+                'exe': (root / 'exe').resolve().name}
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def protected(wmclass, pid, lookup=process_info):
+    if any(token in identity.casefold() for identity in wmclass for token in KEEP):
+        return True
+    identities = []
+    seen = set()
+    while pid and pid not in seen:
+        seen.add(pid)
+        info = lookup(pid)
+        if not info:
+            break
+        identities.extend((info['name'], info['exe']))
+        pid = info['parent']
+    # Match application identity only, never titles, paths to documents or argv.
+    return any(token in identity.casefold() for identity in identities for token in KEEP_FAMILY)
+
+
+def tray_processes():
+    result = {}
+    for path in Path('/proc').iterdir():
+        if not path.name.isdigit():
+            continue
+        pid = int(path.name)
+        info = process_info(pid)
+        if info:
+            name = info['name'].casefold()
+            exe = info['exe'].casefold()
+            app = TRAY_APPS.get(exe) or TRAY_APPS.get(name)
+            if app and not protected([], pid):
+                result[pid] = app
+    return result
+
+
+class ClientMessageData(C.Union):
+    _fields_ = [('b', C.c_char * 20), ('s', C.c_short * 10), ('l', C.c_long * 5)]
+
+
+class ClientMessage(C.Structure):
+    _fields_ = [('type', C.c_int), ('serial', C.c_ulong), ('send_event', C.c_int),
+                ('display', C.c_void_p), ('window', C.c_ulong),
+                ('message_type', C.c_ulong), ('format', C.c_int), ('data', ClientMessageData)]
+
+
+class Event(C.Union):
+    _fields_ = [('client', ClientMessage), ('pad', C.c_long * 24)]
+
+
+class Desktop:
+    def __init__(self):
+        self.x = C.CDLL(ctypes.util.find_library('X11'))
+        signatures = {
+            'XOpenDisplay': ([C.c_char_p], C.c_void_p),
+            'XDefaultRootWindow': ([C.c_void_p], C.c_ulong),
+            'XInternAtom': ([C.c_void_p, C.c_char_p, C.c_int], C.c_ulong),
+            'XGetWindowProperty': ([C.c_void_p, C.c_ulong, C.c_ulong, C.c_long, C.c_long,
+                                   C.c_int, C.c_ulong, C.POINTER(C.c_ulong), C.POINTER(C.c_int),
+                                   C.POINTER(C.c_ulong), C.POINTER(C.c_ulong),
+                                   C.POINTER(C.POINTER(C.c_ubyte))], C.c_int),
+            'XSendEvent': ([C.c_void_p, C.c_ulong, C.c_int, C.c_long, C.POINTER(Event)], C.c_int),
+            'XFree': ([C.c_void_p], C.c_int),
+            'XSync': ([C.c_void_p, C.c_int], C.c_int),
+            'XCloseDisplay': ([C.c_void_p], C.c_int),
+        }
+        for name, (args, result) in signatures.items():
+            getattr(self.x, name).argtypes = args
+            getattr(self.x, name).restype = result
+        # Windows can disappear between enumeration and a property request.
+        self.error_handler = C.CFUNCTYPE(C.c_int, C.c_void_p, C.c_void_p)(lambda *_: 0)
+        self.x.XSetErrorHandler.argtypes = [C.c_void_p]
+        self.x.XSetErrorHandler.restype = C.c_void_p
+        self.previous_error_handler = self.x.XSetErrorHandler(self.error_handler)
+        self.display = self.x.XOpenDisplay(None)
+        if not self.display:
+            raise RuntimeError('Нет подключения к X11; приложения и ВМ не изменены.')
+        self.root = self.x.XDefaultRootWindow(self.display)
+
+    def atom(self, name):
+        return self.x.XInternAtom(self.display, name.encode(), False)
+
+    def prop(self, window, name):
+        actual, fmt, count, after = C.c_ulong(), C.c_int(), C.c_ulong(), C.c_ulong()
+        data = C.POINTER(C.c_ubyte)()
+        status = self.x.XGetWindowProperty(self.display, window, self.atom(name), 0, 65536,
+                                          False, 0, C.byref(actual), C.byref(fmt),
+                                          C.byref(count), C.byref(after), C.byref(data))
+        try:
+            if status or not data:
+                return []
+            if fmt.value == 8:
+                return C.string_at(data, count.value)
+            if fmt.value == 32:
+                return list(C.cast(data, C.POINTER(C.c_ulong))[:count.value])
+            return []
+        finally:
+            if data:
+                self.x.XFree(data)
+
+    def windows(self):
+        result = []
+        for window in self.prop(self.root, '_NET_CLIENT_LIST'):
+            raw = self.prop(window, 'WM_CLASS')
+            classes = raw.decode(errors='replace').strip('\0').split('\0') if raw else []
+            pids = self.prop(window, '_NET_WM_PID')
+            pid = pids[0] if pids else 0
+            kinds = self.prop(window, '_NET_WM_WINDOW_TYPE')
+            allowed = [self.atom('_NET_WM_WINDOW_TYPE_' + k) for k in ('NORMAL', 'DIALOG', 'UTILITY')]
+            if kinds and not any(k in allowed for k in kinds):
+                continue
+            # Fail closed on unidentifiable/foreign windows; never close session components.
+            if not classes or not pid or not process_info(pid) or protected(classes, pid):
+                continue
+            result.append({'window': window, 'pid': pid, 'app': classes[-1],
+                           'close_supported': self.atom('WM_DELETE_WINDOW') in self.prop(window, 'WM_PROTOCOLS'),
+                           'terminal': any(c.casefold() in ('kitty', 'codex-terminal', 'otter-tools', 'alacritty', 'xterm') for c in classes)})
+        return sorted(result, key=lambda item: item['terminal'])
+
+    def close(self, window):
+        if self.atom('WM_DELETE_WINDOW') not in self.prop(window, 'WM_PROTOCOLS'):
+            return False
+        event = Event()
+        event.client = ClientMessage(33, 0, True, self.display, window,
+                                     self.atom('WM_PROTOCOLS'), 32, ClientMessageData())
+        event.client.data.l[0] = self.atom('WM_DELETE_WINDOW')
+        event.client.data.l[1] = 0  # CurrentTime
+        sent = self.x.XSendEvent(self.display, window, False, 0, C.byref(event))
+        self.x.XSync(self.display, False)
+        return bool(sent)
+
+    def shutdown(self):
+        self.x.XCloseDisplay(self.display)
+        self.x.XSetErrorHandler(self.previous_error_handler)
+
+
+def list_vms():
+    result = run(['virsh', '-c', VM_URI, 'list', '--uuid'])
+    if result.returncode:
+        raise RuntimeError('Не удалось получить список ВМ: ' + result.stderr.strip())
+    # virsh emits machine identifiers; names are queried only for the local report.
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def shutdown_vm(uuid):
+    # Both methods are guest shutdown requests, never a host-side power cut.
+    return run(['virsh', '-c', VM_URI, 'shutdown', uuid, '--mode', 'agent,acpi'])
+
+
+def notify(message):
+    if shutil.which('notify-send'):
+        run(['notify-send', '--app-name=Otter', 'Режим ухода', message])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--apply', action='store_true', help='Отправить обычные запросы закрытия и выключения ВМ')
+    parser.add_argument('--dry-run', action='store_true', help='Только показать план (по умолчанию)')
+    args = parser.parse_args()
+    if args.apply and args.dry_run:
+        parser.error('Выберите --apply или --dry-run')
+    state = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'workstation-away'
+    state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (state / 'lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print('Предыдущий ol ещё работает.')
+            return
+        desktop = Desktop()
+        try:
+            windows = desktop.windows()
+            background = tray_processes()
+            vms = list_vms()  # Validate access before changing anything.
+            print(json.dumps({'mode': 'apply' if args.apply else 'dry-run',
+                              'windows': windows, 'background_apps': sorted(set(background.values())),
+                              'shutdown_vm_uuids': vms}, ensure_ascii=False, indent=2), flush=True)
+            if not args.apply:
+                return
+            notify('Закрываю приложения и отправляю выключение ВМ. Если появится запрос сохранения, ответьте на него. Ожидание ВМ — до 90 секунд.')
+            issues = []
+            for uuid in vms:
+                result = shutdown_vm(uuid)
+                if result.returncode:
+                    issues.append('ВМ не приняла выключение: ' + uuid)
+            # Snapshot once: never dismiss a newly opened save/confirmation dialog.
+            for item in windows:
+                if not item['close_supported'] or not desktop.close(item['window']):
+                    issues.append('Нет обычного закрытия: ' + item['app'])
+            # AyuGram normally lives in the tray; start only if it is absent.
+            if not any((info := process_info(int(p.name))) and
+                       'ayugram' in (info['name'] + info['exe']).casefold()
+                       for p in Path('/proc').iterdir() if p.name.isdigit()):
+                sp.Popen([str(Path.home() / '.local/bin/AyuGram')], stdin=sp.DEVNULL,
+                         stdout=sp.DEVNULL, stderr=sp.DEVNULL, start_new_session=True)
+            deadline = time.monotonic() + (90 if vms else 5)
+            remaining_vms = vms
+            while time.monotonic() < deadline:
+                time.sleep(2)
+                remaining_vms = list_vms() if vms else []
+                if not remaining_vms and not desktop.windows():
+                    break
+            remaining = desktop.windows()
+            issues.extend('Осталось окно: ' + name for name in sorted({w['app'] for w in remaining}))
+            issues.extend('ВМ ещё работает: ' + uuid for uuid in remaining_vms)
+            # A tray app may survive WM_DELETE_WINDOW. Report it without terminating it.
+            surviving = {app for pid, app in background.items() if process_info(pid) and
+                         not any(r['pid'] == pid for r in remaining)}
+            for w in windows:
+                info = process_info(w['pid'])
+                if info and not any(r['pid'] == w['pid'] for r in remaining):
+                    surviving.add(w['app'])
+            issues.extend('Процесс ещё работает (возможно, трей): ' + app for app in sorted(surviving))
+            report = {'time': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'issues': issues,
+                      'remaining_vms': remaining_vms}
+            target = state / 'last-run.json'
+            with os.fdopen(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as output:
+                json.dump(report, output, ensure_ascii=False, indent=2)
+            print(json.dumps(report, ensure_ascii=False, indent=2), flush=True)
+            notify(('Проверьте оставшиеся окна/ВМ. ' + '\n'.join(issues[:5])) if issues else
+                   'Запросы выполнены. AyuGram и фоновые службы сохранены; экран заблокируется по таймеру.')
+        finally:
+            desktop.shutdown()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, RuntimeError, sp.TimeoutExpired) as error:
+        print('ol:', error, flush=True)
+        notify(str(error))
+        raise SystemExit(1)
