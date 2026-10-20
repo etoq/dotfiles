@@ -22,6 +22,12 @@ awesome.connect_signal('debug::error',function(err)
  if not preview then notice('AwesomeWM · ошибка',tostring(err))end
 end)
 awful.layout.layouts={awful.layout.suit.tile.left,awful.layout.suit.tile.bottom,awful.layout.suit.fair,awful.layout.suit.max,awful.layout.suit.floating}
+-- Keep both horizontal columns usable when resizing by keyboard or mouse.
+tag.connect_signal('property::master_width_factor',function(t)
+ if t.layout~=awful.layout.suit.tile.left and t.layout~=awful.layout.suit.tile then return end
+ local factor=math.max(.30,math.min(.70,t.master_width_factor))
+ if factor~=t.master_width_factor then t.master_width_factor=factor end
+end)
 awful.screen.connect_for_each_screen(function(s)
  ui.screen(s)
  local wallpaper=home..'/Images/tiffany-re-37-ghidra-neon-emblem.png'
