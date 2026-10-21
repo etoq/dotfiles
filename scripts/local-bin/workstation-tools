@@ -1,0 +1,527 @@
+#!/usr/bin/env python3
+"""System reports, safe VM menu, and Black Tiffany UI for workstation-files."""
+import argparse
+import collections
+import datetime as dt
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess as sp
+import sys
+import uuid
+import xml.etree.ElementTree as ET
+
+HOME = Path.home()
+STATE = Path(os.environ.get('XDG_STATE_HOME', HOME / '.local/state')) / 'workstation-tools'
+URI = 'qemu:///system'
+NATIVE = HOME / '.local/bin/workstation-files'
+
+
+def capture(args, timeout=30):
+    try:
+        p = sp.run([str(v) for v in args], capture_output=True, text=True, timeout=timeout,
+                   env={**os.environ, 'LC_ALL': 'C'})
+        return {'ok': p.returncode == 0, 'code': p.returncode, 'output': p.stdout.strip(), 'error': p.stderr.strip()}
+    except (OSError, sp.TimeoutExpired) as error:
+        return {'ok': False, 'code': None, 'output': '', 'error': str(error)}
+
+
+def checked(args, timeout=30):
+    r = capture(args, timeout)
+    if not r['ok']:
+        raise RuntimeError(r['error'] or r['output'] or 'Команда завершилась ошибкой: ' + str(args[0]))
+    return r['output']
+
+
+def ui_module():
+    path = Path(__file__).resolve().with_name('otter-tools')
+    loader = importlib.machinery.SourceFileLoader('otter_shared', str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def native(command, *args, timeout=1800):
+    return json.loads(checked([NATIVE, command, *args], timeout))
+
+
+def kernel_checks():
+    checks = []
+    package_files = capture(['pacman', '-Qql', 'linux', 'linux-lts'])
+    if not package_files['ok']:
+        return [{'name': 'Установленные ядра', 'status': 'unverified', 'error': package_files['error']}]
+    pkgbase_paths = [Path(line) for line in package_files['output'].splitlines()
+                     if re.fullmatch(r'/usr/lib/modules/[^/]+/pkgbase', line)]
+    dkms = capture(['dkms', 'status'])
+    installed_versions = []
+    for path in pkgbase_paths:
+        version = path.parent.name
+        installed_versions.append(version)
+        try:
+            base = path.read_text().strip()
+        except OSError as error:
+            checks.append({'name': 'Ядро ' + version, 'status': 'unverified', 'error': str(error)})
+            continue
+        problems = []
+        for module in ('nvidia', 'nvidia_drm', 'nvidia_modeset', 'nvidia_uvm'):
+            info = capture(['modinfo', '-k', version, '-F', 'vermagic', module])
+            if not info['ok'] or not info['output'].startswith(version + ' '):
+                problems.append('Нет подходящего модуля ' + module)
+        if dkms['ok'] and not any(line.startswith('nvidia/') and ', ' + version + ',' in line and line.rstrip().endswith(': installed')
+                                  for line in dkms['output'].splitlines()):
+            problems.append('Нет записи NVIDIA DKMS installed')
+        checks.append({'name': f'Ядро {base}: {version}', 'status': 'attention' if problems else 'ok',
+                       'output': '\n'.join(problems) if problems else 'Модули NVIDIA соответствуют ядру.'})
+        if not dkms['ok']:
+            checks.append({'name': 'DKMS: ' + version, 'status': 'unverified', 'error': dkms['error']})
+        image = Path('/boot') / f'initramfs-{base}.img'
+        if not image.exists():
+            checks.append({'name': str(image), 'status': 'attention', 'output': 'Образ отсутствует.'})
+        elif not os.access(image, os.R_OK):
+            checks.append({'name': str(image), 'status': 'unverified', 'output': 'Для чтения образа нужны права администратора; наличие файла проверено.'})
+        else:
+            contents = capture(['lsinitcpio', image], 90)
+            matches = contents['ok'] and '/modules/' + version + '/' in contents['output']
+            checks.append({'name': str(image), 'status': 'ok' if matches else 'attention',
+                           'output': 'Модули в образе соответствуют ядру.' if matches else contents['error'] or 'Версия модулей в образе не совпала.'})
+    if not pkgbase_paths:
+        checks.append({'name': 'Установленные ядра', 'status': 'attention', 'output': 'В пакетах linux/linux-lts не найдены pkgbase.'})
+    if os.uname().release not in installed_versions:
+        checks.append({'name': 'Работающее ядро', 'status': 'attention',
+                       'output': os.uname().release + ': отличается от установленных ядер; после обновления рекомендуется перезагрузка.'})
+    return checks
+
+
+def post_update():
+    checks = []
+    def add(name, result, empty_ok=False):
+        status = 'ok' if result['ok'] else ('attention' if 'ERROR:' in result.get('error', '') and 'Permission denied' not in result.get('error', '') else 'unverified')
+        if empty_ok and result['ok'] and result['output']:
+            status = 'attention'
+        checks.append({'name': name, 'status': status, **result})
+    checks.extend(kernel_checks())
+    add('База пакетов', capture(['pacman', '-Dk'], 45))
+    add('Упавшие системные службы', capture(['systemctl', '--failed', '--plain', '--no-legend', '--no-pager']), True)
+    add('Упавшие пользовательские службы', capture(['systemctl', '--user', '--failed', '--plain', '--no-legend', '--no-pager']), True)
+    try:
+        loaded = Path('/sys/module/nvidia/version').read_text().strip()
+        installed = checked(['modinfo', '-F', 'version', 'nvidia'])
+        reboot = loaded != installed
+        checks.append({'name': 'Загруженный драйвер NVIDIA', 'status': 'attention' if reboot else 'ok',
+                       'output': f'В памяти: {loaded}; на диске: {installed}', 'reboot_suggested': reboot})
+    except (OSError, RuntimeError) as error:
+        checks.append({'name': 'Загруженный драйвер NVIDIA', 'status': 'unverified', 'error': str(error)})
+    mounts = capture(['findmnt', '-J', '-t', 'vfat', '-o', 'TARGET,FSTYPE'])
+    if mounts['ok']:
+        for row in json.loads(mounts['output']).get('filesystems', []):
+            try:
+                vfs = os.statvfs(row['target'])
+                free = vfs.f_bavail * vfs.f_frsize
+                checks.append({'name': 'Свободное место FAT/EFI: ' + row['target'],
+                               'status': 'attention' if free < 200 * 1024**2 else 'ok',
+                               'free_bytes': free, 'output': f'{free / 1024**2:.0f} МиБ свободно; размер следующего initramfs может отличаться'})
+            except OSError as error:
+                checks.append({'name': 'EFI', 'status': 'unverified', 'error': str(error)})
+    else:
+        checks.append({'name': 'FAT/EFI', 'status': 'unverified', 'error': mounts['error'] or 'Нет доступных смонтированных FAT-разделов'})
+    kernel = os.uname().release
+    if not (Path('/usr/lib/modules') / kernel).is_dir():
+        checks.append({'name': 'Работающее ядро', 'status': 'attention', 'output': kernel + ': каталог модулей отсутствует; после обновления нужна перезагрузка'})
+    return {'time': dt.datetime.now().astimezone().isoformat(), 'kernel': kernel, 'checks': checks,
+            'note': 'Только проверка. unverified означает неполную проверку, а не подтверждённую неисправность; права автоматически не повышаются.'}
+
+
+def collect_errors(minutes=10):
+    if not 1 <= minutes <= 10080:
+        raise ValueError('Период должен быть от 1 минуты до 7 суток')
+    now = dt.datetime.now().astimezone()
+    since = now - dt.timedelta(minutes=minutes)
+    entries, sources, seen = [], [], set()
+    for user in (False, True):
+        args = ['journalctl', '-b', '--since', since.strftime('%Y-%m-%d %H:%M:%S'), '--until', now.strftime('%Y-%m-%d %H:%M:%S'),
+                '-p', 'warning', '-n', '3000', '-o', 'json', '--no-pager']
+        if user:
+            args.append('--user')
+        result = capture(args, 45)
+        source = {'scope': 'user' if user else 'system', 'ok': result['ok'], 'error': result['error']}
+        count = 0
+        for line in result['output'].splitlines():
+            try:
+                item = json.loads(line)
+            except ValueError:
+                continue
+            count += 1
+            cursor = item.get('__CURSOR')
+            if cursor and cursor in seen:
+                continue
+            if cursor:
+                seen.add(cursor)
+            message = item.get('MESSAGE', '')
+            if isinstance(message, list):
+                message = bytes(message).decode(errors='replace') if all(type(v) is int and 0 <= v <= 255 for v in message) else str(message)
+            timestamp = int(item.get('__REALTIME_TIMESTAMP', '0')) / 1_000_000
+            entries.append({'time': dt.datetime.fromtimestamp(timestamp).astimezone().isoformat(), 'timestamp': timestamp,
+                            'scope': 'kernel' if item.get('_TRANSPORT') == 'kernel' else source['scope'],
+                            'unit': item.get('_SYSTEMD_USER_UNIT') or item.get('_SYSTEMD_UNIT') or item.get('SYSLOG_IDENTIFIER', '?'),
+                            'priority': item.get('PRIORITY'), 'message': message})
+        source['possibly_truncated'] = count >= 3000
+        sources.append(source)
+    entries.sort(key=lambda e: e['timestamp'])
+    counts = collections.Counter(e['unit'] for e in entries)
+    return {'since': since.isoformat(), 'until': now.isoformat(), 'sources': sources,
+            'summary': dict(counts.most_common()), 'entries': entries,
+            'note': 'Текущая загрузка, warning и серьёзнее, максимум 3000 записей на источник. Совпадение по времени не доказывает общую причину.'}
+
+
+def virsh(*args):
+    return checked(['virsh', '-c', URI, *args], 90)
+
+
+def valid_uuid(value):
+    return str(uuid.UUID(value))
+
+
+def vm_state(domain):
+    return virsh('domstate', valid_uuid(domain)).strip()
+
+
+def vm_inventory():
+    result = []
+    for domain in virsh('list', '--all', '--uuid').splitlines():
+        if not domain.strip():
+            continue
+        domain = valid_uuid(domain.strip())
+        tree = ET.fromstring(virsh('dumpxml', domain))
+        result.append({'uuid': domain, 'name': tree.findtext('name') or domain, 'state': vm_state(domain)})
+    return result
+
+
+def require_stopped(domain):
+    if vm_state(domain) != 'shut off':
+        raise RuntimeError('Для снимка или возврата сначала штатно выключи ВМ.')
+
+
+def snapshot_vm(domain):
+    domain = valid_uuid(domain)
+    require_stopped(domain)
+    name = 'clean-' + dt.datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
+    virsh('snapshot-create-as', domain, '--name', name, '--description', 'Offline snapshot from workstation-tools', '--atomic')
+    return name
+
+
+def revert_vm(domain, snapshot, confirmed=False):
+    domain = valid_uuid(domain)
+    if not confirmed:
+        raise RuntimeError('Возврат требует отдельного подтверждения.')
+    require_stopped(domain)
+    tree = ET.fromstring(virsh('snapshot-dumpxml', domain, '--snapshotname', snapshot))
+    if tree.findtext('state') not in ('shutoff', 'shut off'):
+        raise RuntimeError('Это не снимок выключенной ВМ. Для возврата используй virt-manager с проверкой состояния.')
+    virsh('snapshot-revert', domain, '--snapshotname', snapshot)
+
+
+def vm_menu(ui):
+    while True:
+        inventory = vm_inventory()
+        vm = ui.choose([(f"{v['name']} · {v['state']}", v) for v in inventory], 'Виртуальная машина')
+        if vm is None:
+            return
+        domain = vm['uuid']
+        action = ui.choose([('Открыть virt-manager', 'open'), ('Запустить', 'start'),
+                            ('Выключить штатно', 'shutdown'), ('Создать снимок выключенной ВМ', 'snapshot'),
+                            ('Вернуться к снимку · изменения будут потеряны', 'revert'), ('Обновить состояние', 'refresh')], vm['name'])
+        if action == 'open':
+            sp.Popen(['virt-manager', '--connect', URI, '--show-domain-console', domain], start_new_session=True)
+        elif action == 'start':
+            virsh('start', domain)
+            ui.notify('ВМ', 'Запущена: ' + vm['name'])
+        elif action == 'shutdown':
+            if vm_state(domain) == 'shut off':
+                ui.notify('ВМ', 'Уже выключена: ' + vm['name'])
+            else:
+                virsh('shutdown', domain, '--mode', 'agent,acpi')
+                ui.notify('ВМ', 'Отправлен запрос штатного выключения: ' + vm['name'])
+        elif action == 'snapshot':
+            require_stopped(domain)
+            choice = ui.choose([('Отмена', False), ('Создать снимок дисков', True)], 'Снимок · займёт место на диске')
+            if choice:
+                ui.notify('ВМ · снимок', snapshot_vm(domain))
+        elif action == 'revert':
+            require_stopped(domain)
+            snapshots = virsh('snapshot-list', domain, '--name').splitlines()
+            selected = ui.choose([(name, name) for name in snapshots if name], 'Снимок для возврата')
+            if selected:
+                print('Изменения дисков после снимка будут потеряны.')
+                confirmation = input('Для возврата введи имя ВМ «' + ui.clean(vm['name']) + '»: ')
+                if confirmation == vm['name']:
+                    revert_vm(domain, selected, confirmed=True)
+                    ui.notify('ВМ', 'Восстановлен снимок: ' + selected)
+        elif action is None:
+            return
+
+
+def folder(ui, provided=None):
+    if provided:
+        result = Path(provided).expanduser().absolute()
+    else:
+        raw = input('Папка [~/Downloads]: ').strip()
+        result = Path(raw).expanduser().absolute() if raw else HOME / 'Downloads'
+    if not result.is_dir():
+        raise ValueError('Папка не найдена: ' + str(result))
+    return result
+
+
+def safe_sha(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as f:
+        before = os.fstat(f.fileno())
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError('Не обычный файл: ' + str(path))
+        h = hashlib.sha256()
+        while chunk := f.read(1024 * 1024):
+            h.update(chunk)
+        after = os.fstat(f.fileno())
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+        if identity(before) != identity(after):
+            raise RuntimeError('Файл изменился при проверке: ' + str(path))
+        return h.hexdigest()
+
+
+def trash_duplicates(group, selected):
+    files = [Path(p) for p in group['files']]
+    selected = [Path(p) for p in selected]
+    if not selected or any(p not in files for p in selected):
+        raise ValueError('Некорректный выбор копий.')
+    keep = [p for p in files if p not in selected]
+    if not keep:
+        raise ValueError('Нужно оставить хотя бы одну копию.')
+    for p in [keep[0], *selected]:
+        if safe_sha(p) != group['sha256']:
+            raise RuntimeError('Содержимое изменилось после сканирования: ' + str(p))
+    checked(['gio', 'trash', '--', *selected])
+
+
+def save_report(action, data):
+    directory = STATE / 'reports'
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    name = action + '-' + dt.datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6] + '.json'
+    path = directory / name
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return path
+
+
+def human_size(value):
+    sign = '+' if value > 0 else '-' if value < 0 else ''
+    number = abs(value)
+    for suffix in ('Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ'):
+        if number < 1024 or suffix == 'ТиБ':
+            return f'{sign}{number:.1f} {suffix}'
+        number /= 1024
+
+
+def format_report(action, data):
+    lines = []
+    if action == 'post-update':
+        lines = ['ПРОВЕРКА ПОСЛЕ ОБНОВЛЕНИЯ', data['time'], 'Ядро: ' + data['kernel'], '']
+        labels = {'ok': 'OK', 'attention': 'ВНИМАНИЕ', 'unverified': 'НЕ ПРОВЕРЕНО'}
+        for item in data['checks']:
+            lines += [f"[{labels[item['status']]}] {item['name']}", item.get('output') or item.get('error') or 'Замечаний нет', '']
+        lines.append(data['note'])
+    elif action == 'dupes':
+        lines = ['ДУБЛИКАТЫ', str(data['root']), f"Потенциально лишние логические байты: {human_size(data['possible_saving'])}",
+                 'Жёсткие ссылки не считаются отдельными копиями. Файлы пока не изменены.', '']
+        for i, group in enumerate(data['groups'], 1):
+            lines += [f"{i}. {len(group['files'])} копий × {human_size(group['size'])}", 'SHA-256: ' + group['sha256']]
+            lines += ['  ' + p for p in group['files']]
+            lines.append('')
+        if not data['groups']:
+            lines.append('Дубликатов от 1 КиБ не найдено.')
+        lines.append('На Btrfs фактическая экономия может отличаться из-за сжатия и общих блоков.')
+    elif action == 'growth':
+        lines = ['ИЗМЕНЕНИЕ РАЗМЕРОВ ПАПКИ', str(data['root']),
+                 'Сейчас: ' + human_size(data['total']), 'Выделено блоков по файлам: ' + human_size(data['allocated'])]
+        if data['previous_time'] is not None:
+            lines += ['Предыдущий замер: ' + dt.datetime.fromtimestamp(data['previous_time']).astimezone().isoformat(),
+                      'Разница: ' + human_size(data['delta']), '']
+            state_labels = {'added': 'новый', 'removed': 'удалён', 'changed': 'изменён'}
+            lines += [f"{human_size(row['delta']):>14}  {state_labels[row['state']]:8}  {row['path']}" for row in data['changes']]
+            if not data['changes']:
+                lines.append('Размеры не изменились.')
+        else:
+            lines.append('Первый замер: база создана.' if data['baseline_created'] else 'Первый замер: база не сохранена.')
+        lines += ['', 'Новая база сохранена.' if data['saved'] else 'База не перезаписана: режим просмотра или неполный доступ.',
+                  'Размеры файлов не равны уникальному физическому месту Btrfs.']
+    elif action == 'kind':
+        mismatch = data['extension_mismatch']
+        lines = ['РЕАЛЬНЫЙ ФОРМАТ ФАЙЛА', str(data['file']), 'Размер: ' + human_size(data['size']),
+                 'SHA-256: ' + data['sha256'], 'Сигнатура: ' + (data['signature'] or 'нет известной сигнатуры'),
+                 'Формат: ' + data['description'].get('text', data['description'].get('error', '')),
+                 'MIME: ' + data['mime'].get('text', data['mime'].get('error', '')),
+                 'Расширение: ' + (data['extension'] or '(нет)'), '',
+                 'ВНИМАНИЕ: расширение противоречит сигнатуре.' if mismatch else
+                 'Расширение соответствует известной сигнатуре.' if mismatch is False else 'Соответствие расширения достоверно не определено.',
+                 'Это определение формата, а не заключение о вредоносности. MZ — кандидат DOS/PE.']
+    elif action == 'bindiff':
+        lines = ['СРАВНЕНИЕ БИНАРНИКОВ', 'A: ' + data['first'], 'B: ' + data['second'],
+                 'SHA-256 A: ' + data['first_sha256'], 'SHA-256 B: ' + data['second_sha256'],
+                 f"Различающихся байт: {data['bytes']['changed_bytes']:,}",
+                 f"Диапазонов: {data['bytes']['total_ranges']} (показано до 200)", '',
+                 'СМЕЩЕНИЯ · начало включено, конец исключён']
+        lines += [f"0x{row['start']:x} .. 0x{row['end']:x}  ({row['length']} байт)" for row in data['bytes']['ranges']]
+        for title, key in [('Добавленные строки', 'strings_added'), ('Удалённые строки', 'strings_removed')]:
+            lines += ['', title + ' · до 100'] + data[key]
+        lines += ['', 'Строки ASCII: первые 16 МиБ, до 20 000 уникальных, длина 6–4096 байт.',
+                  'ЭНТРОПИЯ · не является признаком вредоносности сама по себе']
+        for label, key in [('A', 'first_stats'), ('B', 'second_stats')]:
+            item = data[key]
+            lines += [f"{label}: {item['entropy']:.4f} бит/байт; окна по 64 КиБ (первые 4096)"]
+            windows = item['entropy_windows']
+            stride = max(1, (len(windows) + 79) // 80)
+            blocks = '▁▂▃▄▅▆▇█'
+            chart = ''.join(blocks[min(7, int(sum(w['entropy'] for w in windows[i:i+stride]) / len(windows[i:i+stride])))] for i in range(0, len(windows), stride))
+            lines.append(chart or '(пустой файл)')
+        lines += ['', 'ИЗМЕНИВШИЕСЯ ELF-СЕКЦИИ · хеширование до 64 МиБ данных секций каждого файла']
+        for row in data.get('section_changes', []):
+            before, after = row['before'], row['after']
+            state = 'добавлена' if before is None else 'удалена' if after is None else 'изменена'
+            lines.append(row['name'] + ': ' + state)
+            for label, value in [('A', before), ('B', after)]:
+                if value:
+                    lines.append(f"  {label}: {value['type']}, {value['size']} байт, offset 0x{value['offset']:x}; SHA-256: {value['sha256'] or 'не вычислен (NOBITS/лимит/границы)'}")
+        if not data.get('section_changes'):
+            lines.append('Различий в доступных метаданных/проверенном содержимом не найдено, либо файлы не ELF.')
+        for label, key in [('A', 'first_elf_sections'), ('B', 'second_elf_sections')]:
+            item = data[key]
+            lines += ['', 'ELF-СЕКЦИИ ' + label, item.get('text') or item.get('error') or '(нет данных)']
+        lines += ['', 'Байты сопоставляются по одинаковым смещениям; это не семантическое сравнение функций. Полные окна энтропии — в JSON-отчёте.']
+    elif action == 'carve':
+        lines = ['ВСТРОЕННЫЕ ОБЪЕКТЫ · КАНДИДАТЫ', str(data['file']), 'Размер: ' + human_size(data['size']), '']
+        lines += [f"{row['hex_offset']:>12}  {row['kind']:8}  длина: {row['suggested_length'] or 'указать вручную'}" for row in data['candidates']]
+        lines += ['', 'Сигнатура не гарантирует корректность объекта. PNG: границы чанков без проверки CRC. ELF: границы таблиц/данных, без оверлея.']
+        if data['truncated']:
+            lines.append('Достигнут предел 2000 кандидатов; сканирование остановлено раньше конца.')
+    elif action == 'extracted':
+        lines = ['ОБЪЕКТ ИЗВЛЕЧЁН', 'Исходник: ' + data['source'], 'Новый файл: ' + data['output'],
+                 f"Смещение: 0x{data['offset']:x}; длина: {data['length']} байт", 'SHA-256: ' + data['sha256'],
+                 'Исходник не изменён. Копия не запускается.']
+    else:
+        return json.dumps(data, ensure_ascii=False, indent=2)
+    if data.get('errors'):
+        lines += ['', 'НЕПОЛНЫЙ ДОСТУП / ОШИБКИ'] + data['errors']
+    return '\n'.join(lines)
+
+
+def present(ui, action, data):
+    path = save_report(action, data)
+    if action == 'errors':
+        text = f"Журнал: {data['since']} — {data['until']}\n\n" + '\n'.join(f'{n:4}  {u}' for u, n in data['summary'].items())
+        text += '\n\n' + '\n\n'.join(f"{e['time']} [{e['scope']}] {ui.clean(e['unit'])}\n{ui.clean(e['message'])}" for e in data['entries'])
+        text += '\n\nИсточники: ' + json.dumps(data['sources'], ensure_ascii=False) + '\n' + data['note']
+    else:
+        text = '\n'.join(ui.clean(line) for line in format_report(action, data).splitlines())
+    ui.view_report(f'Отчёт сохранён: {path}\n\n' + text, action + '.txt')
+
+
+def run_ui(args):
+    ui = ui_module()
+    action = args.action
+    if action == 'vms':
+        vm_menu(ui)
+        return
+    if action == 'post-update':
+        print('Проверяю ядра, драйвер, initramfs, EFI и службы…', flush=True)
+        present(ui, action, post_update())
+        return
+    if action == 'errors':
+        minutes = args.minutes
+        if minutes is None:
+            minutes = ui.choose([('10 минут', 10), ('30 минут', 30), ('1 час', 60), ('6 часов', 360), ('24 часа', 1440)], 'Период ошибок')
+        if minutes:
+            present(ui, action, collect_errors(minutes))
+        return
+    if action in ('dupes', 'growth'):
+        root = folder(ui, args.paths[0] if args.paths else None)
+        print('Сканирую ' + str(root) + '…', flush=True)
+        data = native(action, root)
+        present(ui, action, data)
+        if action == 'dupes' and data['groups']:
+            group = ui.choose([(f"{len(g['files'])} копий · {g['size']:,} байт · {g['files'][0]}", g) for g in data['groups']], 'Группа дубликатов · Esc оставить всё')
+            if group:
+                selected = ui.choose([(p, p) for p in group['files'][1:]], 'Копии для корзины', multiple=True,
+                                     header='Первая копия сохраняется · Tab выбрать несколько · Esc отмена')
+                if selected and input(f'{len(selected)} файлов → корзина. Введи КОРЗИНА: ') == 'КОРЗИНА':
+                    trash_duplicates(group, selected)
+                    ui.notify('Дубликаты', 'Копии перемещены в корзину: ' + str(len(selected)))
+        return
+    first = ui.file_path(args.paths[0] if args.paths else '')
+    if first is None:
+        return
+    if action == 'kind':
+        present(ui, action, native('kind', first))
+    elif action == 'bindiff':
+        print('Выбери вторую версию файла…', flush=True)
+        second = ui.file_path(args.paths[1] if len(args.paths) > 1 else '')
+        if second is not None:
+            print('Сравниваю файлы…', flush=True)
+            present(ui, action, native('bindiff', first, second))
+    elif action == 'carve':
+        data = native('carve', first)
+        present(ui, action, data)
+        selected = ui.choose([(f"{c['hex_offset']} · {c['kind']} · длина {c['suggested_length'] or 'указать вручную'}", c) for c in data['candidates']], 'Извлечь объект · Esc только отчёт')
+        if selected:
+            suggested = selected['suggested_length']
+            raw = input(f"Длина в байтах [{suggested or 'обязательно'}]; пусто при отсутствии длины — отмена: ").strip()
+            if not raw and not suggested:
+                return
+            length = int(raw, 0) if raw else suggested
+            if length <= 0 or selected['offset'] + length > data['size']:
+                raise ValueError('Диапазон выходит за пределы файла.')
+            output_dir = HOME / 'Documents/Analysis/extracted'
+            output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            name = re.sub(r'[^a-zA-Z0-9_.-]', '_', first.name)[:100]
+            suffix = {'PNG': 'png', 'ELF': 'elf', 'JPEG': 'jpg', 'ZIP': 'zip', 'GZIP': 'gz', 'PDF': 'pdf', '7z': '7z', 'XZ': 'xz'}.get(selected['kind'], 'bin')
+            output = output_dir / f"{name}-{selected['offset']:x}-{uuid.uuid4().hex[:8]}.{suffix}"
+            result = native('carve', first, '--offset', str(selected['offset']), '--length', str(length), '--out', output)
+            present(ui, 'extracted', result)
+
+
+def main():
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=['post-update', 'errors', 'vms', 'dupes', 'growth', 'kind', 'bindiff', 'carve'])
+    parser.add_argument('paths', nargs='*')
+    parser.add_argument('--ui', action='store_true')
+    parser.add_argument('--minutes', type=int)
+    args = parser.parse_args()
+    if args.ui:
+        run_ui(args)
+    elif args.action == 'post-update':
+        print(json.dumps(post_update(), ensure_ascii=False, indent=2))
+    elif args.action == 'errors':
+        print(json.dumps(collect_errors(args.minutes if args.minutes is not None else 10), ensure_ascii=False, indent=2))
+    elif args.action == 'vms':
+        print(json.dumps(vm_inventory(), ensure_ascii=False, indent=2))
+    else:
+        data = native(args.action, *args.paths)
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        pass
+    except (OSError, ValueError, RuntimeError, ET.ParseError) as error:
+        print('Ошибка:', error, file=sys.stderr)
+        try:
+            sp.run(['notify-send', 'Workstation · ошибка', str(error)[:300]], check=False)
+        except OSError:
+            pass
+        raise SystemExit(1)

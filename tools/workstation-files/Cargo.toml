@@ -1,0 +1,12 @@
+[package]
+name = "workstation-files"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+clap = { version = "=4.5.1", features = ["derive"] }
+serde = { version = "=1.0.197", features = ["derive"] }
+serde_json = "=1.0.105"
+sha2 = "=0.10.9"
+walkdir = "=2.3.3"

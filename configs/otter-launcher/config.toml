@@ -53,6 +53,48 @@ move_interface_down  = 10 # ═════════════════�
 
 
 [[modules]]
+description = "Проверка после обновления"
+prefix = "checkupd"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module checkupd"
+unbind_proc = false
+
+[[modules]]
+description = "Ошибки · выбрать период"
+prefix = "errors"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module errors"
+unbind_proc = false
+
+[[modules]]
+description = "Файлы · дубликаты"
+prefix = "dupes"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module dupes"
+unbind_proc = false
+
+[[modules]]
+description = "Диски · что выросло"
+prefix = "growth"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module growth"
+unbind_proc = false
+
+[[modules]]
+description = "Файл · реальный формат"
+prefix = "kind"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module kind"
+unbind_proc = false
+
+[[modules]]
+description = "Бинарники · сравнить версии"
+prefix = "bdiff"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module bdiff"
+unbind_proc = false
+
+[[modules]]
+description = "Бинарник · встроенные объекты"
+prefix = "carve"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module carve"
+unbind_proc = false
+
+[[modules]]
 description = "Вентилятор · тихий / обычный"
 prefix = "fan"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module fan"

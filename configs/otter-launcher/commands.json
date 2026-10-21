@@ -220,7 +220,7 @@
     "raw_argument": false
   },
   "vms": {
-    "command": "exec kitty --class otter-tools -e bash -c 'vm=\"$(virsh list --all --name 2>/dev/null | grep -v '\"'\"'^$'\"'\"' | fzf --cycle --gutter '\"'\"' '\"'\"' --pointer '\"'\"'▌'\"'\"' --color '\"'\"'bg:#080D10,bg+:#183039,fg:#C5D6D8,hl:#4DDDD5,pointer:#4DDDD5'\"'\"' --prompt '\"'\"'  VM > '\"'\"' --preview '\"'\"'virsh dominfo {+} 2>/dev/null'\"'\"' --preview-window=right:40%)\"\n[ -z \"$vm\" ] && exit 0\nstate=\"$(virsh domstate \"$vm\" 2>/dev/null)\"\naction=\"$(printf '\"'\"'  start\n  shutdown\n  reboot\n  force-off\n  snapshot'\"'\"' | fzf --prompt \"  $vm [$state] > \" --color '\"'\"'bg:#080D10,bg+:#183039,fg:#C5D6D8,hl:#4DDDD5,pointer:#4DDDD5'\"'\"')\"\ncase \"$action\" in\n  *start)     virsh start \"$vm\" && notify-send \"VM\" \"Starting $vm\" ;;\n  *shutdown)  virsh shutdown \"$vm\" ;;\n  *reboot)    virsh reboot \"$vm\" ;;\n  *force-off) virsh destroy \"$vm\" ;;\n  *snapshot)  virsh snapshot-create-as \"$vm\" \"snap-$(date +%Y%m%d-%H%M)\" && notify-send \"VM\" \"Snapshot created\" ;;\nesac\n'",
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" vms --ui",
     "url_encoded": false,
     "raw_argument": false
   },
@@ -250,7 +250,7 @@
     "raw_argument": false
   },
   "log": {
-    "command": "kitty -e bash -c 'journalctl -p err -b --no-pager | bat --color=always --paging=always'",
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" errors --ui",
     "url_encoded": false,
     "raw_argument": false
   },
@@ -326,6 +326,41 @@
   },
   "fan": {
     "command": "exec \"$HOME/.local/bin/fan-toggle\"",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "checkupd": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" post-update --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "errors": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" errors --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "dupes": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" dupes --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "growth": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" growth --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "kind": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" kind --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "bdiff": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" bindiff --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "carve": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" carve --ui",
     "url_encoded": false,
     "raw_argument": false
   }

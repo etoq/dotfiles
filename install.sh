@@ -152,7 +152,7 @@ if [ "$DO_PKGS" = "1" ]; then
 
     step "ПАКЕТЫ PACMAN"
     PACMAN_PKGS=(
-        base base-devel git curl wget sudo nano vim
+        base base-devel git curl wget sudo nano vim rust
         man-db man-pages linux linux-headers linux-lts linux-lts-headers
         linux-firmware intel-ucode grub efibootmgr grub-btrfs
         btrfs-progs smartmontools cryptsetup snap-pac snapper
@@ -359,7 +359,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(fan-toggle wallpaper-rotate workstation-away idle-screen-lock imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(workstation-tools workstation-files fan-toggle wallpaper-rotate workstation-away idle-screen-lock imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"
@@ -376,6 +376,11 @@ if [ "$DO_SCRIPTS" = "1" ]; then
     done
     if [[ "$DO_PKGS" == 1 ]]; then
         "$HOME/.local/bin/otter-install-assets" || warn "Ресурсы Otter: повтори otter-install-assets при доступном интернете"
+    fi
+    if command -v cargo >/dev/null 2>&1; then
+        bash "$DOTFILES_DIR/scripts/maintenance/build-workstation-files.sh" || warn "Rust-утилиты не собраны: повтори scripts/maintenance/build-workstation-files.sh"
+    else
+        warn "Для Rust-утилит нужен пакет rust; после установки запусти scripts/maintenance/build-workstation-files.sh"
     fi
     ok "Скрипты установлены"
 

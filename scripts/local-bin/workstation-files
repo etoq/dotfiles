@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+native="$HOME/.local/lib/workstation-tools/workstation-files"
+if [[ ! -x "$native" ]]; then
+    printf '%s\n' 'Rust utilities are not built. Run: bash ~/dotfiles/scripts/maintenance/build-workstation-files.sh' >&2
+    exit 1
+fi
+exec "$native" "$@"
