@@ -83,6 +83,11 @@ key({mod},'F1',hotkeys.show_help,'Показать все сочетания','�
 key({mod},'F2',function()require('cheatsheets').show('nvim')end,'Neovim · частые сочетания','Справочники')
 key({mod},'F3',function()require('cheatsheets').show('terminal')end,'Fish / Kitty · команды и клавиши','Справочники')
 key({mod},'F4',function()require('cheatsheets').show('yazi')end,'Yazi · частые сочетания','Справочники')
+key({mod},'F5',function()require('cheatsheets').show('otter')end,'Otter · команды лаунчера','Справочники')
+key({mod},'F6',function()require('cheatsheets').show('gdb')end,'GDB / pwndbg · отладка','Справочники')
+key({mod},'F7',function()require('cheatsheets').show('recli')end,'RE CLI · анализ файлов','Справочники')
+key({mod},'F8',function()require('cheatsheets').show('ghidra')end,'Ghidra · IDA-подобные сочетания','Справочники')
+key({mod},'F9',function()require('cheatsheets').show('scripts')end,'Свои скрипты · команды терминала','Справочники')
 if preview then key({mod,'Control','Shift'},'Escape',awesome.quit,'Закрыть предпросмотр','Сеанс')end
 key({mod},'q',function()spawn({home..'/.config/sxhkd/clip.sh'})end,'История буфера','Инструменты')
 key({mod,'Shift'},'q',function()spawn({'sh','-c','greenclip clear; printf "" | xclip -selection clipboard; notify-send "Clipboard" "История очищена"'})end,'Очистить буфер','Инструменты')

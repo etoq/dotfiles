@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Read-only data for the native Awesome cheat sheets; never executes listed tools."""
+import json
+import os
+from pathlib import Path
+import sys
+import tomllib
+
+HOME = Path.home()
+
+
+def otter():
+    config = tomllib.loads((HOME / '.config/otter-launcher/config.toml').read_text())
+    modules = {m['prefix']: m.get('description', '') for m in config['modules'] if not m.get('hidden')}
+    categories = [
+        ('OTTER · 1. Приложения', 'app kp obs music ds wf pai cx gai aai rem'),
+        ('OTTER · 2. Файлы и заметки', 'fo yz note recent cal calc hex info ocr cc meta via'),
+        ('OTTER · 3. Свои инструменты', 'checkupd errors dupes growth kind bdiff carve fan'),
+        ('OTTER · 4. Поиск и Git', 'aw aur pac gh yt tr lg ldk jq'),
+        ('OTTER · 5. Реверс и CTF', 'ghi cut die rn rna rnt wsh nm burp bpro msf bh'),
+        ('OTTER · 6. Система и ВМ', 'vm vms top cpu ht dsk sys log upd snap rm kill'),
+        ('OTTER · 7. Сеть и сеанс', 'wifi wvm bt vol ip ports ol sl timer po'),
+    ]
+    groups = []
+    for title, names in categories:
+        rows = [[name, modules.pop(name)] for name in names.split() if name in modules]
+        if rows:
+            groups.append([title, rows])
+    if modules:
+        groups.append(['OTTER · Дополнительно', [[k, v] for k, v in modules.items()]])
+    return groups
+
+
+def scripts():
+    groups = [
+        ('СКРИПТЫ · 1. Проверки', [
+            ('workstation-tools post-update', 'Проверить систему после обновления', 'workstation-tools'),
+            ('workstation-tools errors --minutes 30', 'Ошибки за последние 30 минут', 'workstation-tools'),
+            ('workstation-status', 'SMART, scrub, TRIM и backup · JSON', 'workstation-status'),
+            ('check-nvidia-sleep', 'Проверить профиль сна NVIDIA', 'check-nvidia-sleep'),
+            ('fan-toggle --status', 'Какой профиль вентилятора включён', 'fan-toggle'),
+        ]),
+        ('СКРИПТЫ · 2. Файлы и реверс', [
+            ('workstation-files dupes ПАПКА', 'Поиск дубликатов · только отчёт', 'workstation-files'),
+            ('workstation-files growth ПАПКА', 'Сравнить размер с прошлым замером', 'workstation-files'),
+            ('workstation-files kind ФАЙЛ', 'Формат, расширение и SHA-256', 'workstation-files'),
+            ('workstation-files bindiff A B', 'Сравнить две версии бинарника', 'workstation-files'),
+            ('workstation-files carve ФАЙЛ', 'Сигнатуры встроенных объектов', 'workstation-files'),
+            ('reverse-ghidra', 'Открыть твою сборку Ghidra', 'reverse-ghidra'),
+        ]),
+        ('СКРИПТЫ · 3. ВМ и сеанс', [
+            ('workstation-tools vms --ui', 'Меню управления виртуальными машинами', 'workstation-tools'),
+            ('workstation-away --dry-run', 'Показать план режима ухода', 'workstation-away'),
+            ('otter-run --module ol', 'Закрыть приложения, выключить ВМ', 'otter-run'),
+            ('fan-toggle', 'Тихий ↔ обычный вентилятор', 'fan-toggle'),
+            ('~/bin/random_wallpaper', 'Следующие обои из подборки', 'random_wallpaper'),
+            ('~/bin/screen-lock', 'Заблокировать экран', 'screen-lock'),
+        ]),
+        ('СКРИПТЫ · 4. Резервирование', [
+            ('workstation-backup', 'Посмотреть план backup · без запуска', 'workstation-backup'),
+            ('workstation-backup --run-once', 'Запустить резервирование по плану', 'workstation-backup'),
+            ('proton-quota', 'Сохранённое состояние квоты Proton', 'proton-quota'),
+            ('proton-quota --refresh', 'Обновить занятое место в облаке', 'proton-quota'),
+        ]),
+        ('СКРИПТЫ · 5. Удобство', [
+            ('otter-tools ocr', 'Выделить область и распознать текст', 'otter-tools'),
+            ('otter-tools timer 25m', 'Таймер на 25 минут', 'otter-tools'),
+            ('otter-tools hex ФАЙЛ', 'HEX-просмотр в Neovim', 'otter-tools'),
+            ('tiffany-calendar', 'Открыть календарь', 'tiffany-calendar'),
+            ('clean-meta ФАЙЛ/ПАПКА', 'Удалить метаданные изображений по пути', 'clean-meta'),
+        ]),
+    ]
+    result = []
+    for title, items in groups:
+        rows = [[cmd, desc] for cmd, desc, name in items
+                if any(os.access(folder / name, os.X_OK) for folder in (HOME / '.local/bin', HOME / 'bin'))]
+        if rows:
+            result.append([title, rows])
+    return result
+
+
+if __name__ == '__main__':
+    try:
+        action = sys.argv[1] if len(sys.argv) == 2 else ''
+        if action not in ('otter', 'scripts'):
+            raise ValueError('Usage: cheat-data otter|scripts')
+        print(json.dumps(otter() if action == 'otter' else scripts(), ensure_ascii=False))
+    except (OSError, ValueError, KeyError) as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)

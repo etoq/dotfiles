@@ -102,11 +102,102 @@ local sheets = {
   }},
  },
 }
-local function instance(name)
+sheets.gdb = {
+ {'GDB · 1. Запуск и точки', {
+  {'file ./program', 'Загрузить программу и символы'}, {'set args аргументы', 'Аргументы запуска'},
+  {'start / starti', 'Старт до main / первой инструкции'}, {'b main / b *АДРЕС', 'Точка на функции / адресе'},
+  {'info break / delete НОМЕР', 'Список / удалить точку'}, {'disable / enable НОМЕР', 'Отключить / включить точку'},
+ }},
+ {'GDB · 2. Выполнение', {
+  {'r / c', 'Запустить / продолжить'}, {'n / s', 'Шаг по строкам: поверх / внутрь'},
+  {'ni / si', 'Шаг по инструкциям: поверх / внутрь'}, {'finish', 'До возврата из функции'},
+  {'Ctrl+C', 'Прервать выполнение'}, {'q', 'Выйти из GDB'},
+ }},
+ {'GDB · 3. Память и регистры', {
+  {'info registers', 'Регистры процессора'}, {'p/x ВЫРАЖЕНИЕ', 'Значение в HEX'},
+  {'x/16gx $rsp', '16 восьмибайтовых слов стека · x86-64'}, {'x/32bx АДРЕС', '32 байта памяти'},
+  {'x/s АДРЕС', 'Строка по адресу'}, {'x/10i $pc', '10 инструкций от текущей'},
+ }},
+ {'GDB · 4. Функции и стек', {
+  {'bt', 'Стек вызовов'}, {'frame НОМЕР / up / down', 'Выбрать стековый кадр'},
+  {'info args / info locals', 'Аргументы / локальные переменные'}, {'disassemble /r ИМЯ', 'Инструкции с байтами'},
+ }},
+ {'PWNDBG · 5. Быстрый анализ', {
+  {'context / ctx', 'Сводка текущего состояния'}, {'telescope $rsp 16', 'Разыменовать указатели стека'},
+  {'vmmap', 'Карта памяти процесса'}, {'nearpc', 'Инструкции около текущего PC'},
+  {'search -t string ТЕКСТ', 'Найти строку в памяти'}, {'checksec', 'Защитные свойства бинарника'},
+ }},
+ {'GDB · 6. Справка', {
+  {'help КОМАНДА', 'Синтаксис команды'}, {'apropos СЛОВО', 'Найти команду по описанию'},
+  {'pwndbg ФИЛЬТР', 'Найти команду pwndbg'},
+ }},
+}
+sheets.recli = {
+ {'RE CLI · 1. Первичный осмотр', {
+  {'file ФАЙЛ', 'Определить формат'}, {'sha256sum ФАЙЛ', 'Вычислить SHA-256'},
+  {'strings -a -n 6 ФАЙЛ', 'ASCII-строки от 6 символов'}, {'xxd -g 1 -l 256 ФАЙЛ', 'Первые 256 байт'},
+ }},
+ {'RE CLI · 2. ELF', {
+  {'readelf -h ФАЙЛ', 'Заголовок и архитектура'}, {'readelf -SW ФАЙЛ', 'Секции'},
+  {'readelf -lW ФАЙЛ', 'Сегменты и права'}, {'readelf -sW ФАЙЛ', 'Таблицы символов'},
+  {'readelf -dW ФАЙЛ', 'Зависимости и dynamic'}, {'readelf -rW ФАЙЛ', 'Релокации'},
+ }},
+ {'RE CLI · 3. Дизассемблирование', {
+  {'objdump -d -M intel ФАЙЛ', 'Код · синтаксис Intel для x86'}, {'objdump -s -j .rodata ФАЙЛ', 'Байты секции .rodata'},
+  {'nm -an ФАЙЛ', 'Символы по адресам, если сохранены'},
+ }},
+ {'RADARE2 · 4. Навигация', {
+  {'r2 -A ФАЙЛ', 'Открыть и выполнить статический анализ'}, {'afl', 'Список функций'},
+  {'s sym.main / s АДРЕС', 'Перейти к функции / адресу'}, {'pdf', 'Дизассемблировать функцию'},
+  {'px 64', '64 байта от текущего смещения'}, {'izz', 'Строки во всём файле'},
+ }},
+ {'RADARE2 · 5. Связи и помощь', {
+  {'axt @ АДРЕС', 'Входящие ссылки на адрес'}, {'agf', 'Граф текущей функции'},
+  {'V / VV', 'Визуальный режим / граф'}, {'КОМАНДА?', 'Справка: pdf? / afl? / px?'},
+  {'q', 'Выйти из текущего режима / r2'},
+ }},
+ {'СВОИ · 6. Дополнение', {
+  {'workstation-files kind ФАЙЛ', 'Формат + SHA-256 + расширение'}, {'workstation-files bindiff A B', 'Разница байт, строк и ELF-секций'},
+  {'workstation-files carve ФАЙЛ', 'Кандидаты встроенных объектов'},
+ }},
+}
+sheets.ghidra = {
+ {'GHIDRA · 1. Код и данные', {
+  {'C / U', 'Дизассемблировать / убрать разметку'}, {'P / Alt+P', 'Создать / изменить функцию'},
+  {'D', 'Данные: byte → word → dword → qword'}, {'A', 'Данные: char → string → unicode'},
+  {'O', 'Создать указатель'}, {'Ctrl+Alt+A', 'Патч: Assemble'},
+ }},
+ {'GHIDRA · 2. Имена и типы', {
+  {'N', 'Переименовать символ под курсором'}, {'Y', 'Тип в декомпиляторе'},
+  {';', 'Комментарий'}, {'Ctrl+Shift+L', 'Метка операнда'},
+  {'Ctrl+Z / Ctrl+Shift+Z', 'Отменить / повторить изменение'},
+ }},
+ {'GHIDRA · 3. Навигация', {
+  {'G', 'Перейти к адресу / метке'}, {'X', 'Ссылки на символ под курсором'},
+  {'Alt+← / Alt+→', 'Назад / вперёд по истории'}, {'Ctrl+F6', 'Предыдущая активная панель'},
+  {'Ctrl+Shift+F6', 'Предыдущая активная программа'},
+ }},
+ {'GHIDRA · 4. Декомпилятор и граф', {
+  {'F5', 'Открыть декомпилятор'}, {'Ctrl+F5', 'Обновить декомпиляцию'},
+  {'Space', 'Listing ↔ Function Graph'}, {'Ctrl+Space', 'Раскрыть данные / переменные в Listing'},
+  {'Shift+A', 'Автоанализ'},
+ }},
+ {'GHIDRA · 5. Поиск', {
+  {'Alt+T', 'Поиск текста'}, {'Alt+F3', 'Повторить поиск текста'},
+  {'Alt+B', 'Поиск байтов в памяти'}, {'F3 / Shift+F3', 'Поиск памяти: вперёд / назад'},
+  {'Shift+F12', 'Defined Strings'},
+ }},
+ {'GHIDRA · 6. Файлы', {
+  {'I / Ctrl+I', 'Импорт файла / открыть файловую систему'}, {'Ctrl+S', 'Сохранить программу'},
+  {'Ctrl+Shift+O', 'Экспортировать программу'}, {'Win+F8', 'Эта справка · профиль Linux / IDA'},
+ }},
+}
+local function instance(name,data)
  if M.instances[name] then return M.instances[name] end
- local data=assert(sheets[name],'Unknown cheat sheet: '..tostring(name))
- local widget=popup.widget.new({width=1280,height=620,font='JetBrainsMono Nerd Font 11',
-  description_font='JetBrainsMono Nerd Font 11',group_margin=20,merge_duplicates=false,
+ data=data or assert(sheets[name],'Unknown cheat sheet: '..tostring(name))
+ local dense=name=='otter' or name=='scripts'
+ local widget=popup.widget.new({width=name=='scripts' and 1480 or 1280,height=name=='otter' and 800 or 620,font=dense and 'JetBrainsMono Nerd Font 10.5' or 'JetBrainsMono Nerd Font 11',
+  description_font=dense and 'JetBrainsMono Nerd Font 10.5' or 'JetBrainsMono Nerd Font 11',group_margin=20,merge_duplicates=false,
   bg='#080D10',fg='#C5D6D8',border_color='#0ABAB5',border_width=1,
   modifiers_fg='#0ABAB5',label_bg='#0ABAB5',label_fg='#080D10'})
  -- App sheets contain only curated rows, independent of global bindings/client class.
@@ -125,6 +216,18 @@ local function instance(name)
  return widget
 end
 function M.show(name)
+ if name=='otter' or name=='scripts' then
+  awful.spawn.easy_async({os.getenv('HOME')..'/.local/bin/cheat-data',name},function(out,err,_,code)
+   local data=require('dkjson').decode(out)
+   if code~=0 or not data then
+    require('naughty').notify({title='Справочник',text='Не удалось прочитать данные: '..err})
+    return
+   end
+   M.instances[name]=nil
+   instance(name,data):show_help(nil,awful.screen.focused(),{show_awesome_keys=false})
+  end)
+  return
+ end
  return instance(name):show_help(nil,awful.screen.focused(),{show_awesome_keys=false})
 end
 return M
