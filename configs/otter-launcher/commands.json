@@ -323,5 +323,10 @@
     "command": "exec \"$HOME/.local/bin/workstation-away\" --apply",
     "url_encoded": false,
     "raw_argument": false
+  },
+  "fan": {
+    "command": "exec \"$HOME/.local/bin/fan-toggle\"",
+    "url_encoded": false,
+    "raw_argument": false
   }
 }

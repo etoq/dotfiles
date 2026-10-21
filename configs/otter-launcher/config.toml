@@ -53,6 +53,12 @@ move_interface_down  = 10 # ═════════════════�
 
 
 [[modules]]
+description = "Вентилятор · тихий / обычный"
+prefix = "fan"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module fan"
+unbind_proc = false
+
+[[modules]]
 description = "Приложения · выбрать"
 prefix = "app"
 cmd = 'exec "$HOME/.local/bin/otter-apps"'
