@@ -330,7 +330,7 @@
     "raw_argument": false
   },
   "checkupd": {
-    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" post-update --ui",
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" post-update --admin --ui",
     "url_encoded": false,
     "raw_argument": false
   },

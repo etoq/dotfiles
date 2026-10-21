@@ -51,7 +51,15 @@ def native(command, *args, timeout=1800):
     return json.loads(checked([NATIVE, command, *args], timeout))
 
 
-def kernel_checks():
+def authorize_admin():
+    """Authenticate on this terminal; only protected read commands use sudo."""
+    if os.geteuid() != 0:
+        print('Для полной проверки initramfs нужны права администратора.', flush=True)
+        if sp.run(['/usr/bin/sudo', '-v']).returncode != 0:
+            raise RuntimeError('Проверка отменена: права администратора не получены.')
+
+
+def kernel_checks(admin=False):
     checks = []
     package_files = capture(['pacman', '-Qql', 'linux', 'linux-lts'])
     if not package_files['ok']:
@@ -83,10 +91,11 @@ def kernel_checks():
         image = Path('/boot') / f'initramfs-{base}.img'
         if not image.exists():
             checks.append({'name': str(image), 'status': 'attention', 'output': 'Образ отсутствует.'})
-        elif not os.access(image, os.R_OK):
+        elif not admin and not os.access(image, os.R_OK):
             checks.append({'name': str(image), 'status': 'unverified', 'output': 'Для чтения образа нужны права администратора; наличие файла проверено.'})
         else:
-            contents = capture(['lsinitcpio', image], 90)
+            command = ['/usr/bin/sudo', '-n', '--', '/usr/bin/lsinitcpio', image] if admin and os.geteuid() != 0 else ['lsinitcpio', image]
+            contents = capture(command, 90)
             matches = contents['ok'] and '/modules/' + version + '/' in contents['output']
             checks.append({'name': str(image), 'status': 'ok' if matches else 'attention',
                            'output': 'Модули в образе соответствуют ядру.' if matches else contents['error'] or 'Версия модулей в образе не совпала.'})
@@ -98,14 +107,14 @@ def kernel_checks():
     return checks
 
 
-def post_update():
+def post_update(admin=False):
     checks = []
     def add(name, result, empty_ok=False):
         status = 'ok' if result['ok'] else ('attention' if 'ERROR:' in result.get('error', '') and 'Permission denied' not in result.get('error', '') else 'unverified')
         if empty_ok and result['ok'] and result['output']:
             status = 'attention'
         checks.append({'name': name, 'status': status, **result})
-    checks.extend(kernel_checks())
+    checks.extend(kernel_checks(admin=admin))
     add('База пакетов', capture(['pacman', '-Dk'], 45))
     add('Упавшие системные службы', capture(['systemctl', '--failed', '--plain', '--no-legend', '--no-pager']), True)
     add('Упавшие пользовательские службы', capture(['systemctl', '--user', '--failed', '--plain', '--no-legend', '--no-pager']), True)
@@ -134,7 +143,9 @@ def post_update():
     if not (Path('/usr/lib/modules') / kernel).is_dir():
         checks.append({'name': 'Работающее ядро', 'status': 'attention', 'output': kernel + ': каталог модулей отсутствует; после обновления нужна перезагрузка'})
     return {'time': dt.datetime.now().astimezone().isoformat(), 'kernel': kernel, 'checks': checks,
-            'note': 'Только проверка. unverified означает неполную проверку, а не подтверждённую неисправность; права автоматически не повышаются.'}
+            'note': 'Только проверка. unverified означает неполную проверку, а не подтверждённую неисправность. ' +
+                    ('Для чтения защищённых initramfs используется sudo; интерфейс и отчёты работают от пользователя.' if admin else
+                     'Для полной проверки initramfs используй --admin.')}
 
 
 def collect_errors(minutes=10):
@@ -437,7 +448,7 @@ def run_ui(args):
         return
     if action == 'post-update':
         print('Проверяю ядра, драйвер, initramfs, EFI и службы…', flush=True)
-        present(ui, action, post_update())
+        present(ui, action, post_update(admin=args.admin))
         return
     if action == 'errors':
         minutes = args.minutes
@@ -499,11 +510,16 @@ def main():
     parser.add_argument('paths', nargs='*')
     parser.add_argument('--ui', action='store_true')
     parser.add_argument('--minutes', type=int)
+    parser.add_argument('--admin', action='store_true', help='Запросить sudo для чтения initramfs; только post-update')
     args = parser.parse_args()
+    if args.admin:
+        if args.action != 'post-update':
+            parser.error('--admin доступен только для post-update')
+        authorize_admin()
     if args.ui:
         run_ui(args)
     elif args.action == 'post-update':
-        print(json.dumps(post_update(), ensure_ascii=False, indent=2))
+        print(json.dumps(post_update(admin=args.admin), ensure_ascii=False, indent=2))
     elif args.action == 'errors':
         print(json.dumps(collect_errors(args.minutes if args.minutes is not None else 10), ensure_ascii=False, indent=2))
     elif args.action == 'vms':

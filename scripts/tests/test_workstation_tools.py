@@ -50,6 +50,28 @@ class VmPolicy(unittest.TestCase):
 
 
 class ReportsAndTrash(unittest.TestCase):
+    def test_denied_admin_authentication_cancels_check(self):
+        with patch.object(tools.os, 'geteuid', return_value=1000), patch.object(tools.sp, 'run') as run:
+            run.return_value.returncode = 1
+            with self.assertRaisesRegex(RuntimeError, 'права администратора не получены'):
+                tools.authorize_admin()
+            run.assert_called_once_with(['/usr/bin/sudo', '-v'])
+
+    def test_admin_read_only_elevates_initramfs_reader(self):
+        def capture(args, timeout=30):
+            program = str(args[0])
+            output = {'pacman': '/usr/lib/modules/TEST/pkgbase', 'dkms': 'nvidia/580, TEST, x86_64: installed',
+                      'modinfo': 'TEST SMP', '/usr/bin/sudo': 'usr/lib/modules/TEST/kernel/nvidia.ko'}.get(program, '')
+            return {'ok': True, 'code': 0, 'output': output, 'error': ''}
+        with patch.object(tools, 'capture', side_effect=capture) as run, patch.object(Path, 'read_text', return_value='linux-lts'), \
+             patch.object(Path, 'exists', return_value=True), patch.object(tools.os, 'access', return_value=False), \
+             patch.object(tools.os, 'geteuid', return_value=1000), patch.object(tools.os, 'uname') as uname:
+            uname.return_value.release = 'TEST'
+            checks = tools.kernel_checks(admin=True)
+        self.assertEqual(checks[1]['status'], 'ok')
+        privileged = [c.args[0] for c in run.call_args_list if c.args[0][0] == '/usr/bin/sudo']
+        self.assertEqual(privileged, [['/usr/bin/sudo', '-n', '--', '/usr/bin/lsinitcpio', Path('/boot/initramfs-linux-lts.img')]])
+
     def test_kernel_check_uses_package_files_and_marks_unreadable_image_unknown(self):
         def capture(args, timeout=30):
             program = str(args[0])

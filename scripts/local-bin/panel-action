@@ -15,7 +15,7 @@ def music(command):
 def term(*args): launch(['kitty','--class','panel-tool','-e',*args])
 tools={'calc','ocr','hex','info','cc','timer','recent','ports','kill'}
 if action in tools: term(str(H/'.local/bin/otter-tools'),action)
-elif action=='launcher': launch(['kitty','--class','otter','--override','window_padding_width=22.5 12.75 7.5 17.25','--override','background=#101B20','--override','foreground=#C5D6D8','-e',str(H/'.local/bin/otter-launcher')])
+elif action=='launcher': launch(['kitty','--class','otter','--override','remember_window_size=no','--override','initial_window_width=500','--override','initial_window_height=420','--override','window_padding_width=22.5 12.75 7.5 17.25','--override','background=#101B20','--override','foreground=#C5D6D8','-e',str(H/'.local/bin/otter-launcher')])
 elif action=='monitor': launch(['kitty','--class','panel-monitor','--start-as=fullscreen','-e','btop'])
 elif action=='network': term('nmtui')
 elif action=='vpn': launch(['throne'])

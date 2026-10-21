@@ -17,7 +17,7 @@ super + w
 # Alt+Shift is handled directly by XKB (US/RU).
 
 super + d
-    kitty --class otter --override "window_padding_width=22.5 12.75 7.5 17.25" --override background=#101B20 --override foreground=#C5D6D8 -e bash -c '/home/eto/.local/bin/otter-launcher; sleep 0.1'
+    ~/.local/bin/panel-action launcher
 
 super + shift + l
     betterlockscreen -l dimblur
