@@ -1,11 +1,11 @@
 [Unit]
-Description=Local work/rest activity tracker (no key contents recorded)
+Description=Work/rest countdown timers with elapsed-time analytics
 PartOf=graphical-session.target
 ConditionEnvironment=DISPLAY
 
 [Service]
 Type=exec
-ExecStart=%h/.local/bin/study daemon --idle-seconds 300
+ExecStart=%h/.local/bin/study daemon
 Restart=on-failure
 RestartSec=5
 UMask=0077

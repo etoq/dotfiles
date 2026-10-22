@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""Local work/rest activity accounting and an independent console countdown."""
+"""Work/rest countdowns with elapsed-time analytics; no input monitoring."""
 import argparse
 import contextlib
 import curses
 import datetime as dt
 import fcntl
-import importlib.machinery
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -18,143 +16,148 @@ import sys
 import time
 
 STATE = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'study'
-LABELS = {'work': 'Работа', 'rest': 'Отдых', 'off': 'Пауза'}
-POLL = 5
+LABELS = {'work': 'Работа', 'rest': 'Отдых', 'none': 'Без аналитики'}
+BOOT = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
 
 
 def database():
     os.umask(0o077)
     STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     db = sqlite3.connect(STATE / 'activity.sqlite3', timeout=5)
+    db.row_factory = sqlite3.Row
     db.execute('PRAGMA journal_mode=WAL')
-    db.executescript('''
-        CREATE TABLE IF NOT EXISTS intervals (
-          id INTEGER PRIMARY KEY, start REAL NOT NULL, end REAL NOT NULL,
-          kind TEXT NOT NULL CHECK(kind IN ('work','rest')), CHECK(end>start));
-        CREATE INDEX IF NOT EXISTS interval_end ON intervals(end);
-        CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-        INSERT OR IGNORE INTO state VALUES ('mode','off');
-    ''')
+    # The old activity intervals/state are preserved, but excluded from timer reports.
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS timer_runs (
+          id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('work','rest','none')),
+          duration REAL NOT NULL CHECK(duration>0), elapsed REAL NOT NULL DEFAULT 0,
+          status TEXT NOT NULL, wall REAL NOT NULL, mono REAL NOT NULL,
+          boot TEXT NOT NULL, notified INTEGER NOT NULL DEFAULT 0);
+        CREATE UNIQUE INDEX IF NOT EXISTS one_active_timer ON timer_runs((1))
+          WHERE status IN ('running','paused');
+        CREATE TABLE IF NOT EXISTS timer_intervals (
+          id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL, start REAL NOT NULL,
+          end REAL NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('work','rest')), CHECK(end>start));
+        CREATE INDEX IF NOT EXISTS timer_interval_end ON timer_intervals(end);
+    """)
     return db
 
 
-def value(db, key, default=''):
-    row = db.execute('SELECT value FROM state WHERE key=?', (key,)).fetchone()
-    return row[0] if row else default
+def current_timer(db):
+    row = db.execute("SELECT * FROM timer_runs WHERE status IN ('running','paused')").fetchone()
+    return dict(row) if row else None
 
 
-def put(db, key, item):
-    db.execute('INSERT OR REPLACE INTO state VALUES (?,?)', (key, str(item)))
-
-
-def set_mode(db, mode):
-    with db:
-        put(db, 'mode', mode)
-
-
-def record(db, start, end, kind):
-    if kind not in ('work', 'rest') or end <= start:
+def record(db, run, start, end):
+    if run['kind'] == 'none' or end <= start:
         return
-    last = db.execute('SELECT id,end,kind FROM intervals ORDER BY id DESC LIMIT 1').fetchone()
-    if last and last[2] == kind and abs(last[1] - start) < .001:
-        db.execute('UPDATE intervals SET end=? WHERE id=?', (end, last[0]))
+    last = db.execute('SELECT id,end FROM timer_intervals WHERE run_id=? ORDER BY id DESC LIMIT 1',
+                      (run['id'],)).fetchone()
+    if last and abs(last['end']-start) < .01:
+        db.execute('UPDATE timer_intervals SET end=? WHERE id=?', (end, last['id']))
     else:
-        db.execute('INSERT INTO intervals(start,end,kind) VALUES (?,?,?)', (start, end, kind))
+        db.execute('INSERT INTO timer_intervals(run_id,start,end,kind) VALUES (?,?,?,?)',
+                   (run['id'], start, end, run['kind']))
 
 
-def sample(db, previous, current, idle_seconds):
-    """Credit only observed, unlocked intervals; never infer time across sleep."""
-    wall, mono, boot, activity, unlocked, mode = current
-    old_wall, old_mono, old_boot, _, old_unlocked, old_mode = previous
-    elapsed = wall - old_wall
-    safe = (0 < elapsed <= POLL * 3 and abs(elapsed - (mono-old_mono)) < 1
-            and abs(elapsed - (boot-old_boot)) < 1)
-    if (safe and unlocked and old_unlocked and mode == old_mode
-            and activity is not None):
-        # Map the monotonic idle deadline onto this wall-clock sample.
-        deadline = wall - max(0, mono - activity - idle_seconds)
-        record(db, old_wall, min(wall, deadline), mode)
-    return safe
+def advance(db, wall=None, mono=None, boot=None):
+    """Called inside an immediate transaction, so UI and worker cannot double count."""
+    wall = time.time() if wall is None else wall
+    mono = time.monotonic() if mono is None else mono
+    boot = BOOT if boot is None else boot
+    run = current_timer(db)
+    if not run:
+        return
+    if run['boot'] != boot or mono < run['mono']:
+        db.execute("UPDATE timer_runs SET status='interrupted' WHERE id=?", (run['id'],))
+        return
+    if run['status'] == 'paused':
+        return
+    delta = mono-run['mono']
+    amount = min(delta, max(0, run['duration']-run['elapsed']))
+    # Monotonic time excludes suspend and ignores wall-clock adjustments.
+    start = wall-delta
+    record(db, run, start, start+amount)
+    elapsed = min(run['duration'], run['elapsed']+amount)
+    status = 'done' if elapsed >= run['duration'] else 'running'
+    db.execute('UPDATE timer_runs SET elapsed=?,status=?,wall=?,mono=? WHERE id=?',
+               (elapsed, status, wall, mono, run['id']))
 
 
-def idle_module():
-    path = Path(__file__).resolve().with_name('idle-screen-lock')
-    loader = importlib.machinery.SourceFileLoader('study_idle_input', str(path))
-    spec = importlib.util.spec_from_loader(loader.name, loader)
-    module = importlib.util.module_from_spec(spec)
-    loader.exec_module(module)
-    return module
+@contextlib.contextmanager
+def transaction(db):
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        yield
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
 
 
-def unlocked_session(session):
-    result = sp.run(['loginctl', 'show-session', session, '-p', 'Active', '-p', 'LockedHint'],
-                    text=True, capture_output=True, timeout=2)
-    props = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
-    if result.returncode or props.get('Active') != 'yes' or props.get('LockedHint') != 'no':
-        return False
-    # Manual betterlockscreen does not always set logind's LockedHint.
-    return sp.run(['pgrep', '-u', str(os.getuid()), '-x', 'i3lock'],
-                  stdout=sp.DEVNULL, timeout=2).returncode == 1
+def start_timer(db, kind, seconds, wall=None, mono=None, boot=None):
+    if kind not in LABELS or not 1 <= seconds <= 7*86400:
+        raise ValueError('Выбери тип и длительность таймера от секунды до 7 дней.')
+    wall = time.time() if wall is None else wall
+    mono = time.monotonic() if mono is None else mono
+    boot = BOOT if boot is None else boot
+    with transaction(db):
+        advance(db, wall, mono, boot)
+        if current_timer(db):
+            raise RuntimeError('Таймер уже запущен. Сначала заверши или отмени его клавишей C.')
+        db.execute("INSERT INTO timer_runs(kind,duration,status,wall,mono,boot) VALUES (?,?,'running',?,?,?)",
+                   (kind, seconds, wall, mono, boot))
 
 
-def daemon(db, idle_seconds):
-    module = idle_module()
-    session = module.graphical_session()
+def control(db, action, wall=None, mono=None, boot=None):
+    wall = time.time() if wall is None else wall
+    mono = time.monotonic() if mono is None else mono
+    boot = BOOT if boot is None else boot
+    with transaction(db):
+        advance(db, wall, mono, boot)
+        run = current_timer(db)
+        if not run:
+            return
+        state = {'pause': 'paused', 'resume': 'running', 'cancel': 'cancelled',
+                 'interrupt': 'interrupted'}[action]
+        db.execute('UPDATE timer_runs SET status=?,wall=?,mono=? WHERE id=?',
+                   (state, wall, mono, run['id']))
+
+
+def notify_timer(kind):
+    with contextlib.suppress(OSError):
+        sp.Popen(['notify-send', '-a', 'Study', 'Таймер завершён', LABELS[kind] + ' · время вышло.'],
+                 stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+
+
+def daemon(db):
     with (STATE / 'daemon.lock').open('w') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RuntimeError('Трекер уже запущен.')
-        session_key = Path('/proc/sys/kernel/random/boot_id').read_text().strip() + ':' + session
-        with db:
-            if value(db, 'session') != session_key:
-                put(db, 'mode', 'off')
-            put(db, 'session', session_key)
-        events = module.RawInput()
+            raise RuntimeError('Служба таймера уже запущена.')
         running = True
-
         def finish(*_):
             nonlocal running
             running = False
-
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, finish)
-        last_activity, previous = None, None
-        next_sample = time.monotonic()
-        print(f'Activity tracker ready; idle cutoff {idle_seconds}s; no key contents recorded.', flush=True)
+        print('Countdown worker ready; no keyboard/mouse monitoring.', flush=True)
         try:
             while running:
-                if events.wait(min(.25, max(0, next_sample-time.monotonic()))):
-                    last_activity = time.monotonic()
-                mono = time.monotonic()
-                if mono < next_sample:
-                    continue
-                wall = time.time()
-                boot = time.clock_gettime(time.CLOCK_BOOTTIME)
-                try:
-                    unlocked = unlocked_session(session)
-                except (OSError, sp.SubprocessError):
-                    unlocked = False
-                mode = value(db, 'mode', 'off')
-                current = (wall, mono, boot, last_activity, unlocked, mode)
-                with db:
-                    safe = sample(db, previous, current, idle_seconds) if previous else True
-                    if not safe or not unlocked:
-                        last_activity = None
-                        current = (wall, mono, boot, None, unlocked, mode)
-                    active = (safe and unlocked and last_activity is not None
-                              and mono-last_activity < idle_seconds and mode != 'off')
-                    reason = ('пауза' if mode == 'off' else 'экран заблокирован / сеанс неактивен'
-                              if not unlocked else 'нет активности' if not active else 'идёт учёт')
-                    put(db, 'heartbeat', wall)
-                    put(db, 'status', reason)
-                    put(db, 'idle_seconds', idle_seconds)
-                previous = current
-                next_sample = time.monotonic() + POLL
+                with transaction(db):
+                    advance(db)
+                    notifications = db.execute("SELECT id,kind FROM timer_runs WHERE status='done' AND notified=0").fetchall()
+                    db.execute("UPDATE timer_runs SET notified=1 WHERE status='done' AND notified=0")
+                for row in notifications:
+                    notify_timer(row['kind'])
+                time.sleep(.5)
         finally:
-            events.close()
-            with db:
-                put(db, 'heartbeat', 0)
+            control(db, 'interrupt')
+
+
+def ensure_service():
+    sp.run(['systemctl', '--user', 'start', 'study.service'], check=True, timeout=8)
 
 
 def daily_totals(db, now=None):
@@ -166,7 +169,7 @@ def daily_totals(db, now=None):
     boundaries = [(day, dt.datetime.combine(day, dt.time()).timestamp(),
                    dt.datetime.combine(day+dt.timedelta(days=1), dt.time()).timestamp())
                   for day in totals]
-    for start, end, kind in db.execute('SELECT start,end,kind FROM intervals WHERE end>? AND start<?',
+    for start, end, kind in db.execute('SELECT start,end,kind FROM timer_intervals WHERE end>? AND start<?',
                                      (boundaries[0][1], now)):
         for day, low, high in boundaries:
             totals[day][kind] += max(0, min(end, high, now)-max(start, low))
@@ -183,14 +186,7 @@ def report(db, period='all', now=None):
                         for kind in ('work', 'rest')}
     start = periods.get(period, today-dt.timedelta(days=29))
     rows = [{'date': day.isoformat(), **row} for day, row in totals.items() if day >= start]
-    return {'mode': value(db, 'mode', 'off'), 'summary_seconds': summary, 'days': rows,
-            'status': tracker_status(db)}
-
-
-def tracker_status(db):
-    if time.time()-float(value(db, 'heartbeat', '0')) > 20:
-        return 'трекер не запущен'
-    return value(db, 'status', 'ожидание')
+    return {'summary_seconds': summary, 'days': rows, 'timer': current_timer(db)}
 
 
 def hours(seconds):
@@ -199,8 +195,7 @@ def hours(seconds):
 
 def report_lines(db, period='all'):
     data = report(db, period)
-    rows = ['ВРЕМЯ', '',
-            f'Режим: {LABELS[data["mode"]]} · {data["status"]}', '',
+    rows = ['СТАТИСТИКА', '',
             f'{"Период":18} {"Работа":>12} {"Отдых":>12}']
     for key, label in [('day', 'Сегодня'), ('week', 'Последние 7 дней'),
                        ('month', 'Текущий месяц'), ('30', 'Последние 30 дней')]:
@@ -223,13 +218,12 @@ def duration(text):
     return seconds
 
 
-def notify_timer():
-    with contextlib.suppress(OSError):
-        sp.Popen(['notify-send', '-a', 'Study', 'Таймер завершён', 'Время вышло.'],
-                 stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+def clock(seconds):
+    seconds = max(0, int(seconds+.999))
+    return f'{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}'
 
 
-def dashboard(screen, db, countdown=None):
+def dashboard(screen, db, initial_kind=None, initial_seconds=None):
     with contextlib.suppress(curses.error):
         curses.curs_set(0)
     screen.timeout(250)
@@ -237,27 +231,58 @@ def dashboard(screen, db, countdown=None):
         curses.start_color()
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_CYAN, -1)
-    page, offset, deadline, message = 'day', 0, None, ''
-    if countdown:
-        set_mode(db, 'off')
-        deadline = time.time()+countdown
+    page, offset, message = 'day', 0, ''
+
+    def prompt(kind):
+        if current_timer(db):
+            raise RuntimeError('Таймер уже идёт. Сначала заверши или отмени его клавишей C.')
+        screen.timeout(-1)
+        screen.erase()
+        with contextlib.suppress(curses.error):
+            screen.addstr(1, 1, LABELS[kind] + ' · новый таймер')
+            screen.addstr(3, 1, 'Длительность: минуты, 25m, 90s, 1h')
+            screen.addstr(5, 1, '> ')
+            screen.refresh()
+            curses.curs_set(1)
+        curses.echo()
+        try:
+            text = screen.getstr(30).decode().strip()
+            if not text:
+                return
+            seconds = duration(text)
+            ensure_service()
+            start_timer(db, kind, seconds)
+        finally:
+            curses.noecho()
+            with contextlib.suppress(curses.error):
+                curses.curs_set(0)
+            screen.timeout(250)
+
+    if initial_kind:
+        if initial_seconds is not None:
+            ensure_service()
+            start_timer(db, initial_kind, initial_seconds)
+        else:
+            try:
+                prompt(initial_kind)
+            except (ValueError, RuntimeError, sp.SubprocessError) as error:
+                message = str(error)
     while True:
         screen.erase()
         height, width = screen.getmaxyx()
-        if deadline is not None:
-            remaining = max(0, int(deadline-time.time()+.999))
-            if not remaining:
-                notify_timer()
-                deadline, message = None, 'Таймер завершён. Учёт остаётся на паузе.'
-            lines = ['ТАЙМЕР', '',
-                     f'{remaining//3600:02}:{remaining//60%60:02}:{remaining%60:02}', '',
-                     'Без аналитики. Q — отменить и выйти.',
-                     '1 — работа · 2 — отдых · пробел — пауза']
+        run = current_timer(db)
+        if run:
+            paused = ' · ПАУЗА' if run['status']=='paused' else ''
+            lines = ['ТАЙМЕР · ' + LABELS[run['kind']] + paused, '',
+                     clock(run['duration']-run['elapsed']),
+                     f'Прошло {clock(run["elapsed"])} из {clock(run["duration"])}', '']
         else:
-            lines = report_lines(db, page)
-        footer = ['1 работа · 2 отдых · 3 таймер · пробел пауза',
+            lines = ['ТАЙМЕР', '1 работа · 2 отдых · 3 без аналитики',
+                     'Выбери тип и задай длительность.', '']
+        lines += report_lines(db, page)
+        footer = ['1/2/3 новый таймер · пробел пауза/продолжить · C отменить',
                   'D день · W 7 дней · M месяц · A 30 дней · ↑↓ прокрутка',
-                  'Q закрыть окно (учёт продолжится, если выбран режим)', message]
+                  'Q закрыть окно — таймер продолжится в фоне', message]
         room = max(1, height-len(footer)-1)
         offset = min(offset, max(0, len(lines)-room))
         for row, line in enumerate(lines[offset:offset+room]):
@@ -274,73 +299,69 @@ def dashboard(screen, db, countdown=None):
             continue
         if isinstance(key, str):
             key = key.lower()
-            key = ord({'в': 'd', 'ц': 'w', 'ь': 'm', 'ф': 'a', 'й': 'q'}.get(key, key))
-        if key in (ord('q'), ord('Q'), 27):
+            key = ord({'в': 'd', 'ц': 'w', 'ь': 'm', 'ф': 'a', 'й': 'q', 'с': 'c'}.get(key, key))
+        if key in (ord('q'), 27):
             return
-        if key in (ord('1'), ord('2'), ord(' ')):
-            set_mode(db, {ord('1'): 'work', ord('2'): 'rest', ord(' '): 'off'}[key])
-            deadline = None
-            message = 'Режим изменён; данные обновляются каждые 5 секунд.'
-        elif key == ord('3'):
-            screen.timeout(-1)
-            with contextlib.suppress(curses.error):
-                screen.move(max(0, height-1), 0)
-                screen.clrtoeol()
-                screen.addnstr('Минуты или 25m / 1h: ', max(1, width-1))
-            curses.echo()
-            try:
-                text = screen.getstr(30).decode().strip()
-                seconds = duration(text)
-                set_mode(db, 'off')
-                deadline, offset = time.time()+seconds, 0
-            except (ValueError, curses.error, UnicodeError) as error:
-                message = str(error)
-            finally:
-                curses.noecho()
-                screen.timeout(250)
-        elif key in (ord('d'), ord('w'), ord('m'), ord('a')):
-            page = {ord('d'): 'day', ord('w'): 'week', ord('m'): 'month', ord('a'): '30'}[key]
-            offset = 0
-        elif key == curses.KEY_DOWN:
-            offset += 1
-        elif key == curses.KEY_UP:
-            offset = max(0, offset-1)
+        try:
+            if key in (ord('1'), ord('2'), ord('3')):
+                prompt({ord('1'): 'work', ord('2'): 'rest', ord('3'): 'none'}[key])
+                offset, message = 0, ''
+            elif key == ord(' '):
+                if run:
+                    control(db, 'resume' if run['status']=='paused' else 'pause')
+            elif key == ord('c'):
+                control(db, 'cancel')
+                message = 'Таймер отменён. Сохранено только прошедшее время работы/отдыха.'
+            elif key in (ord('d'), ord('w'), ord('m'), ord('a')):
+                page = {ord('d'): 'day', ord('w'): 'week', ord('m'): 'month', ord('a'): '30'}[key]
+                offset = 0
+            elif key == curses.KEY_DOWN:
+                offset += 1
+            elif key == curses.KEY_UP:
+                offset = max(0, offset-1)
+        except (ValueError, RuntimeError, sp.SubprocessError, curses.error, UnicodeError) as error:
+            message = str(error)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Работа / отдых с аналитикой; таймер без аналитики.')
+    parser = argparse.ArgumentParser(description='Таймеры работы, отдыха и без аналитики.')
     commands = parser.add_subparsers(dest='command')
-    daemon_parser = commands.add_parser('daemon', help='Фоновый сборщик активности')
-    daemon_parser.add_argument('--idle-seconds', type=int, default=300)
-    for name, help_text in [('work', 'Начать учёт работы'), ('rest', 'Начать учёт отдыха'),
-                            ('pause', 'Пауза учёта'), ('status', 'Текущее состояние')]:
-        commands.add_parser(name, help=help_text)
-    report_parser = commands.add_parser('report', help='Статистика в часах')
-    report_parser.add_argument('period', choices=['day', 'week', 'month', '30', 'all'], default='all', nargs='?')
-    report_parser.add_argument('--json', action='store_true')
-    timer_parser = commands.add_parser('timer', help='Отсчёт без аналитики; учёт ставится на паузу')
-    timer_parser.add_argument('duration', default='25m', nargs='?')
+    commands.add_parser('daemon', help='Фоновое выполнение только запущенных таймеров')
+    for name in ('work', 'rest', 'timer'):
+        cmd = commands.add_parser(name, help={'work': 'Таймер работы', 'rest': 'Таймер отдыха',
+                                              'timer': 'Таймер без аналитики'}[name])
+        cmd.add_argument('duration', nargs='?', help='Минуты или 25m / 90s / 1h')
+    for name in ('pause', 'resume', 'cancel', 'status'):
+        commands.add_parser(name)
+    cmd = commands.add_parser('report', help='Статистика таймеров в часах')
+    cmd.add_argument('period', choices=['day', 'week', 'month', '30', 'all'], default='all', nargs='?')
+    cmd.add_argument('--json', action='store_true')
     args = parser.parse_args()
     db = database()
     try:
         if args.command == 'daemon':
-            if not 30 <= args.idle_seconds <= 3600:
-                parser.error('--idle-seconds: от 30 до 3600')
-            daemon(db, args.idle_seconds)
-        elif args.command in ('work', 'rest', 'pause'):
-            mode = 'off' if args.command == 'pause' else args.command
-            set_mode(db, mode)
-            print(LABELS[mode] + ' · ' + tracker_status(db))
+            daemon(db)
+        elif args.command in ('pause', 'resume', 'cancel'):
+            control(db, args.command)
+            print('Готово.')
         elif args.command == 'status':
-            print(LABELS[value(db, 'mode', 'off')] + ' · ' + tracker_status(db))
+            run = current_timer(db)
+            print(f'{LABELS[run["kind"]]} · {clock(run["duration"]-run["elapsed"])} · {run["status"]}'
+                  if run else 'Нет запущенного таймера.')
         elif args.command == 'report':
             print(json.dumps(report(db, args.period), ensure_ascii=False, indent=2) if args.json
                   else '\n'.join(report_lines(db, args.period)))
-        elif args.command == 'timer':
-            seconds = duration(args.duration)
-            if not sys.stdin.isatty() or not sys.stdout.isatty():
-                raise RuntimeError('Откройте таймер в терминале: study timer 25m')
-            curses.wrapper(dashboard, db, seconds)
+        elif args.command in ('work', 'rest', 'timer'):
+            kind = 'none' if args.command == 'timer' else args.command
+            seconds = duration(args.duration) if args.duration else None
+            if sys.stdin.isatty() and sys.stdout.isatty():
+                curses.wrapper(dashboard, db, kind, seconds)
+            elif seconds is not None:
+                ensure_service()
+                start_timer(db, kind, seconds)
+                print(LABELS[kind] + ' · ' + clock(seconds))
+            else:
+                raise ValueError('Укажи длительность: study ' + args.command + ' 25m')
         elif sys.stdin.isatty() and sys.stdout.isatty():
             curses.wrapper(dashboard, db)
         else:
@@ -354,6 +375,6 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         pass
-    except (OSError, sqlite3.Error, RuntimeError, ValueError, curses.error) as error:
+    except (OSError, sqlite3.Error, RuntimeError, ValueError, curses.error, sp.SubprocessError) as error:
         print('Study:', error, file=sys.stderr)
         sys.exit(1)

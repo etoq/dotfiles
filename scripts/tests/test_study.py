@@ -1,4 +1,4 @@
-"""Accounting invariants; no real activity database, input or clock changes."""
+"""Countdown accounting with deterministic clocks and private databases."""
 import datetime as dt
 import importlib.machinery
 import importlib.util
@@ -14,7 +14,7 @@ study = importlib.util.module_from_spec(spec)
 loader.exec_module(study)
 
 
-class Accounting(unittest.TestCase):
+class Timers(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -25,92 +25,120 @@ class Accounting(unittest.TestCase):
         self.db = study.database()
         self.addCleanup(self.db.close)
 
-    def total(self):
-        return self.db.execute('SELECT coalesce(sum(end-start),0) FROM intervals').fetchone()[0]
+    def start(self, kind='work', seconds=60, wall=100, mono=50, boot='test'):
+        study.start_timer(self.db, kind, seconds, wall, mono, boot)
 
-    def test_work_and_rest_are_separate_and_merge_only_contiguous(self):
-        study.record(self.db, 100, 105, 'work')
-        study.record(self.db, 105, 110, 'work')
-        study.record(self.db, 110, 115, 'rest')
-        study.record(self.db, 120, 125, 'rest')
-        self.assertEqual(self.db.execute('SELECT start,end,kind FROM intervals').fetchall(),
-                         [(100, 110, 'work'), (110, 115, 'rest'), (120, 125, 'rest')])
+    def tick(self, wall, mono, boot='test'):
+        with study.transaction(self.db):
+            study.advance(self.db, wall, mono, boot)
 
-    def test_default_off_and_timer_mode_cannot_write_intervals(self):
-        self.assertEqual(study.value(self.db, 'mode'), 'off')
-        for kind in ('off', 'timer', 'unknown'):
-            study.record(self.db, 0, 50, kind)
+    def control(self, action, wall, mono):
+        study.control(self.db, action, wall, mono, 'test')
+
+    def total(self, kind='work'):
+        return self.db.execute('SELECT coalesce(sum(end-start),0) FROM timer_intervals WHERE kind=?',
+                               (kind,)).fetchone()[0]
+
+    def test_nothing_is_counted_until_timer_is_started(self):
+        self.assertIsNone(study.current_timer(self.db))
+        self.tick(90000, 90000)
         self.assertEqual(self.total(), 0)
 
-    def test_active_sample(self):
-        old = (100, 50, 50, 49, True, 'work')
-        now = (105, 55, 55, 54, True, 'work')
-        self.assertTrue(study.sample(self.db, old, now, 300))
+    def test_work_is_bounded_by_requested_duration(self):
+        self.start(seconds=60)
+        self.tick(130, 80)
+        self.assertEqual(self.total(), 30)
+        self.tick(1000, 950)
+        self.assertEqual(self.total(), 60)
+        self.assertIsNone(study.current_timer(self.db))
+        self.tick(2000, 1950)
+        self.assertEqual(self.total(), 60)
+
+    def test_pause_and_resume_exclude_pause_time(self):
+        self.start()
+        self.control('pause', 110, 60)
+        self.tick(210, 160)
+        self.assertEqual(self.total(), 10)
+        self.control('resume', 210, 160)
+        self.tick(225, 175)
+        self.assertEqual(self.total(), 25)
+
+    def test_cancel_credits_only_elapsed_time(self):
+        self.start(seconds=3600)
+        self.control('cancel', 120, 70)
+        self.tick(1000, 950)
+        self.assertEqual(self.total(), 20)
+        self.assertIsNone(study.current_timer(self.db))
+
+    def test_rest_and_untracked_timer(self):
+        self.start('rest', 10)
+        self.tick(110, 60)
+        self.start('none', 10, 110, 60)
+        self.tick(120, 70)
+        self.assertEqual(self.total('rest'), 10)
+        self.assertEqual(self.total('work'), 0)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM timer_runs').fetchone()[0], 2)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM timer_intervals').fetchone()[0], 1)
+
+    def test_only_one_timer_and_repeated_tick_never_double_count(self):
+        self.start()
+        with self.assertRaises(RuntimeError):
+            self.start('rest')
+        self.tick(110, 60)
+        self.tick(110, 60)
+        self.assertEqual(self.total(), 10)
+
+    def test_sleep_does_not_count_and_reboot_interrupts(self):
+        self.start()
+        self.tick(3710, 60)
+        self.assertEqual(self.total(), 10)
+        self.assertEqual(study.current_timer(self.db)['elapsed'], 10)
+        self.tick(3720, 2, boot='new-boot')
+        self.assertIsNone(study.current_timer(self.db))
+        self.assertEqual(self.total(), 10)
+
+    def test_clock_change_does_not_invent_time(self):
+        self.start()
+        self.tick(90000, 55)
         self.assertEqual(self.total(), 5)
 
-    def test_idle_cutoff_clips_interval(self):
-        old = (398, 348, 348, 50, True, 'rest')
-        now = (403, 353, 353, 50, True, 'rest')
-        study.sample(self.db, old, now, 300)
-        self.assertEqual(self.total(), 2)
-        study.sample(self.db, now, (408, 358, 358, 50, True, 'rest'), 300)
-        self.assertEqual(self.total(), 2)
-
-    def test_locked_inactive_pause_and_mode_switch_do_not_count(self):
-        old = (100, 50, 50, 49, True, 'work')
-        for unlocked, mode in [(False, 'work'), (True, 'off'), (True, 'rest')]:
-            study.sample(self.db, old, (105, 55, 55, 54, unlocked, mode), 300)
-        study.sample(self.db, (100, 50, 50, 49, False, 'work'),
-                     (105, 55, 55, 54, True, 'work'), 300)
-        self.assertEqual(self.total(), 0)
-
-    def test_no_input_no_credit(self):
-        study.sample(self.db, (100, 50, 50, None, True, 'work'),
-                     (105, 55, 55, None, True, 'work'), 300)
-        self.assertEqual(self.total(), 0)
-
-    def test_suspend_and_wall_clock_jumps_never_create_hours(self):
-        old = (100, 50, 50, 49, True, 'work')
-        for sample in [(3705, 55, 3655, 54, True, 'work'),
-                       (105, 55, 3655, 54, True, 'work'),
-                       (95, 55, 55, 54, True, 'work'),
-                       (110, 55, 55, 54, True, 'work')]:
-            self.assertFalse(study.sample(self.db, old, sample, 300))
-        self.assertEqual(self.total(), 0)
-
-    def test_report_splits_midnight_and_excludes_future(self):
+    def test_midnight_split(self):
         midnight = dt.datetime(2026, 10, 22).timestamp()
-        study.record(self.db, midnight-3600, midnight+3600, 'work')
+        self.start(seconds=7200, wall=midnight-3600)
+        self.tick(midnight+1800, 5450)
         data = study.report(self.db, 'week', midnight+1800)
         self.assertEqual(data['summary_seconds']['day']['work'], 1800)
         self.assertEqual(data['summary_seconds']['week']['work'], 5400)
 
-    def test_month_includes_day_one_on_31st_and_rolling_week_is_separate(self):
+    def test_month_and_rolling_periods(self):
         first = dt.datetime(2026, 10, 1).timestamp()
         now = dt.datetime(2026, 10, 31, 12).timestamp()
-        study.record(self.db, first, first+3600, 'rest')
-        study.record(self.db, now-7200, now-3600, 'work')
+        self.start('rest', 3600, first)
+        self.tick(first+3600, 3650)
+        self.start('work', 3600, now-3600, 3700)
+        self.tick(now, 7300)
         data = study.report(self.db, 'month', now)
         self.assertEqual(len(data['days']), 31)
         self.assertEqual(data['summary_seconds']['month'], {'work': 3600, 'rest': 3600})
         self.assertEqual(data['summary_seconds']['week'], {'work': 3600, 'rest': 0})
-        self.assertEqual(data['summary_seconds']['30'], {'work': 3600, 'rest': 0})
-        rolling = study.report(self.db, '30', now)
-        self.assertEqual(len(rolling['days']), 30)
-        self.assertEqual(rolling['summary_seconds']['month'], {'work': 3600, 'rest': 3600})
+        self.assertEqual(len(study.report(self.db, '30', now)['days']), 30)
 
-    def test_duration_validation_and_decimal_hours(self):
+    def test_old_activity_preserved_but_excluded(self):
+        with self.db:
+            self.db.execute('CREATE TABLE intervals(start REAL,end REAL,kind TEXT)')
+            now = dt.datetime(2026, 10, 22, 12).timestamp()
+            self.db.execute("INSERT INTO intervals VALUES (?,?,'work')", (now-1000, now))
+        self.assertEqual(study.report(self.db, 'day', now)['summary_seconds']['day']['work'], 0)
+        self.assertEqual(self.db.execute('SELECT end-start FROM intervals').fetchone()[0], 1000)
+
+    def test_durations_and_permissions(self):
         self.assertEqual(study.duration('25'), 1500)
         self.assertEqual(study.duration('1.5h'), 5400)
-        self.assertEqual(study.duration('1s'), 1)
         self.assertEqual(study.hours(5400), '1.50 ч')
-        for text in ('0', '-1', 'garbage', '8d', '999999999h'):
-            with self.assertRaises(ValueError):
-                study.duration(text)
-
-    def test_private_storage(self):
+        for text in ('0', '-1', 'bad', '999999h'):
+            with self.assertRaises(ValueError): study.duration(text)
         self.assertEqual(self.state.stat().st_mode & 0o777, 0o700)
-        self.assertEqual((self.state / 'activity.sqlite3').stat().st_mode & 0o777, 0o600)
+        self.assertEqual((self.state/'activity.sqlite3').stat().st_mode & 0o777, 0o600)
 
 
 if __name__ == '__main__':
