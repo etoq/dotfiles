@@ -16,7 +16,7 @@ Awesome — текущий рабочий оконный менеджер; bspwm
 | Win+Shift+D / A | Discord / ChatGPT Desktop |
 | Win+Shift+V / G | virt-manager / Ghidra |
 | Win+Shift+N / P | Yazi / pavucontrol |
-| Win+Shift+X / C / K / R | Пипетка / калькулятор / календарь / таймер |
+| Win+Shift+X / C / K / R | Пипетка / калькулятор / календарь / работа, отдых и таймер |
 | Win+1…7 | Переключить рабочий стол |
 | Win+Shift+1…7 | Перенести окно на стол |
 | Win+H/J/K/L | Фокус по направлению |

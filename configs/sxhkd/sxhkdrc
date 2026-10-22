@@ -40,7 +40,7 @@ super + shift + {z,o,s,n,p,t,c,v,x,k,e,r}
 	"$HOME/bin/xcolor-pick", \
 	"$HOME/.local/bin/tiffany-calendar", \
 	rofi -modi emoji -m -1 -show emoji, \
-	kitty --class timer -e bash $HOME/bin/timer}
+	kitty --class otter-tools -e "$HOME/.local/bin/study"}
 
 # Менеджер буфера обмена (greenclip + fzf)
 super + q

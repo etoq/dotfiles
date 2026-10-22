@@ -69,7 +69,7 @@ key({mod,'Shift'},'t',function()spawn({home..'/.local/bin/AyuGram'})end,'AyuGram
 key({mod,'Shift'},'s',function()action('vpn')end,'Throne','Приложения')
 key({mod,'Shift'},'n',function()action('files')end,'Yazi','Приложения')
 key({mod,'Shift'},'p',function()spawn('pavucontrol')end,'Звуковые устройства','Приложения')
-key({mod,'Shift'},'r',function()action('timer')end,'Таймер','Инструменты')
+key({mod,'Shift'},'r',function()spawn({'kitty','--class','otter-tools','-e',home..'/.local/bin/study'})end,'Работа / отдых / таймер','Инструменты')
 key({mod,'Shift'},'e',function()spawn({'rofi','-modi','emoji','-show','emoji'})end,'Эмодзи','Инструменты')
 key({mod},'w',function()action('wallpaper')end,'Случайные обои','Оформление')
 key({mod},'p',function()spawn({home..'/.local/bin/panel-switch','toggle'})end,'Скрыть / показать панель','Оформление')

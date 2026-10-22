@@ -199,7 +199,7 @@ def hours(seconds):
 
 def report_lines(db, period='all'):
     data = report(db, period)
-    rows = ['BLACK TIFFANY · ВРЕМЯ', '',
+    rows = ['ВРЕМЯ', '',
             f'Режим: {LABELS[data["mode"]]} · {data["status"]}', '',
             f'{"Период":18} {"Работа":>12} {"Отдых":>12}']
     for key, label in [('day', 'Сегодня'), ('week', 'Последние 7 дней'),
@@ -249,7 +249,7 @@ def dashboard(screen, db, countdown=None):
             if not remaining:
                 notify_timer()
                 deadline, message = None, 'Таймер завершён. Учёт остаётся на паузе.'
-            lines = ['BLACK TIFFANY · ТАЙМЕР', '',
+            lines = ['ТАЙМЕР', '',
                      f'{remaining//3600:02}:{remaining//60%60:02}:{remaining%60:02}', '',
                      'Без аналитики. Q — отменить и выйти.',
                      '1 — работа · 2 — отдых · пробел — пауза']
