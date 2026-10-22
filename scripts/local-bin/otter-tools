@@ -23,11 +23,6 @@ STATE = HOME / '.local/state/otter-tools'
 ASSETS = HOME / '.local/share/otter-tools'
 SELF = Path(__file__).resolve()
 COLORS = 'bg:#080D10,bg+:#183039,fg:#C5D6D8,fg+:#A3F0E7,hl:#0ABAB5,hl+:#4DDDD5,pointer:#0ABAB5,header:#7E999F'
-ROFI_STYLE = ('window { width: 780px; } listview { columns: 1; lines: 8; } '
-              'message { background-color: #101B20; padding: 12px; } '
-              'textbox { background-color: transparent; text-color: #A3F0E7; } '
-              'entry { placeholder: ""; }')
-
 
 def clean(text):
     return ''.join(c if c.isprintable() else ' ' for c in str(text))
@@ -128,63 +123,9 @@ def info(argument=''):
         view_report(file_report(path))
 
 
-def rofi(items, prompt, message=''):
-    result = capture(['rofi', '-dmenu', '-i', '-p', prompt, '-mesg', html.escape(message),
-                      '-theme-str', ROFI_STYLE],
-                     input='\n'.join(items))
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
-def calculate(expression):
-    result = capture(['qalc', '-t', '-m', '3000', expression], timeout=8)
-    answer = result.stdout.strip()
-    if result.returncode or not answer or re.search(r'error:|ошибка:', answer + result.stderr, re.I):
-        raise ValueError(clean(result.stderr or answer or 'Не удалось вычислить'))
-    return answer
-
-
 def calculator(argument=''):
-    STATE.mkdir(parents=True, exist_ok=True)
-    history_file = STATE / 'calc-history.json'
-    try:
-        history = json.loads(history_file.read_text())[-30:]
-    except (OSError, ValueError):
-        history = []
-    expression = argument.strip()
-    message = '2+2 · 255 to hex · 0xFF to dec · 10 km to m · sin(30 deg)'
-    while True:
-        entries = {f'{x[0]} = {x[1]}': x for x in reversed(history)}
-        if not expression:
-            expression = rofi(list(entries), 'calc', message)
-            if not expression:
-                return
-            if expression in entries:
-                copy(entries[expression][1])
-                notify('Калькулятор', 'Результат скопирован')
-                return
-        try:
-            answer = calculate(expression)
-        except (ValueError, sp.TimeoutExpired) as error:
-            message = str(error)
-            expression = ''
-            continue
-        history = [x for x in history if x[0] != expression] + [[expression, answer]]
-        history_file.write_text(json.dumps(history[-30:], ensure_ascii=False))
-        action = rofi(['Скопировать результат', 'Продолжить с результатом', 'Новое выражение'],
-                      'calc', expression + ' = ' + answer)
-        if action == 'Скопировать результат':
-            copy(answer)
-            notify('Калькулятор', answer)
-            return
-        if action == 'Продолжить с результатом':
-            value = rofi([], 'calc', 'ans = ' + answer + ' · пример: ans * 2')
-            if not value:
-                return
-            expression = value.replace('ans', '(' + answer + ')')
-        elif action == 'Новое выражение':
-            expression = ''
-        else:
-            return
+    program = SELF.with_name('tiffany-calculator')
+    os.execv(sys.executable, [sys.executable, str(program), argument])
 
 
 def ocr():
