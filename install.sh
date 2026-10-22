@@ -305,6 +305,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/systemd/user/clean-screenshots.service" "$HOME/.config/systemd/user/clean-screenshots.service"
     link "configs/xsettingsd" "$HOME/.config/xsettingsd"
     link "configs/fish/tiffany.fish" "$HOME/.config/fish/tiffany.fish"
+    link "configs/fish/functions/ssh.fish" "$HOME/.config/fish/functions/ssh.fish"
     link "configs/btop/themes" "$HOME/.config/btop/themes"
     link "configs/gtk-3.0/gtk.css" "$HOME/.config/gtk-3.0/gtk.css"
     link "configs/lsd" "$HOME/.config/lsd"
