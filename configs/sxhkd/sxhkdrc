@@ -23,7 +23,7 @@ super + shift + d
     ~/.local/bin/otter-run --module ds
 
 super + shift + a
-    ~/.local/bin/otter-run --module pai
+    chatgpt
 
 super + shift + l
     betterlockscreen -l dimblur

@@ -58,7 +58,7 @@ key({mod},'Return',function()spawn('kitty')end,'Терминал','Прилож�
 key({mod},'d',function()action('launcher')end,'Otter launcher','Приложения')
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')
 key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/otter-run','--module','ds'})end,'Discord','Приложения')
-key({mod,'Shift'},'a',function()spawn({home..'/.local/bin/otter-run','--module','pai'})end,'ChatGPT · сайт','Приложения')
+key({mod,'Shift'},'a',function()spawn({'chatgpt'})end,'ChatGPT Desktop','Приложения')
 key({mod,'Shift'},'c',function()spawn({home..'/bin/calculator'})end,'Калькулятор','Инструменты')
 key({mod,'Shift'},'k',function()action('calendar')end,'Календарь calcurse','Инструменты')
 key({mod,'Shift'},'v',function()action('vms')end,'Виртуальные машины','Лаборатория')

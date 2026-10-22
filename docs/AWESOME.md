@@ -13,7 +13,7 @@ Awesome — текущий рабочий оконный менеджер; bspwm
 | Win+Shift+B | Control Deck: звук, яркость, инструменты |
 | Win+P | Скрыть / показать Polybar |
 | Win+Shift+Z / O / T / S | Zen / Obsidian / AyuGram / Throne |
-| Win+Shift+D / A | Discord / ChatGPT (сайт) |
+| Win+Shift+D / A | Discord / ChatGPT Desktop |
 | Win+Shift+V / G | virt-manager / Ghidra |
 | Win+Shift+N / P | Yazi / pavucontrol |
 | Win+Shift+X / C / K / R | Пипетка / калькулятор / календарь / таймер |
