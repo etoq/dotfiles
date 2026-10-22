@@ -126,7 +126,7 @@ for name,dir in pairs({h='left',j='down',k='up',l='right'})do
 end
 for i=1,7 do
  key({mod},'#'..(i+9),function()ui.view_tag(i)end,'Рабочий стол '..i,'Столы')
- key({mod,'Shift'},'#'..(i+9),function()local c=client.focus;local t=awful.screen.focused().tags[i];if c and t then c:move_to_tag(t)end end,'Окно на стол '..i,'Столы')
+ key({mod,'Shift'},'#'..(i+9),function()navigation.move_to_tag(awful.screen.focused().tags[i])end,'Окно на стол '..i,'Столы')
 end
 key({mod,'Shift'},'Return',function()
  for _,c in ipairs(client.get())do
@@ -167,6 +167,7 @@ awful.rules.rules={
  {rule_any={type={'dock'}},properties={border_width=0,focus=false,focusable=false,skip_taskbar=true,buttons={}}},
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
+ {rule={class='kitty'},properties={maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='calendar'},properties={floating=true,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(900,c.screen.workarea.height-80)end},callback=place_popup},
  {rule={class='otter'},properties={floating=true,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false,width=500,height=420,screen=function()return awful.screen.focused()end},callback=place_popup},
  {rule={class='tiffany-scratch'},properties={floating=true,sticky=true,ontop=true,skip_taskbar=true,width=1000,height=600,placement=awful.placement.centered}},

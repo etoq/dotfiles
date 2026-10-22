@@ -32,6 +32,31 @@ function M.swap(dir)
  local dest=target(dir,true)
  if dest then source:swap(dest);activate(source)end
 end
+function M.move_to_tag(t)
+ local c=client.focus
+ if not M.is_window(c) or not t then return end
+ local current=c:tags()
+ if #current==1 and current[1]==t then return end
+ -- Maximization itself can make c.floating true implicitly. Respect only
+ -- explicit floating intent (dialogs/tools/Win+Space) and fixed-size windows.
+ local tiled=c.type=='normal' and awful.client.property.get(c,'floating')~=true and not awful.client.object.is_fixed(c)
+ -- A maximized tiled client is excluded from the tiler, even on its new tag.
+ if tiled then
+  c.fullscreen=false
+  c.maximized=false
+  c.maximized_horizontal=false
+  c.maximized_vertical=false
+ end
+ c:move_to_tag(t)
+ if tiled then
+  -- Append from the current position, keeping the destination's existing order.
+  -- setslave() also swaps earlier clients and can promote an already-managed one.
+  local after=false
+  for _,other in ipairs(client.get(c.screen))do
+   if other==c then after=true elseif after then c:swap(other)end
+  end
+ end
+end
 function M.cycle(step)
  local source=client.focus;local choices=windows(source and source.screen or awful.screen.focused())
  if #choices==0 then return end
