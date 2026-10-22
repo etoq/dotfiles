@@ -6,7 +6,7 @@ vim.lsp.config('pyright', {
     capabilities = capabilities,
     settings = {
         pyright = { disableOrganizeImports = true },
-        python  = { analysis = { ignore = { '*' } } },
+        python  = { analysis = { diagnosticMode = 'openFiles', typeCheckingMode = 'basic' } },
     },
 })
 -- Активируем сервер
@@ -14,8 +14,8 @@ vim.lsp.enable('pyright')
 
 -- Python (ruff):
 vim.lsp.config('ruff', { capabilities = capabilities })
-vim.lsp.enable('ruff')
+if vim.fn.executable('ruff') == 1 then vim.lsp.enable('ruff') end
 
 -- TypeScript/JavaScript:
 vim.lsp.config('ts_ls', { capabilities = capabilities })
-vim.lsp.enable('ts_ls')
+if vim.fn.executable('typescript-language-server') == 1 then vim.lsp.enable('ts_ls') end

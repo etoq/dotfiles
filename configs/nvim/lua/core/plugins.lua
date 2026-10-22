@@ -129,6 +129,8 @@ require("lazy").setup({
             "mfussenegger/nvim-dap-python",
         },
         config = function()
+            -- Resolve Mason executables before mason-nvim-dap builds adapter paths.
+            require('mason').setup()
             local dap = require("dap")
             local dapui = require("dapui")
 
@@ -147,7 +149,8 @@ require("lazy").setup({
             dap.listeners.before.event_exited["dapui_config"] = function() dapui.close() end
 
             -- Настройка Python DAP
-            require("dap-python").setup("python3")
+            local debugpy_python = vim.fn.stdpath('data') .. '/mason/packages/debugpy/venv/bin/python'
+            require("dap-python").setup(vim.fn.executable(debugpy_python) == 1 and debugpy_python or 'python3')
         end
     },
 })
@@ -189,14 +192,14 @@ vim.lsp.config('pyright', {
     capabilities = capabilities,
     settings = {
         pyright = { disableOrganizeImports = true },
-        python  = { analysis = { ignore = { '*' } } },
+        python  = { analysis = { diagnosticMode = 'openFiles', typeCheckingMode = 'basic' } },
     },
 })
 vim.lsp.enable('pyright')
 
 -- Python (ruff):
 vim.lsp.config('ruff', { capabilities = capabilities })
-vim.lsp.enable('ruff')
+if vim.fn.executable('ruff') == 1 then vim.lsp.enable('ruff') end
 
 -- C / C++ (clangd) - ВАЖНО ДЛЯ РЕВЕРСА И С:
 vim.lsp.config('clangd', { capabilities = capabilities })
