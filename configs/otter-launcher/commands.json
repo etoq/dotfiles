@@ -45,7 +45,7 @@
     "raw_argument": false
   },
   "ds": {
-    "command": "exec /usr/bin/discord",
+    "command": "exec \"$HOME/.local/bin/desktop-app\" open discord",
     "url_encoded": false,
     "raw_argument": false
   },

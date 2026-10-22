@@ -20,10 +20,10 @@ super + d
     ~/.local/bin/panel-action launcher
 
 super + shift + d
-    ~/.local/bin/otter-run --module ds
+    ~/.local/bin/desktop-app open discord
 
 super + shift + a
-    chatgpt
+    ~/.local/bin/desktop-app open chatgpt
 
 super + shift + l
     betterlockscreen -l dimblur
@@ -67,7 +67,7 @@ Print
 
 # close and kill
 super + c
-    bspc node -c
+    ~/.local/bin/desktop-app close-focused
 
 # alternate between the tiled and monocle layout
 super + space

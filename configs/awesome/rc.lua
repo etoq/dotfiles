@@ -57,8 +57,8 @@ end
 key({mod},'Return',function()spawn('kitty')end,'Терминал','Приложения')
 key({mod},'d',function()action('launcher')end,'Otter launcher','Приложения')
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')
-key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/otter-run','--module','ds'})end,'Discord','Приложения')
-key({mod,'Shift'},'a',function()spawn({'chatgpt'})end,'ChatGPT Desktop','Приложения')
+key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/desktop-app','open','discord'})end,'Discord','Приложения')
+key({mod,'Shift'},'a',function()spawn({home..'/.local/bin/desktop-app','open','chatgpt'})end,'ChatGPT Desktop','Приложения')
 key({mod,'Shift'},'c',function()spawn({home..'/bin/calculator'})end,'Калькулятор','Инструменты')
 key({mod,'Shift'},'k',function()action('calendar')end,'Календарь calcurse','Инструменты')
 key({mod,'Shift'},'v',function()action('vms')end,'Виртуальные машины','Лаборатория')
@@ -102,7 +102,14 @@ key({},'XF86MonBrightnessDown',function()action('brightness-down')end,'Темн�
 key({},'XF86AudioPlay',function()action('media')end,'Play / pause','Мультимедиа')
 key({},'XF86AudioNext',function()action('next')end,'Следующий трек','Мультимедиа')
 key({},'XF86AudioPrev',function()action('previous')end,'Предыдущий трек','Мультимедиа')
-key({mod},'c',function()if client.focus then client.focus:kill()end end,'Закрыть окно','Окна')
+key({mod},'c',function()
+ local c=client.focus
+ if not c then return end
+ local class=(c.class or ''):lower()
+ if class=='chatgpt' or class=='discord' then
+  spawn({home..'/.local/bin/desktop-app','close',tostring(c.window)})
+ else c:kill()end
+end,'Закрыть окно','Окна')
 key({mod},'f',function()if client.focus then client.focus.fullscreen=not client.focus.fullscreen;client.focus:raise()end end,'Полный экран','Окна')
 key({mod},'m',function()if client.focus then client.focus.maximized=not client.focus.maximized;client.focus:raise()end end,'Развернуть окно','Окна')
 key({mod},'space',function()if client.focus then client.focus.floating=not client.focus.floating end end,'Плавающее / тайловое','Окна')

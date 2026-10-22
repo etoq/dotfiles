@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""Reuse ChatGPT/Discord windows and request their native Quit command."""
+import argparse
+import contextlib
+import fcntl
+import os
+from pathlib import Path
+import re
+import subprocess as sp
+import sys
+import time
+
+HOME = Path.home()
+LAUNCH = {'chatgpt': ['/usr/bin/chatgpt'], 'discord': ['/usr/bin/discord']}
+
+
+def run(args, timeout=4):
+    return sp.run([str(x) for x in args], text=True, capture_output=True, timeout=timeout)
+
+
+def app_of_pid(pid):
+    try:
+        proc = Path('/proc') / str(int(pid))
+        if proc.stat().st_uid != os.getuid():
+            return None
+        exe = (proc / 'exe').resolve(strict=True)
+        if exe == Path('/usr/lib/chatgpt/ChatGPT'):
+            return 'chatgpt'
+        if exe.name == 'Discord' and (
+                exe.parent in (Path('/opt/discord'), Path('/usr/share/discord'))
+                or (exe.parent.parent == HOME / '.config/discord'
+                    and re.fullmatch(r'app-[0-9.]+', exe.parent.name))):
+            return 'discord'
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def main_processes(app):
+    result = []
+    for proc in Path('/proc').iterdir():
+        if not proc.name.isdigit() or app_of_pid(proc.name) != app:
+            continue
+        try:
+            # Chromium may put its entire process title in argv[0].
+            args = (proc / 'cmdline').read_bytes().replace(b'\0', b' ')
+            if not re.search(rb'(?:^|\s)--type=', args):
+                result.append(int(proc.name))
+        except OSError:
+            continue
+    return result
+
+
+def window_info(window):
+    props = run(['xprop', '-id', str(int(window)), 'WM_CLASS', '_NET_WM_PID', '_NET_WM_WINDOW_TYPE'])
+    if props.returncode:
+        return None
+    pid = re.search(r'_NET_WM_PID\(CARDINAL\) = (\d+)', props.stdout)
+    classes = re.search(r'WM_CLASS\(STRING\) = (.*)', props.stdout)
+    names = re.findall(r'"([^"\n]*)"', classes[1]) if classes else []
+    if not pid or not names:
+        return None
+    app = app_of_pid(int(pid[1]))
+    if app not in LAUNCH or names[-1].lower() != app:
+        return None
+    return {'window': int(window), 'pid': int(pid[1]), 'app': app,
+            'normal': '_NET_WM_WINDOW_TYPE_NORMAL' in props.stdout}
+
+
+def windows(app):
+    matches = run(['xdotool', 'search', '--class', '^' + app + '$'])
+    result = []
+    for window in matches.stdout.splitlines():
+        if not window.isdigit():
+            continue
+        info = window_info(window)
+        if not info or info['app'] != app or not info['normal']:
+            continue
+        geometry = run(['xdotool', 'getwindowgeometry', '--shell', window])
+        fields = dict(line.split('=', 1) for line in geometry.stdout.splitlines() if '=' in line)
+        width, height = int(fields.get('WIDTH', 0)), int(fields.get('HEIGHT', 0))
+        # Exclude Electron clipboard/tray/helper windows, including unmapped ones.
+        if width >= 320 and height >= 240:
+            info['area'] = width * height
+            result.append(info)
+    return sorted(result, key=lambda item: item['area'], reverse=True)
+
+
+def managed_windows(app):
+    props = run(['xprop', '-root', '_NET_CLIENT_LIST'])
+    ids = {int(token, 16) for token in re.findall(r'0x[0-9a-fA-F]+', props.stdout)}
+    return [item for item in windows(app) if item['window'] in ids]
+
+
+def activate(window):
+    window = int(window)
+    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+    code = ("for _,c in ipairs(client.get())do if c.window==" + str(window)
+                + " then c.minimized=false;c.hidden=false;"
+                "if c.first_tag then c.first_tag:view_only()end;"
+                "client.focus=c;c:raise();return true end end;return false")
+    # A managed window on another tag is intentionally unmapped by the WM.
+    # Switch its tag first instead of waiting for it to become viewable.
+    if 'awesome' in desktop and 'boolean true' in run(['awesome-client', code]).stdout:
+        return
+    if 'bspwm' in desktop and run(['bspc', 'node', hex(window), '-f']).returncode == 0:
+        return
+    focused = run(['xdotool', 'windowactivate', '--sync', str(window)])
+    if focused.returncode:
+        raise RuntimeError('Не удалось переключиться на окно.')
+
+
+def open_app(app):
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', HOME / '.cache')) / 'desktop-app'
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (runtime / (app + '.lock')).open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        existing = managed_windows(app)
+        if existing:
+            activate(existing[0]['window'])
+            return
+        # When all windows were withdrawn to the tray, let Electron's native
+        # single-instance IPC call BrowserWindow.show(). XMapWindow alone leaves
+        # Electron's internal visibility state false and breaks menu accelerators.
+        state = Path(os.environ.get('XDG_STATE_HOME', HOME / '.local/state')) / 'desktop-app'
+        state.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with (state / (app + '.log')).open('ab') as log:
+            sp.Popen(LAUNCH[app], stdin=sp.DEVNULL, stdout=log, stderr=log,
+                     start_new_session=True)
+        # Repeated hotkeys while startup is in progress never spawn another app.
+        deadline = time.monotonic() + 12
+        while time.monotonic() < deadline:
+            existing = managed_windows(app)
+            if existing:
+                activate(existing[0]['window'])
+                return
+            time.sleep(.15)
+        raise RuntimeError('Приложение запускается, но его окно пока не найдено. Повтори сочетание позже.')
+
+
+def close_window(window):
+    info = window_info(window)
+    if not info:
+        raise RuntimeError('Окно не принадлежит ChatGPT или Discord этого пользователя.')
+    # Native app menu accelerators honor pending-work/call confirmation dialogs.
+    # Electron ignores XSendEvent key events directed with --window. Focus the
+    # validated window and use XTest instead, after checking the WM active client.
+    activate(window)
+    focused = run(['xdotool', 'getactivewindow'])
+    if focused.stdout.strip() != str(int(window)):
+        raise RuntimeError('Фокус изменился; выход отменён.')
+    result = run(['xdotool', 'windowfocus', '--sync', str(int(window)),
+                  'key', '--clearmodifiers', 'ctrl+q'])
+    if result.returncode:
+        raise RuntimeError('Не удалось отправить штатную команду выхода.')
+
+
+def main():
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    cmd = commands.add_parser('open')
+    cmd.add_argument('app', choices=LAUNCH)
+    cmd = commands.add_parser('close')
+    cmd.add_argument('window', type=int)
+    commands.add_parser('close-focused')
+    args = parser.parse_args()
+    if args.command == 'open':
+        open_app(args.app)
+    elif args.command == 'close':
+        close_window(args.window)
+    else:
+        focused = run(['xdotool', 'getactivewindow'])
+        if focused.returncode or not focused.stdout.strip().isdigit():
+            return
+        window = int(focused.stdout.strip())
+        if window_info(window):
+            close_window(window)
+        else:
+            sp.run(['bspc', 'node', '-c'], check=True)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, sp.SubprocessError) as error:
+        print('Desktop app:', error, file=sys.stderr)
+        with contextlib.suppress(OSError):
+            sp.run(['notify-send', 'Ошибка запуска/закрытия', str(error)], check=False)
+        sys.exit(1)
