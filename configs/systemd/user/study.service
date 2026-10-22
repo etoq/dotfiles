@@ -1,0 +1,13 @@
+[Unit]
+Description=Local work/rest activity tracker (no key contents recorded)
+PartOf=graphical-session.target
+ConditionEnvironment=DISPLAY
+
+[Service]
+Type=exec
+ExecStart=%h/.local/bin/study daemon --idle-seconds 300
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+

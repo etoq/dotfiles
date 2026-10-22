@@ -90,6 +90,7 @@ pkill flameshot; flameshot &
 pkill -u "$(id -u)" -x xautolock 2>/dev/null || true
 dbus-update-activation-environment --systemd DISPLAY XAUTHORITY
 systemctl --user start idle-screen-lock.service
+systemctl --user start study.service
 
 # 4. Теплые цвета
 pkill gammastep

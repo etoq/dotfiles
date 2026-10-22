@@ -309,6 +309,11 @@
     "url_encoded": true,
     "raw_argument": false
   },
+  "study": {
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/study\"",
+    "url_encoded": false,
+    "raw_argument": false
+  },
   "po": {
     "command": "exec kitty --class panel-tool -e bash \"$HOME/bin/powermenu\"",
     "url_encoded": false,

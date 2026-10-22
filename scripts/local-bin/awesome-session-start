@@ -34,6 +34,7 @@ if keyboard_fields.get('layout','').strip()!='us,ru' or 'grp:alt_shift_toggle' n
  call(['setxkbmap','-layout','us,ru','-option','grp:alt_shift_toggle'])
 call(['xrdb','-merge',H/'.Xresources'])
 call(['systemctl','--user','start','idle-screen-lock.service'])
+call(['systemctl','--user','start','study.service'])
 call(['systemctl','--user','start','wallpaper-rotate.timer'])
 once('dunst',['dunst'])
 once('xsettingsd',['xsettingsd'])

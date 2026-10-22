@@ -522,6 +522,12 @@ with_argument = true
 url_encode = true
 
 [[modules]]
+description = "Время · работа / отдых / аналитика"
+prefix = "study"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module study"
+unbind_proc = false
+
+[[modules]]
 description = "Питание · меню"
 prefix = "po"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module po"
