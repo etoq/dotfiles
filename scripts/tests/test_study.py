@@ -140,6 +140,23 @@ class Timers(unittest.TestCase):
         self.assertEqual(self.state.stat().st_mode & 0o777, 0o700)
         self.assertEqual((self.state/'activity.sqlite3').stat().st_mode & 0o777, 0o600)
 
+    def test_polybar_only_remaining_time_running_and_paused(self):
+        study.start_timer(self.db, 'none', 1500, 100, 50, study.BOOT)
+        with patch.object(study.time, 'monotonic', return_value=52):
+            self.assertEqual(study.bar_text(), '00:24:58')
+        study.control(self.db, 'pause', 102, 52, study.BOOT)
+        with patch.object(study.time, 'monotonic', return_value=500):
+            self.assertEqual(study.bar_text(), '00:24:58')
+        study.control(self.db, 'cancel', 104, 54, study.BOOT)
+        self.assertEqual(study.bar_text(), '')
+        self.assertEqual(self.total(), 0)
+
+    def test_polybar_does_not_create_a_missing_database(self):
+        missing = Path(self.temp.name)/'not-created'
+        with patch.object(study, 'STATE', missing):
+            self.assertEqual(study.bar_text(), '')
+        self.assertFalse(missing.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

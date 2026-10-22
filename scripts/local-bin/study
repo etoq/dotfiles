@@ -223,6 +223,24 @@ def clock(seconds):
     return f'{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}'
 
 
+def bar_text():
+    """Read-only Polybar query: no schema writes or service activation."""
+    try:
+        with contextlib.closing(sqlite3.connect(
+                (STATE / 'activity.sqlite3').as_uri() + '?mode=ro', uri=True, timeout=.1)) as db:
+            db.row_factory = sqlite3.Row
+            run = current_timer(db)
+            if not run or run['boot'] != BOOT:
+                return ''
+            elapsed = run['elapsed']
+            if run['status'] == 'running':
+                elapsed += max(0, time.monotonic()-run['mono'])
+            remaining = run['duration']-elapsed
+            return clock(remaining) if remaining > 0 else ''
+    except (sqlite3.Error, OSError, ValueError):
+        return ''
+
+
 def dashboard(screen, db, initial_kind=None, initial_seconds=None):
     with contextlib.suppress(curses.error):
         curses.curs_set(0)
@@ -327,6 +345,7 @@ def main():
     parser = argparse.ArgumentParser(description='Таймеры работы, отдыха и без аналитики.')
     commands = parser.add_subparsers(dest='command')
     commands.add_parser('daemon', help='Фоновое выполнение только запущенных таймеров')
+    commands.add_parser('bar', help='Оставшееся время для Polybar')
     for name in ('work', 'rest', 'timer'):
         cmd = commands.add_parser(name, help={'work': 'Таймер работы', 'rest': 'Таймер отдыха',
                                               'timer': 'Таймер без аналитики'}[name])
@@ -337,6 +356,9 @@ def main():
     cmd.add_argument('period', choices=['day', 'week', 'month', '30', 'all'], default='all', nargs='?')
     cmd.add_argument('--json', action='store_true')
     args = parser.parse_args()
+    if args.command == 'bar':
+        print(bar_text())
+        return
     db = database()
     try:
         if args.command == 'daemon':
