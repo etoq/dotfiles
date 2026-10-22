@@ -30,7 +30,7 @@ modifcolor=C99070ff
 lockargs+=(
     --ind-pos="x+w*0.62:y+h*0.58" --radius=44 --ring-width=2
     --time-pos="ix:iy-150" --time-align=0 --time-size=48
-    --date-str="%d:%m:%Y" --date-pos="ix:iy-110"
+    --date-str="%d.%m.%Y" --date-pos="ix:iy-110"
     --date-color=C5D6D8cc --date-font="$font" --date-size=16 --date-align=0
     --greeter-pos="ix:iy+90" --greeter-align=0 --greeter-size=14
     --layout-pos="ix:iy+120" --layout-align=0
