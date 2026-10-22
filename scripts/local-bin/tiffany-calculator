@@ -89,8 +89,6 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         input_row = Gtk.Box(spacing=10)
         self.entry = Gtk.Entry()
         self.entry.set_placeholder_text('2+2 · 0xFF to dec · 10 km to m')
-        self.entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, 'edit-clear-symbolic')
-        self.entry.connect('icon-release', lambda *_: self.clear_entry())
         self.entry.connect('activate', lambda *_: self.compute())
         input_row.pack_start(self.entry, True, True, 0)
         self.compute_button = Gtk.Button(label='Вычислить')
