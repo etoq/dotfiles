@@ -1,15 +1,119 @@
-#!/usr/bin/env bash
-set -euo pipefail
-# Original Gpick floating picker; Win+Shift+X keeps its historical command name.
-if ! command -v gpick >/dev/null 2>&1; then
-    notify-send 'Пипетка Gpick' 'Нужен пакет gpick: sudo pacman -S gpick' || true
-    exit 1
-fi
-color=$(gpick -pso --no-newline) || exit 0
-[[ "$color" =~ ^#[[:xdigit:]]{6}$ ]] || exit 0
-preview_dir="${XDG_CACHE_HOME:-$HOME/.cache}/gpick-swatches"
-mkdir -p "$preview_dir"
-swatch="$preview_dir/${color#\#}.png"
-magick -size 100x100 "xc:$color" "$swatch"
-printf '%s' "$color" | xclip -selection clipboard
-notify-send -a Gpick --icon="$swatch" 'Цвет скопирован' "$color" --expire-time=5000
+#!/usr/bin/env python3
+"""Original Gpick picker, with cancellation and bounded process lifetime."""
+import fcntl
+import os
+from pathlib import Path
+import re
+import selectors
+import shutil
+import signal
+import subprocess as sp
+import time
+
+
+def notify(title, text, icon=None):
+    command = ['notify-send', '-a', 'Gpick', '--expire-time=5000']
+    if icon:
+        command += ['--icon', str(icon)]
+    sp.run(command + ['--', title, text], check=False)
+
+
+def is_picker(pid, executable):
+    try:
+        proc = Path('/proc') / str(pid)
+        return (proc.stat().st_uid == os.getuid()
+                and os.path.samefile(proc / 'exe', executable)
+                and (proc / 'cmdline').read_bytes().split(b'\0')[1:2] == [b'-pso'])
+    except (OSError, ValueError):
+        return False
+
+
+def stop(process):
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except sp.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+
+
+def cancel(*_):
+    raise KeyboardInterrupt()
+
+
+def main():
+    os.umask(0o077)
+    executable = shutil.which('gpick')
+    if not executable:
+        notify('Пипетка Gpick', 'Нужен пакет gpick.')
+        return
+    cache = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache'))
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', cache)) / 'tiffany-color-picker'
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    pidfile, cancelled = runtime / 'pid', runtime / 'cancelled'
+    with (runtime / 'lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            cancelled.touch(mode=0o600)
+            try:
+                pid = int(pidfile.read_text())
+                if is_picker(pid, executable):
+                    os.kill(pid, signal.SIGTERM)
+            except (OSError, ValueError):
+                pass
+            return
+        cancelled.unlink(missing_ok=True)
+        process = sp.Popen([executable, '-pso', '--no-newline'], stdout=sp.PIPE, stderr=sp.DEVNULL)
+        pidfile.write_text(str(process.pid))
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            signal.signal(sig, cancel)
+        output, color = b'', None
+        deadline = time.monotonic() + 120
+        try:
+            # Read the seven color bytes without waiting for stdout EOF or Gpick's exit.
+            # Some picker versions stay resident after emitting their single result.
+            with selectors.DefaultSelector() as selector:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                while time.monotonic() < deadline and not cancelled.exists():
+                    if not selector.select(timeout=.1):
+                        if process.poll() is not None:
+                            break
+                        continue
+                    chunk = os.read(process.stdout.fileno(), 256)
+                    if not chunk:
+                        break
+                    output += chunk
+                    match = re.fullmatch(rb'\s*(#[0-9a-fA-F]{6})\s*', output)
+                    if match:
+                        color = match[1].decode('ascii')
+                        break
+                    if len(output) > 4096:
+                        break
+        except KeyboardInterrupt:
+            return
+        finally:
+            stop(process)
+            process.stdout.close()
+            pidfile.unlink(missing_ok=True)
+        if not color or cancelled.exists():
+            cancelled.unlink(missing_ok=True)
+            return
+        sp.run(['xclip', '-selection', 'clipboard'], input=color.encode(), check=True, timeout=5)
+        preview = cache / 'gpick-swatches'
+        preview.mkdir(parents=True, exist_ok=True)
+        swatch = preview / (color[1:] + '.png')
+        icon = None
+        if shutil.which('magick'):
+            result = sp.run(['magick', '-size', '100x100', 'xc:' + color, str(swatch)], timeout=5)
+            if result.returncode == 0:
+                icon = swatch
+        notify('Цвет скопирован', color, icon)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, sp.SubprocessError) as error:
+        notify('Пипетка · ошибка', str(error)[:250])

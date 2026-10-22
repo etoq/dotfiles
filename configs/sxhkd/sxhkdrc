@@ -19,6 +19,12 @@ super + w
 super + d
     ~/.local/bin/panel-action launcher
 
+super + shift + d
+    ~/.local/bin/otter-run --module ds
+
+super + shift + a
+    ~/.local/bin/otter-run --module pai
+
 super + shift + l
     betterlockscreen -l dimblur
 
@@ -31,7 +37,7 @@ super + shift + {z,o,s,n,p,t,c,v,x,k,e,r}
 	"$HOME/.local/bin/AyuGram", \
 	sh $HOME/bin/calculator, \
 	virt-manager, \
-	bash "$HOME/bin/xcolor-pick", \
+	"$HOME/bin/xcolor-pick", \
 	"$HOME/.local/bin/tiffany-calendar", \
 	rofi -modi emoji -m -1 -show emoji, \
 	kitty --class timer -e bash $HOME/bin/timer}
