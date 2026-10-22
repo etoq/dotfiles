@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess as sp
 import sys
 import tempfile
 
@@ -62,7 +63,7 @@ def save_history(history):
         Path(temporary).unlink(missing_ok=True)
 
 
-def output_expression(expression):
+def python_hex_expression(expression):
     """Accept Python-style outer hex(...) as an output format, not qalc's parser."""
     match = re.match(r'hex\s*\(', expression, re.I)
     if not match:
@@ -90,6 +91,23 @@ def output_expression(expression):
                     return '(' + inner + ') to hex'
                 return expression
     return expression
+
+
+def output_expression(expression):
+    formatted = python_hex_expression(expression)
+    if formatted != expression:
+        return formatted
+    # Ignore quoted text and respect explicit output conversions (to dec/bin/etc.).
+    visible = re.sub(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*' ''', '', expression, flags=re.X)
+    if re.search(r'\bto\b|->|→', visible, re.I):
+        return expression
+    numbers = re.findall(r'(?<![\w.])0x[0-9a-f]+(?!\w)', visible, re.I)
+    return '(' + expression + ') to hex' if len(numbers) >= 2 else expression
+
+
+def clipboard_text(answer):
+    """Plain text usable in terminals/debuggers, including negative HEX values."""
+    return answer.strip().replace('\N{MINUS SIGN}', '-')
 
 
 class CalculatorWindow(Gtk.ApplicationWindow):
@@ -195,6 +213,8 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         if not self.closed:
             self.compute_button.set_sensitive(True)
             self.entry.set_sensitive(True)
+            self.copy_button.set_sensitive(bool(self.answer))
+            self.continue_button.set_sensitive(bool(self.answer))
 
     def compute(self):
         expression = self.entry.get_text().strip()
@@ -208,6 +228,8 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         self.stop_job()
         self.entry.set_sensitive(False)
         self.compute_button.set_sensitive(False)
+        self.copy_button.set_sensitive(False)
+        self.continue_button.set_sensitive(False)
         self.set_status('Вычисляю…')
         try:
             process = Gio.Subprocess.new(['qalc', '-t', '-m', '3000', '--', output_expression(expression)],
@@ -215,6 +237,8 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         except GLib.Error as error:
             self.entry.set_sensitive(True)
             self.compute_button.set_sensitive(True)
+            self.copy_button.set_sensitive(bool(self.answer))
+            self.continue_button.set_sensitive(bool(self.answer))
             self.set_status(str(error), True)
             return
         self.job = process
@@ -239,6 +263,8 @@ class CalculatorWindow(Gtk.ApplicationWindow):
                 self.timeout = None
             self.entry.set_sensitive(True)
             self.compute_button.set_sensitive(True)
+            self.copy_button.set_sensitive(bool(self.answer))
+            self.continue_button.set_sensitive(bool(self.answer))
             answer = (output or '').strip()
             if timed_out[0]:
                 self.set_status('Вычисление остановлено: превышено 8 секунд.', True)
@@ -259,11 +285,21 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         process.communicate_utf8_async(None, None, done)
 
     def copy_result(self):
-        if self.answer:
-            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-            clipboard.set_text(self.answer, -1)
-            clipboard.store()
-            self.set_status('Результат скопирован')
+        if self.job:
+            self.set_status('Дождись результата вычисления.')
+            return
+        if not self.answer:
+            return
+        try:
+            # Give CLIPBOARD to an independent owner. It survives closing this
+            # window and does not depend on GTK clipboard-manager handoff.
+            sp.run(['xclip', '-selection', 'clipboard', '-in'],
+                   input=clipboard_text(self.answer).encode('utf-8'),
+                   stdout=sp.DEVNULL, stderr=sp.DEVNULL, check=True, timeout=2)
+        except (OSError, sp.SubprocessError) as error:
+            self.set_status('Не удалось скопировать результат: ' + str(error), True)
+            return
+        self.set_status('Результат скопирован')
 
     def continue_result(self):
         if self.answer:
