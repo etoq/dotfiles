@@ -19,6 +19,9 @@ super + w
 super + d
     ~/.local/bin/panel-action launcher
 
+super + s
+    ~/.local/bin/desktop-app open localsend
+
 super + shift + d
     ~/.local/bin/desktop-app open discord
 
@@ -36,7 +39,7 @@ super + shift + {z,o,s,n,p,t,c,v,x,k,e,r}
 	pavucontrol, \
 	"$HOME/.local/bin/AyuGram", \
 	sh $HOME/bin/calculator, \
-	virt-manager, \
+	"$HOME/.local/bin/panel-action" vm-menu, \
 	"$HOME/bin/xcolor-pick", \
 	"$HOME/.local/bin/tiffany-calendar", \
 	rofi -modi emoji -m -1 -show emoji, \

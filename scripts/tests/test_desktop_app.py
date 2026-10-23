@@ -39,6 +39,17 @@ class Lifecycle(unittest.TestCase):
             self.assertEqual(launch.call_count, 1)
             activate.assert_called_once_with(123)
 
+    def test_localsend_tray_restore_does_not_spawn(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(app.os.environ,
+                {'XDG_RUNTIME_DIR': tmp, 'XDG_STATE_HOME': tmp}), \
+                patch.object(app, 'managed_windows', side_effect=[[], [{'window': 456}]]), \
+                patch.object(app, 'activate_localsend', return_value=True) as native, \
+                patch.object(app, 'activate') as activate, patch.object(app.sp, 'Popen') as launch:
+            app.open_app('localsend')
+            native.assert_called_once_with()
+            activate.assert_called_once_with(456)
+            launch.assert_not_called()
+
     def test_other_desktop_switches_before_waiting_for_map(self):
         with patch.dict(app.os.environ, {'XDG_CURRENT_DESKTOP': 'awesome'}), \
                 patch.object(app, 'run', return_value=completed([], '   boolean true\n')) as run:

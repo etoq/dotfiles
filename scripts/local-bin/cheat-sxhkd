@@ -67,12 +67,13 @@ row "Переключить раскладку RU/EN"  "Alt + Shift"        "$YL
 
 # ── ПРИЛОЖЕНИЯ ────────────────────────────────────────────────────
 header "ПРИЛОЖЕНИЯ  [ super + shift + ... ]"
+row "LocalSend · показать окно"    "super + s"          "$PNK"
 row "Librewolf"                    "super + shift + f"  "$PNK"
 row "Файловый менеджер"            "super + shift + n"  "$PNK"
 row "PulseAudio (pavucontrol)"     "super + shift + p"  "$PNK"
 row "Telegram (AyuGram)"           "super + shift + t"  "$PNK"
 row "Калькулятор"                  "super + shift + c"  "$PNK"
-row "virt-manager"                 "super + shift + v"  "$PNK"
+row "ВМ · Python-меню"             "super + shift + v"  "$PNK"
 row "Пипетка цвета (Gpick)"       "super + shift + x"  "$PNK"
 row "Календарь (calcurse)"         "super + shift + k"  "$PNK"
 row "Блокировка экрана"            "super + shift + l"  "$PNK"

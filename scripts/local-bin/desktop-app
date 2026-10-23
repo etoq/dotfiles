@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open or restore the existing ChatGPT/Discord window."""
+"""Open or restore existing ChatGPT, Discord and LocalSend windows."""
 import argparse
 import contextlib
 import fcntl
@@ -11,7 +11,8 @@ import sys
 import time
 
 HOME = Path.home()
-LAUNCH = {'chatgpt': ['/usr/bin/chatgpt'], 'discord': ['/usr/bin/discord']}
+LAUNCH = {'chatgpt': ['/usr/bin/chatgpt'], 'discord': ['/usr/bin/discord'], 'localsend': ['/usr/bin/localsend']}
+CLASSES = {'chatgpt': 'chatgpt', 'discord': 'discord', 'localsend': 'org.localsend.localsend_app'}
 
 
 def run(args, timeout=4):
@@ -24,6 +25,8 @@ def app_of_pid(pid):
         if proc.stat().st_uid != os.getuid():
             return None
         exe = (proc / 'exe').resolve(strict=True)
+        if exe == Path('/opt/localsend/localsend'):
+            return 'localsend'
         if exe == Path('/usr/lib/chatgpt/ChatGPT'):
             return 'chatgpt'
         if exe.name == 'Discord' and (
@@ -61,14 +64,14 @@ def window_info(window):
     if not pid or not names:
         return None
     app = app_of_pid(int(pid[1]))
-    if app not in LAUNCH or names[-1].lower() != app:
+    if app not in LAUNCH or names[-1].lower() != CLASSES[app]:
         return None
     return {'window': int(window), 'pid': int(pid[1]), 'app': app,
             'normal': '_NET_WM_WINDOW_TYPE_NORMAL' in props.stdout}
 
 
 def windows(app):
-    matches = run(['xdotool', 'search', '--class', '^' + app + '$'])
+    matches = run(['xdotool', 'search', '--class', '^' + re.escape(CLASSES[app]) + '$'])
     result = []
     for window in matches.stdout.splitlines():
         if not window.isdigit():
@@ -110,6 +113,26 @@ def activate(window):
         raise RuntimeError('Не удалось переключиться на окно.')
 
 
+def activate_localsend():
+    """GTK exports Activate even when LocalSend is withdrawn to its tray."""
+    pids = set(main_processes('localsend'))
+    if not pids:
+        return False
+    names = run(['busctl', '--user', '--no-pager', '--no-legend', 'list'])
+    for line in names.stdout.splitlines():
+        fields = line.split()
+        if len(fields) < 2 or not re.fullmatch(r':[0-9]+\.[0-9]+', fields[0]):
+            continue
+        if not fields[1].isdigit() or int(fields[1]) not in pids:
+            continue
+        result = run(['gdbus', 'call', '--session', '--dest', fields[0],
+                      '--object-path', '/org/localsend/localsend_app',
+                      '--method', 'org.freedesktop.Application.Activate', '{}'])
+        if result.returncode == 0:
+            return True
+    raise RuntimeError('LocalSend запущен, но его окно не удалось открыть через GTK. Новый процесс не создан.')
+
+
 def open_app(app):
     runtime = Path(os.environ.get('XDG_RUNTIME_DIR', HOME / '.cache')) / 'desktop-app'
     runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -127,9 +150,11 @@ def open_app(app):
         # Electron's internal visibility state false and breaks menu accelerators.
         state = Path(os.environ.get('XDG_STATE_HOME', HOME / '.local/state')) / 'desktop-app'
         state.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with (state / (app + '.log')).open('ab') as log:
-            sp.Popen(LAUNCH[app], stdin=sp.DEVNULL, stdout=log, stderr=log,
-                     start_new_session=True)
+        restored = app == 'localsend' and activate_localsend()
+        if not restored:
+            with (state / (app + '.log')).open('ab') as log:
+                sp.Popen(LAUNCH[app], stdin=sp.DEVNULL, stdout=log, stderr=log,
+                         start_new_session=True)
         # Repeated hotkeys while startup is in progress never spawn another app.
         deadline = time.monotonic() + 12
         while time.monotonic() < deadline:
