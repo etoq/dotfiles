@@ -255,12 +255,12 @@
     "raw_argument": false
   },
   "upd": {
-    "command": "kitty -e bash -c 'sudo pacman -Syu; read -p \"Done. Press Enter...\"'",
+    "command": "exec kitty -e \"$HOME/.local/bin/workstation-update\" pacman",
     "url_encoded": false,
     "raw_argument": false
   },
   "yupd": {
-    "command": "kitty -e bash -c 'yay -Syu; read -p \"Done. Press Enter...\"'",
+    "command": "exec kitty -e \"$HOME/.local/bin/workstation-update\" yay",
     "url_encoded": false,
     "raw_argument": false
   },

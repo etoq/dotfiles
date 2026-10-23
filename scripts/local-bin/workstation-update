@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Interactive update with a before/after package summary."""
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import subprocess as sp
+
+
+def snapshot():
+    result = sp.run(['pacman', '-Q'], capture_output=True, text=True, check=True)
+    return dict(line.split(maxsplit=1) for line in result.stdout.splitlines())
+
+
+def remaining(command, label):
+    print('\n' + label, flush=True)
+    try:
+        result = sp.run(command, capture_output=True, text=True, timeout=90)
+        if result.returncode not in (0, 1) or (result.returncode == 1 and bool(result.stderr.strip())):
+            print('Проверить не удалось: ' + (result.stderr.strip() or 'ошибка проверки'))
+        elif result.stdout.strip():
+            print(result.stdout.strip())
+        else:
+            print('Нет доступных обновлений.')
+        if result.stderr.strip() and result.returncode == 0:
+            print(result.stderr.strip())
+    except (OSError, sp.TimeoutExpired) as error:
+        print('Проверить не удалось: ' + str(error))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', choices=('pacman', 'yay'))
+    args = parser.parse_args()
+    state = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'workstation-update'
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (state / 'lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print('Другая команда upd/yupd уже работает.')
+            input('Enter — закрыть…')
+            return 1
+        before = snapshot()
+        code = 130
+        try:
+            code = sp.call(['yay', '-Syu'] if args.mode == 'yay' else ['sudo', 'pacman', '-Syu'])
+        except KeyboardInterrupt:
+            print('\nОбновление прервано.')
+        after = snapshot()
+        changed = [(name, before[name], version) for name, version in after.items()
+                   if name in before and version != before[name]]
+        added = sorted(after.keys() - before.keys())
+        removed = sorted(before.keys() - after.keys())
+        lines = [f'ИТОГ · {args.mode} · код завершения {code}',
+                 'Команда завершилась успешно.' if code == 0 else 'Команда завершилась с ошибкой или была прервана.',
+                 f'Изменены версии: {len(changed)} · установлено: {len(added)} · удалено: {len(removed)}']
+        lines += [f'  {name}: {old} → {new}' for name, old, new in sorted(changed)]
+        lines += [f'  + {name} {after[name]}' for name in added]
+        lines += [f'  − {name} {before[name]}' for name in removed]
+        summary = '\n'.join(lines)
+        print('\n' + summary, flush=True)
+        (state / 'last-summary.txt').write_text(summary + '\n')
+        remaining(['pacman', '-Qu'], 'Остались обновления из системных репозиториев:')
+        remaining(['yay', '-Qua'], 'Остались обновления AUR:')
+        print('\nОставшиеся пакеты могли быть исключены или не установиться; точная причина указана выше в журнале.')
+        input('Enter — закрыть…')
+        return code
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
