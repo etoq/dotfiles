@@ -262,6 +262,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/systemd/user/udiskie.service" "$HOME/.config/systemd/user/udiskie.service"
     link "configs/systemd/user/proton-quota.service" "$HOME/.config/systemd/user/proton-quota.service"
     link "configs/systemd/user/proton-quota.timer" "$HOME/.config/systemd/user/proton-quota.timer"
+    link "configs/autostart/localsend_app.desktop" "$HOME/.config/autostart/localsend_app.desktop"
     link "configs/autostart/udiskie.desktop" "$HOME/.config/autostart/udiskie.desktop"
     step "СИМЛИНКИ КОНФИГОВ"
     link "configs/applications/tiffany-image.desktop" "$HOME/.local/share/applications/tiffany-image.desktop"

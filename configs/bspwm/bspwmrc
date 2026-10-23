@@ -97,3 +97,6 @@ pkill gammastep
 gammastep -m randr &
 # Батарея
 pkill battery-alert; ~/bin/battery-alert &
+
+# LocalSend background receiver; Win+S restores its existing window.
+pgrep -u "$(id -u)" -x localsend >/dev/null || /usr/bin/localsend --hidden &

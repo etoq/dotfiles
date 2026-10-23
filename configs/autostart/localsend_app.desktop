@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LocalSend
+Comment=Receive files in the background
+Exec=/usr/bin/localsend --hidden
+StartupNotify=false
+Terminal=false
