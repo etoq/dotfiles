@@ -443,9 +443,15 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module log"
 unbind_proc = false
 
 [[modules]]
-description = "Система · обновление"
+description = "Обновить · pacman"
 prefix = "upd"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module upd"
+unbind_proc = false
+
+[[modules]]
+description = "Обновить · yay + AUR"
+prefix = "yupd"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module yupd"
 unbind_proc = false
 
 [[modules]]
