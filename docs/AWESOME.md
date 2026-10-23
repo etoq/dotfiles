@@ -16,6 +16,7 @@ Awesome — текущий рабочий оконный менеджер; bspwm
 | Win+Shift+D / A | Discord / ChatGPT Desktop |
 | Win+Shift+V / G | Наше Python-меню управления VM / Ghidra |
 | Win+S | Показать LocalSend, включая восстановление из трея |
+| Win+X | Codex resume в ~/learning/linux-re · масштаб 130% |
 | Win+Shift+N / P | Yazi / pavucontrol |
 | Win+Shift+X / C / K / R | Пипетка / калькулятор / календарь / работа, отдых и таймер |
 | Win+1…7 | Переключить рабочий стол |

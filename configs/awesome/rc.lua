@@ -57,6 +57,7 @@ end
 key({mod},'Return',function()spawn({'kitty','--override','font_size=14.7'})end,'Терминал · масштаб 130%','Приложения')
 key({mod},'d',function()action('launcher')end,'Otter launcher','Приложения')
 key({mod},'s',function()spawn({home..'/.local/bin/desktop-app','open','localsend'})end,'LocalSend · показать окно','Приложения')
+key({mod},'x',function()spawn({'kitty','--class','codex-terminal','--override','font_size=14.7','--directory',home..'/learning/linux-re','-e','/usr/bin/codex','resume'})end,'Codex resume · learning/linux-re','Приложения')
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')
 key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/desktop-app','open','discord'})end,'Discord','Приложения')
 key({mod,'Shift'},'a',function()spawn({home..'/.local/bin/desktop-app','open','chatgpt'})end,'ChatGPT Desktop','Приложения')

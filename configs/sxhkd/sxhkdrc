@@ -22,6 +22,9 @@ super + d
 super + s
     ~/.local/bin/desktop-app open localsend
 
+super + x
+    kitty --class codex-terminal --override font_size=14.7 --directory "$HOME/learning/linux-re" -e /usr/bin/codex resume
+
 super + shift + d
     ~/.local/bin/desktop-app open discord
 
