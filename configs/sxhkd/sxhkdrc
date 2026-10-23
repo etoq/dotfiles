@@ -4,7 +4,7 @@ super + Escape + r
 
 # Launch Terminal
 super + Return
-    kitty
+    kitty --override font_size=14.7
 
 # Hide or Unhide Polybar
 super + p

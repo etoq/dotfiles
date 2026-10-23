@@ -54,7 +54,7 @@ local function key(mods,name,fn,description,group)
  name=physical[name] and ('#'..physical[name]) or name
  keys=gears.table.join(keys,awful.key(mods,name,fn,{description=description,group=group or 'Awesome'}))
 end
-key({mod},'Return',function()spawn('kitty')end,'Терминал','Приложения')
+key({mod},'Return',function()spawn({'kitty','--override','font_size=14.7'})end,'Терминал · масштаб 130%','Приложения')
 key({mod},'d',function()action('launcher')end,'Otter launcher','Приложения')
 key({mod},'s',function()spawn({home..'/.local/bin/desktop-app','open','localsend'})end,'LocalSend · показать окно','Приложения')
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')

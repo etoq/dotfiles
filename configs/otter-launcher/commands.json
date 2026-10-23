@@ -60,7 +60,7 @@
     "raw_argument": false
   },
   "cx": {
-    "command": "exec kitty --class codex-terminal -e /usr/bin/codex",
+    "command": "exec kitty --class codex-terminal --override font_size=14.7 -e /usr/bin/codex",
     "url_encoded": false,
     "raw_argument": false
   },
