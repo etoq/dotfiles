@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""Single-instance graphical frontend for the private translate API client."""
+import importlib.machinery
+import importlib.util
+import json
+from pathlib import Path
+import re
+import sys
+import urllib.parse
+
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk, Gio, GLib, Gtk
+
+
+def sibling(name):
+    loader = importlib.machinery.SourceFileLoader(name.replace('-', '_'), str(Path(__file__).resolve().with_name(name)))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+core = sibling('translate')
+CSS = sibling('tiffany-calculator').CSS + b'''
+.calculator textview, .calculator textview text { font: 16px monospace; }
+.calculator scrolledwindow { border: 1px solid #183039; border-radius: 8px; }
+.calculator combobox button { padding: 6px 10px; }
+.calculator .settings { border: 1px solid #183039; border-radius: 8px; padding: 12px; }
+'''
+
+
+class TranslatorWindow(Gtk.ApplicationWindow):
+    def __init__(self, application):
+        super().__init__(application=application, title='Переводчик')
+        self.set_wmclass('tiffany-translator', 'TiffanyTranslator')
+        self.set_default_size(920, 650)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.get_style_context().add_class('calculator')
+        self.job = None
+        self.timeout = None
+        self.closed = False
+        self.answer = ''
+        self.cache = {}
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        body.set_border_width(24)
+        self.add(body)
+        top = Gtk.Box(spacing=12)
+        title = Gtk.Label(label='Переводчик', xalign=0)
+        title.get_style_context().add_class('heading')
+        top.pack_start(title, True, True, 0)
+        settings_button = Gtk.Button(label='Настройки API')
+        settings_button.connect('clicked', lambda *_: self.reveal.set_reveal_child(not self.reveal.get_reveal_child()))
+        top.pack_end(settings_button, False, False, 0)
+        body.pack_start(top, False, False, 0)
+        self.reveal = Gtk.Revealer()
+        self.reveal.set_transition_type(Gtk.RevealerTransitionType.NONE)
+        form = Gtk.Grid(column_spacing=10, row_spacing=8)
+        form.get_style_context().add_class('settings')
+        self.provider = Gtk.ComboBoxText()
+        for value, label in [('gemini', 'Gemini'), ('openai', 'OpenAI')]:
+            self.provider.append(value, label)
+        self.provider.set_active_id('gemini')
+        self.model = Gtk.Entry(text=core.PROVIDERS['gemini']['model'])
+        self.secret = Gtk.Entry(visibility=False)
+        self.secret.set_placeholder_text('API-ключ · пусто — использовать сохранённый')
+        self.secret.set_hexpand(True)
+        save = Gtk.Button(label='Сохранить')
+        save.connect('clicked', self.save_settings)
+        self.provider.connect('changed', lambda *_: self.model.set_text(core.PROVIDERS[self.provider.get_active_id()]['model']))
+        form.attach(self.provider, 0, 0, 1, 1)
+        form.attach(self.model, 1, 0, 1, 1)
+        form.attach(self.secret, 0, 1, 2, 1)
+        form.attach(save, 2, 1, 1, 1)
+        links = Gtk.Box(spacing=10)
+        links.pack_start(Gtk.LinkButton.new_with_label('https://aistudio.google.com/apikey', 'Ключ Gemini'), False, False, 0)
+        links.pack_start(Gtk.LinkButton.new_with_label('https://platform.openai.com/api-keys', 'Ключ OpenAI'), False, False, 0)
+        form.attach(links, 0, 2, 3, 1)
+        self.reveal.add(form)
+        body.pack_start(self.reveal, False, False, 0)
+        row = Gtk.Box(spacing=10)
+        self.target = Gtk.ComboBoxText()
+        for value, label in [('auto', 'Авто · RU ↔ EN'), ('ru', 'На русский'), ('en', 'На английский'), ('de', 'На немецкий'), ('fr', 'На французский'), ('es', 'На испанский')]:
+            self.target.append(value, label)
+        self.target.set_active_id('auto')
+        row.pack_start(self.target, False, False, 0)
+        self.badge = Gtk.Label(xalign=1)
+        self.badge.set_ellipsize(3)
+        self.badge.get_style_context().add_class('muted')
+        row.pack_end(self.badge, True, True, 0)
+        body.pack_start(row, False, False, 0)
+        panes = Gtk.Box(spacing=14, homogeneous=True)
+        self.source = self.text_pane(panes, 'Исходный текст', True)
+        self.result = self.text_pane(panes, 'Перевод', False)
+        body.pack_start(panes, True, True, 0)
+        actions = Gtk.Box(spacing=10)
+        paste = Gtk.Button(label='Вставить')
+        paste.connect('clicked', self.paste)
+        actions.pack_start(paste, False, False, 0)
+        self.translate_button = Gtk.Button(label='Перевести')
+        self.translate_button.get_style_context().add_class('primary')
+        self.translate_button.connect('clicked', lambda *_: self.compute())
+        actions.pack_start(self.translate_button, False, False, 0)
+        self.copy_button = Gtk.Button(label='Копировать')
+        self.copy_button.set_sensitive(False)
+        self.copy_button.connect('clicked', self.copy)
+        actions.pack_end(self.copy_button, False, False, 0)
+        body.pack_start(actions, False, False, 0)
+        self.status = Gtk.Label(label='Ctrl+Enter — перевести · Ctrl+Shift+C — копировать', xalign=0)
+        self.status.set_line_wrap(True)
+        self.status.get_style_context().add_class('muted')
+        body.pack_start(self.status, False, False, 0)
+        self.connect('key-press-event', self.keypress)
+        self.connect('destroy', self.destroyed)
+        self.load_settings()
+
+    def text_pane(self, parent, label, editable):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.pack_start(Gtk.Label(label=label, xalign=0), False, False, 0)
+        view = Gtk.TextView(editable=editable, cursor_visible=editable)
+        view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        view.set_accepts_tab(False)
+        for side in ('left', 'right', 'top', 'bottom'):
+            getattr(view, 'set_' + side + '_margin')(12)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroll.add(view)
+        box.pack_start(scroll, True, True, 0)
+        parent.pack_start(box, True, True, 0)
+        return view
+
+    def load_settings(self):
+        try:
+            config = core.settings()
+            self.provider.set_active_id(config['provider'])
+            self.model.set_text(config['model'])
+            core.api_key(config)
+            self.badge.set_text(config['provider'] + ' · ' + config['model'])
+            return True
+        except core.TranslationError:
+            self.reveal.set_reveal_child(True)
+            self.status.set_text('Выберите сервис и сохраните API-ключ в настройках. Ключ вводится только здесь.')
+            return False
+
+    def save_settings(self, *_):
+        config = {'provider': self.provider.get_active_id(), 'model': self.model.get_text().strip()}
+        secret = self.secret.get_text().strip()
+        try:
+            if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,100}', config['model']):
+                raise core.TranslationError('Проверьте название модели.')
+            if secret:
+                if len(secret) > 1024 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
+                    raise core.TranslationError('Некорректный формат API-ключа.')
+                core.atomic_private(core.CONFIG / (config['provider'] + '.key'), secret + '\n')
+            core.api_key(config)
+            core.atomic_private(core.CONFIG / 'config.json', json.dumps(config) + '\n')
+            self.secret.set_text('')
+            self.cache.clear()
+            self.load_settings()
+            self.reveal.set_reveal_child(False)
+            self.status.set_text('Настройки сохранены. Текст отправляется только по кнопке «Перевести».')
+        except (core.TranslationError, OSError) as error:
+            self.status.set_text(str(error))
+
+    def compute(self):
+        if self.job or not self.load_settings():
+            return
+        buffer = self.source.get_buffer()
+        text = buffer.get_text(*buffer.get_bounds(), True)
+        if not text.strip() or len(text) > core.LIMIT:
+            self.status.set_text('Введите текст: от 1 до 12 000 символов.')
+            return
+        target = self.target.get_active_id()
+        config = core.settings()
+        key = (config['provider'], config['model'], target, text)
+        if key in self.cache:
+            self.show_result(self.cache[key])
+            return
+        self.copy_button.set_sensitive(False)
+        self.translate_button.set_sensitive(False)
+        self.status.set_text('Перевожу…')
+        try:
+            self.job = Gio.Subprocess.new([sys.executable, str(Path(core.__file__).resolve()), '--to', target], Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE)
+            self.timeout = GLib.timeout_add_seconds(50, self.timed_out)
+            self.job.communicate_utf8_async(text, None, self.finished, key)
+        except GLib.Error:
+            self.stop_job()
+            self.translate_button.set_sensitive(True)
+            self.status.set_text('Не удалось запустить переводчик.')
+
+    def finished(self, process, result, key):
+        if self.closed or process != self.job:
+            return
+        if self.timeout:
+            GLib.source_remove(self.timeout)
+            self.timeout = None
+        self.job = None
+        self.translate_button.set_sensitive(True)
+        try:
+            _, output, error = process.communicate_utf8_finish(result)
+            if not process.get_successful():
+                self.status.set_text(core.printable(error.strip())[:500] or 'Ошибка перевода.')
+                return
+            answer = core.printable(output).strip('\n')
+            if not answer:
+                self.status.set_text('Сервис вернул пустой ответ.')
+                return
+            if len(self.cache) >= 32:
+                self.cache.pop(next(iter(self.cache)))
+            self.cache[key] = answer
+            self.show_result(answer)
+        except GLib.Error:
+            self.status.set_text('Не удалось получить ответ переводчика.')
+
+    def show_result(self, answer):
+        self.answer = answer
+        self.result.get_buffer().set_text(answer)
+        self.copy_button.set_sensitive(True)
+        self.status.set_text('Готово · Ctrl+Shift+C — скопировать перевод')
+
+    def paste(self, *_):
+        def received(_clipboard, text, _data):
+            if not self.closed and text:
+                self.source.get_buffer().set_text(text)
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).request_text(received, None)
+
+    def copy(self, *_):
+        if self.job or not self.answer or not self.copy_button.get_sensitive():
+            return
+        try:
+            core.clipboard(self.answer)
+            self.status.set_text('Перевод скопирован')
+        except core.TranslationError as error:
+            self.status.set_text(str(error))
+
+    def stop_job(self):
+        if self.timeout:
+            GLib.source_remove(self.timeout)
+            self.timeout = None
+        if self.job:
+            self.job.force_exit()
+            self.job = None
+
+    def timed_out(self):
+        self.timeout = None
+        self.stop_job()
+        self.translate_button.set_sensitive(True)
+        self.status.set_text('Время ожидания истекло. Повторите запрос вручную.')
+        return False
+
+    def destroyed(self, *_):
+        self.closed = True
+        self.stop_job()
+        self.cache.clear()
+
+    def keypress(self, _window, event):
+        control = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        if event.keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        if control and event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            self.compute()
+            return True
+        if control and event.state & Gdk.ModifierType.SHIFT_MASK and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
+            self.copy()
+            return True
+        return False
+
+
+class TranslatorApp(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id='org.eto.TiffanyTranslator', flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+        self.window = None
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    def do_activate(self):
+        if self.window is None or self.window.closed:
+            self.window = TranslatorWindow(self)
+        self.window.show_all()
+        self.window.present()
+        self.window.source.grab_focus()
+
+    def do_command_line(self, command_line):
+        args = command_line.get_arguments()[1:]
+        text = ' '.join(args)
+        if len(args) == 1 and args[0].startswith('--encoded='):
+            text = urllib.parse.unquote(args[0].split('=', 1)[1])
+        self.activate()
+        if text:
+            self.window.source.get_buffer().set_text(text)
+        return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(TranslatorApp().run(sys.argv))

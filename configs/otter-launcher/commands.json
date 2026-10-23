@@ -105,7 +105,7 @@
     "raw_argument": false
   },
   "tr": {
-    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/translate\" --ui --encoded='{}'",
+    "command": "exec \"$HOME/.local/bin/tiffany-translator\" --encoded='{}'",
     "url_encoded": true,
     "raw_argument": false
   },
@@ -366,6 +366,11 @@
   },
   "carve": {
     "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/workstation-tools\" carve --ui",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ssh": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/lazyssh\"",
     "url_encoded": false,
     "raw_argument": false
   }

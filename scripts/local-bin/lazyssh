@@ -1,0 +1,8 @@
+#!/bin/sh
+# Portable terminal capabilities for native OpenSSH spawned by the TUI.
+export TERM=xterm-256color
+if [ ! -x "$HOME/.local/libexec/lazyssh" ]; then
+    printf '%s\n' 'Сначала выполните lazyssh-install.' >&2
+    exit 1
+fi
+exec "$HOME/.local/libexec/lazyssh" "$@"

@@ -1,0 +1,17 @@
+#!/bin/bash
+# Build audited upstream revision; no sudo or changes to OpenSSH configuration.
+set -euo pipefail
+revision=07cb2abb1abf65d4036a7574c2b33a1808d5614f
+source_dir=$(mktemp -d)
+trap 'rm -rf -- "$source_dir"' EXIT
+git -C "$source_dir" init -q
+git -C "$source_dir" remote add origin https://github.com/Adembc/lazyssh.git
+git -C "$source_dir" fetch --depth 1 origin "$revision"
+git -C "$source_dir" checkout -q --detach FETCH_HEAD
+cd "$source_dir"
+go mod verify
+go build -mod=readonly -trimpath -ldflags="-X main.gitCommit=$revision" -o lazyssh ./cmd
+install -d "$HOME/.local/libexec"
+install -m 755 lazyssh "$HOME/.local/libexec/lazyssh.new"
+mv -f "$HOME/.local/libexec/lazyssh.new" "$HOME/.local/libexec/lazyssh"
+printf '%s\n' 'Установлено. Запуск: lazyssh; выход: q.'

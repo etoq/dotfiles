@@ -169,7 +169,7 @@ awful.rules.rules={
  {rule_any={type={'dock'}},properties={border_width=0,focus=false,focusable=false,skip_taskbar=true,buttons={}}},
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
- {rule={class='TiffanyCalculator'},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},
+ {rule_any={class={'TiffanyCalculator','TiffanyTranslator'}},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},
  {rule={class='kitty'},properties={maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='calendar'},properties={floating=true,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(900,c.screen.workarea.height-80)end},callback=place_popup},
  {rule={class='otter'},properties={floating=true,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false,width=500,height=420,screen=function()return awful.screen.focused()end},callback=place_popup},
@@ -184,7 +184,7 @@ end)
 -- Follow explicit activation of Zen links and the single-instance calculator.
 awful.ewmh.add_activate_filter(function(c,context,hints)
  local class=(c.class or ''):lower()
- if (class~='zen' and class~='tiffanycalculator') or c.type~='normal' then return end
+ if (class~='zen' and class~='tiffanycalculator' and class~='tiffanytranslator') or c.type~='normal' then return end
  c.minimized=false
  if not c:isvisible() and c.first_tag then c.first_tag:view_only()end
  if _G.mouse.screen~=c.screen then awful.screen.focus(c.screen)end

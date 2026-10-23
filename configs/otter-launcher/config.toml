@@ -542,3 +542,10 @@ with_argument = true
 url_encode = true
 unbind_proc = false
 hidden = true
+
+[[modules]]
+prefix = "ssh"
+description = "SSH · lazyssh"
+with_argument = false
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ssh"
+unbind_proc = false
