@@ -255,7 +255,7 @@
     "raw_argument": false
   },
   "upd": {
-    "command": "kitty -e bash -c 'sudo pacman -Syu; read -p \"Done. Press Enter...\"'",
+    "command": "kitty -e bash -c 'yay -Syu; read -p \"Done. Press Enter...\"'",
     "url_encoded": false,
     "raw_argument": false
   },
@@ -370,7 +370,7 @@
     "raw_argument": false
   },
   "ssh": {
-    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/lazyssh\"",
+    "command": "exec kitty --override font_size=14.7 --class otter-tools --start-as maximized -e \"$HOME/.local/bin/lazyssh\"",
     "url_encoded": false,
     "raw_argument": false
   }
