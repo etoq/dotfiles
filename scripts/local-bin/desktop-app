@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reuse ChatGPT/Discord windows and request their native Quit command."""
+"""Open or restore the existing ChatGPT/Discord window."""
 import argparse
 import contextlib
 import fcntl
@@ -141,46 +141,14 @@ def open_app(app):
         raise RuntimeError('Приложение запускается, но его окно пока не найдено. Повтори сочетание позже.')
 
 
-def close_window(window):
-    info = window_info(window)
-    if not info:
-        raise RuntimeError('Окно не принадлежит ChatGPT или Discord этого пользователя.')
-    # Native app menu accelerators honor pending-work/call confirmation dialogs.
-    # Electron ignores XSendEvent key events directed with --window. Focus the
-    # validated window and use XTest instead, after checking the WM active client.
-    activate(window)
-    focused = run(['xdotool', 'getactivewindow'])
-    if focused.stdout.strip() != str(int(window)):
-        raise RuntimeError('Фокус изменился; выход отменён.')
-    result = run(['xdotool', 'windowfocus', '--sync', str(int(window)),
-                  'key', '--clearmodifiers', 'ctrl+q'])
-    if result.returncode:
-        raise RuntimeError('Не удалось отправить штатную команду выхода.')
-
-
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     cmd = commands.add_parser('open')
     cmd.add_argument('app', choices=LAUNCH)
-    cmd = commands.add_parser('close')
-    cmd.add_argument('window', type=int)
-    commands.add_parser('close-focused')
     args = parser.parse_args()
-    if args.command == 'open':
-        open_app(args.app)
-    elif args.command == 'close':
-        close_window(args.window)
-    else:
-        focused = run(['xdotool', 'getactivewindow'])
-        if focused.returncode or not focused.stdout.strip().isdigit():
-            return
-        window = int(focused.stdout.strip())
-        if window_info(window):
-            close_window(window)
-        else:
-            sp.run(['bspc', 'node', '-c'], check=True)
+    open_app(args.app)
 
 
 if __name__ == '__main__':

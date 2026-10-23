@@ -1,4 +1,4 @@
-"""Window reuse and scoped native Quit requests; never touch installed sessions."""
+"""Window reuse; never touch installed sessions."""
 import importlib.machinery
 import importlib.util
 from pathlib import Path
@@ -47,28 +47,6 @@ class Lifecycle(unittest.TestCase):
             self.assertEqual(run.call_args.args[0][0], 'awesome-client')
             self.assertIn('view_only()', run.call_args.args[0][1])
 
-    def test_close_rejects_unknown_or_foreign_window(self):
-        with patch.object(app, 'window_info', return_value=None), patch.object(app, 'run') as run:
-            with self.assertRaises(RuntimeError):
-                app.close_window(123)
-            run.assert_not_called()
-
-    def test_changed_focus_prevents_quitting_an_unrelated_app(self):
-        with patch.object(app, 'window_info', return_value={'app': 'discord'}), \
-                patch.object(app, 'activate'), patch.object(app, 'run', return_value=completed([], '999\n')) as run:
-            with self.assertRaises(RuntimeError):
-                app.close_window(123)
-            self.assertEqual(run.call_count, 1)
-            self.assertEqual(run.call_args.args[0], ['xdotool', 'getactivewindow'])
-
-    def test_close_uses_native_accelerator_with_real_key_events(self):
-        with patch.object(app, 'window_info', return_value={'app': 'chatgpt'}), \
-                patch.object(app, 'activate'), patch.object(app, 'run',
-                side_effect=[completed([], '123\n'), completed([])]) as run:
-            app.close_window(123)
-            command = run.call_args.args[0]
-            self.assertEqual(command, ['xdotool', 'windowfocus', '--sync', '123',
-                                      'key', '--clearmodifiers', 'ctrl+q'])
 
 
 if __name__ == '__main__':

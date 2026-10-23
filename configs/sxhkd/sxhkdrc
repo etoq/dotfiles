@@ -67,7 +67,7 @@ Print
 
 # close and kill
 super + c
-    ~/.local/bin/desktop-app close-focused
+    bspc node -c
 
 # alternate between the tiled and monocle layout
 super + space

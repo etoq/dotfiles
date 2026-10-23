@@ -102,14 +102,7 @@ key({},'XF86MonBrightnessDown',function()action('brightness-down')end,'Темн�
 key({},'XF86AudioPlay',function()action('media')end,'Play / pause','Мультимедиа')
 key({},'XF86AudioNext',function()action('next')end,'Следующий трек','Мультимедиа')
 key({},'XF86AudioPrev',function()action('previous')end,'Предыдущий трек','Мультимедиа')
-key({mod},'c',function()
- local c=client.focus
- if not c then return end
- local class=(c.class or ''):lower()
- if class=='chatgpt' or class=='discord' then
-  spawn({home..'/.local/bin/desktop-app','close',tostring(c.window)})
- else c:kill()end
-end,'Закрыть окно','Окна')
+key({mod},'c',function()if client.focus then client.focus:kill()end end,'Закрыть окно','Окна')
 key({mod},'f',function()if client.focus then client.focus.fullscreen=not client.focus.fullscreen;client.focus:raise()end end,'Полный экран','Окна')
 key({mod},'m',function()if client.focus then client.focus.maximized=not client.focus.maximized;client.focus:raise()end end,'Развернуть окно','Окна')
 key({mod},'space',function()if client.focus then client.focus.floating=not client.focus.floating end end,'Плавающее / тайловое','Окна')
