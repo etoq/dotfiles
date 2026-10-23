@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+# Only Cloud Translation v3 requires OAuth. Keep Python packages outside Arch's system Python.
+venv="$HOME/.local/share/tiffany-translator/auth"
+python3 -m venv --system-site-packages "$venv"
+"$venv/bin/python" -m pip install 'google-auth[requests]==2.62.0'

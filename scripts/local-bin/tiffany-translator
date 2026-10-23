@@ -59,24 +59,54 @@ class TranslatorWindow(Gtk.ApplicationWindow):
         form = Gtk.Grid(column_spacing=10, row_spacing=8)
         form.get_style_context().add_class('settings')
         self.provider = Gtk.ComboBoxText()
-        for value, label in [('gemini', 'Gemini'), ('openai', 'OpenAI')]:
+        for value, label in [('gemini', 'Gemini'), ('deepl', 'DeepL'), ('google', 'Google Cloud Advanced')]:
             self.provider.append(value, label)
         self.provider.set_active_id('gemini')
-        self.model = Gtk.Entry(text=core.PROVIDERS['gemini']['model'])
+        self.model = Gtk.Entry()
+        self.model.set_hexpand(True)
         self.secret = Gtk.Entry(visibility=False)
         self.secret.set_placeholder_text('API-ключ · пусто — использовать сохранённый')
         self.secret.set_hexpand(True)
+        self.project = Gtk.Entry()
+        self.project.set_placeholder_text('ID проекта Google Cloud')
+        self.location = Gtk.Entry()
+        self.location.set_placeholder_text('Регион · global')
+        self.credentials = Gtk.Entry()
+        self.credentials.set_placeholder_text('JSON авторизации · пусто — использовать ADC')
+        self.credentials.set_hexpand(True)
+        self.choose = Gtk.Button(label='Выбрать JSON')
+        self.choose.connect('clicked', self.choose_credentials)
+        cloud = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        project_row = Gtk.Box(spacing=8)
+        project_row.pack_start(self.project, True, True, 0)
+        project_row.pack_start(self.location, False, False, 0)
+        cloud.pack_start(project_row, False, False, 0)
+        credential_row = Gtk.Box(spacing=8)
+        credential_row.pack_start(self.credentials, True, True, 0)
+        credential_row.pack_start(self.choose, False, False, 0)
+        cloud.pack_start(credential_row, False, False, 0)
+        self.cloud_reveal = Gtk.Revealer()
+        self.cloud_reveal.add(cloud)
+        self.secret_reveal = Gtk.Revealer()
+        self.secret_reveal.add(self.secret)
+        self.config_hint = Gtk.Label(xalign=0)
+        self.config_hint.set_line_wrap(True)
+        self.config_hint.set_max_width_chars(72)
+        self.config_hint.get_style_context().add_class('muted')
+        self.key_link = Gtk.LinkButton.new_with_label('https://aistudio.google.com/apikey', 'Получить ключ')
         save = Gtk.Button(label='Сохранить')
         save.connect('clicked', self.save_settings)
-        self.provider.connect('changed', lambda *_: self.model.set_text(core.PROVIDERS[self.provider.get_active_id()]['model']))
         form.attach(self.provider, 0, 0, 1, 1)
         form.attach(self.model, 1, 0, 1, 1)
-        form.attach(self.secret, 0, 1, 2, 1)
-        form.attach(save, 2, 1, 1, 1)
-        links = Gtk.Box(spacing=10)
-        links.pack_start(Gtk.LinkButton.new_with_label('https://aistudio.google.com/apikey', 'Ключ Gemini'), False, False, 0)
-        links.pack_start(Gtk.LinkButton.new_with_label('https://platform.openai.com/api-keys', 'Ключ OpenAI'), False, False, 0)
-        form.attach(links, 0, 2, 3, 1)
+        form.attach(self.secret_reveal, 0, 1, 2, 1)
+        form.attach(self.cloud_reveal, 0, 2, 2, 1)
+        form.attach(self.config_hint, 0, 3, 2, 1)
+        footer = Gtk.Box(spacing=10)
+        footer.pack_start(self.key_link, True, True, 0)
+        footer.pack_end(save, False, False, 0)
+        form.attach(footer, 0, 4, 2, 1)
+        self.provider.connect('changed', self.provider_changed)
+        self.provider_changed()
         self.reveal.add(form)
         body.pack_start(self.reveal, False, False, 0)
         row = Gtk.Box(spacing=10)
@@ -130,38 +160,94 @@ class TranslatorWindow(Gtk.ApplicationWindow):
         parent.pack_start(box, True, True, 0)
         return view
 
+    def provider_changed(self, *_):
+        provider = self.provider.get_active_id()
+        config = core.provider_config(provider)
+        self.model.set_text(config['model'])
+        self.secret.set_text('')
+        self.project.set_text(config.get('project', ''))
+        self.location.set_text(config.get('location', 'global'))
+        self.credentials.set_text(config.get('credentials', ''))
+        cloud = provider == 'google'
+        self.cloud_reveal.set_reveal_child(cloud)
+        self.secret_reveal.set_reveal_child(not cloud)
+        hints = {
+            'gemini': 'Модель Gemini · низкий уровень thinking для быстрого перевода.',
+            'deepl': 'latency_optimized — быстрее; quality_optimized — приоритет качества.',
+            'google': 'Модель general/nmt. Нужны Cloud Translation API, биллинг и права Cloud Translation API User. API-ключ Gemini не подходит.',
+        }
+        links = {'gemini': ('https://aistudio.google.com/apikey', 'Получить ключ Gemini'),
+                 'deepl': ('https://www.deepl.com/en/developers', 'Получить ключ DeepL'),
+                 'google': ('https://console.cloud.google.com/apis/library/translate.googleapis.com', 'Настроить Google Cloud')}
+        self.config_hint.set_text(hints[provider])
+        self.key_link.set_uri(links[provider][0])
+        self.key_link.set_label(links[provider][1])
+
+    def choose_credentials(self, *_):
+        chooser = Gtk.FileChooserNative.new('JSON сервисного аккаунта Google Cloud', self,
+                                           Gtk.FileChooserAction.OPEN, 'Выбрать', 'Отмена')
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name('JSON')
+        file_filter.add_pattern('*.json')
+        chooser.add_filter(file_filter)
+        if chooser.run() == Gtk.ResponseType.ACCEPT:
+            self.credentials.set_text(chooser.get_filename())
+        chooser.destroy()
+
     def load_settings(self):
         try:
             config = core.settings()
             self.provider.set_active_id(config['provider'])
             self.model.set_text(config['model'])
-            core.api_key(config)
+            self.project.set_text(config.get('project', ''))
+            self.location.set_text(config.get('location', 'global'))
+            self.credentials.set_text(config.get('credentials', ''))
+            core.credentials_ready(config)
             self.badge.set_text(config['provider'] + ' · ' + config['model'])
             return True
-        except core.TranslationError:
+        except core.TranslationError as error:
             self.reveal.set_reveal_child(True)
-            self.status.set_text('Выберите сервис и сохраните API-ключ в настройках. Ключ вводится только здесь.')
+            self.status.set_text(str(error))
             return False
 
     def save_settings(self, *_):
         config = {'provider': self.provider.get_active_id(), 'model': self.model.get_text().strip()}
         secret = self.secret.get_text().strip()
         try:
-            if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,100}', config['model']):
-                raise core.TranslationError('Проверьте название модели.')
-            if secret:
-                if len(secret) > 1024 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
-                    raise core.TranslationError('Некорректный формат API-ключа.')
-                core.atomic_private(core.CONFIG / (config['provider'] + '.key'), secret + '\n')
-            core.api_key(config)
-            core.atomic_private(core.CONFIG / 'config.json', json.dumps(config) + '\n')
+            if config['provider'] == 'google':
+                config.update(project=self.project.get_text().strip(),
+                              location=self.location.get_text().strip() or 'global',
+                              credentials=self.credentials.get_text().strip())
+                core.validate_config(config)
+                if config['credentials']:
+                    path = Path(config['credentials']).expanduser()
+                    if path.stat().st_size > 128000:
+                        raise core.TranslationError('Слишком большой JSON авторизации.')
+                    contents = path.read_text()
+                    data = json.loads(contents)
+                    if data.get('type') not in ('service_account', 'authorized_user'):
+                        raise core.TranslationError('Выберите JSON сервисного аккаунта или ADC.')
+                    destination = core.CONFIG / 'google-credentials.json'
+                    core.atomic_private(destination, contents)
+                    config['credentials'] = str(destination)
+            else:
+                core.validate_config(config)
+                if secret:
+                    if len(secret) > 1024 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
+                        raise core.TranslationError('Некорректный формат API-ключа.')
+                    core.atomic_private(core.CONFIG / (config['provider'] + '.key'), secret + '\n')
+            core.credentials_ready(config)
+            core.save_config(config)
             self.secret.set_text('')
             self.cache.clear()
             self.load_settings()
             self.reveal.set_reveal_child(False)
-            self.status.set_text('Настройки сохранены. Текст отправляется только по кнопке «Перевести».')
-        except (core.TranslationError, OSError) as error:
-            self.status.set_text(str(error))
+            self.status.set_text('Настройки сохранены. Нажмите «Перевести» для проверки подключения.')
+        except (core.TranslationError, OSError, ValueError, AttributeError) as error:
+            if isinstance(error, core.TranslationError):
+                self.status.set_text(str(error))
+            else:
+                self.status.set_text('Не удалось прочитать или сохранить настройки. Проверьте JSON и права доступа.')
 
     def compute(self):
         if self.job or not self.load_settings():
@@ -173,7 +259,7 @@ class TranslatorWindow(Gtk.ApplicationWindow):
             return
         target = self.target.get_active_id()
         config = core.settings()
-        key = (config['provider'], config['model'], target, text)
+        key = (json.dumps(config, sort_keys=True), target, text)
         if key in self.cache:
             self.show_result(self.cache[key])
             return
@@ -182,7 +268,7 @@ class TranslatorWindow(Gtk.ApplicationWindow):
         self.status.set_text('Перевожу…')
         try:
             self.job = Gio.Subprocess.new([sys.executable, str(Path(core.__file__).resolve()), '--to', target], Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE)
-            self.timeout = GLib.timeout_add_seconds(50, self.timed_out)
+            self.timeout = GLib.timeout_add_seconds(75, self.timed_out)
             self.job.communicate_utf8_async(text, None, self.finished, key)
         except GLib.Error:
             self.stop_job()

@@ -24,7 +24,7 @@ class Translation(unittest.TestCase):
         self.config = Path(self.temp.name)/'config'
         p = patch.object(tr, 'CONFIG', self.config)
         p.start(); self.addCleanup(p.stop)
-        p = patch.dict(tr.os.environ, {'GEMINI_API_KEY': '', 'OPENAI_API_KEY': ''})
+        p = patch.dict(tr.os.environ, {'GEMINI_API_KEY': '', 'DEEPL_API_KEY': ''})
         p.start(); self.addCleanup(p.stop)
 
     def test_direction_and_override(self):
@@ -43,30 +43,46 @@ class Translation(unittest.TestCase):
         self.assertNotIn(text, body['systemInstruction']['parts'][0]['text'])
         self.assertNotIn('tools', body)
 
-    def test_openai_responses_store_false_and_no_tools(self):
-        url, body, headers = tr.request_spec({'provider': 'openai', 'model': 'gpt-4.1-mini'},
-                                            'DUMMY_SECRET', 'hello', 'RU')
-        self.assertEqual(url, 'https://api.openai.com/v1/responses')
-        self.assertFalse(body['store'])
-        self.assertEqual(body['input'], 'hello')
-        self.assertEqual(headers['Authorization'], 'Bearer DUMMY_SECRET')
-        self.assertNotIn('tools', body)
+    def test_deepl_endpoint_and_auth(self):
+        for key, host in [('DUMMY_SECRET:fx', 'api-free.deepl.com'), ('DUMMY_SECRET', 'api.deepl.com')]:
+            url, body, headers = tr.request_spec({'provider': 'deepl', 'model': 'latency_optimized'}, key, 'hello', 'RU')
+            self.assertEqual(url, 'https://' + host + '/v2/translate')
+            self.assertEqual(headers['Authorization'], 'DeepL-Auth-Key ' + key)
+            self.assertEqual(body['text'], ['hello'])
+            self.assertEqual(body['target_lang'], 'RU')
+            self.assertTrue(body['preserve_formatting'])
+            self.assertNotIn(key, url)
+
+    def test_google_advanced_uses_oauth_and_project(self):
+        config = {'provider': 'google', 'project': 'test-project', 'location': 'global', 'model': 'general/nmt'}
+        url, body, headers = tr.request_spec(config, 'DUMMY_TOKEN', 'hello', 'RU')
+        self.assertEqual(url, 'https://translate.googleapis.com/v3/projects/test-project/locations/global:translateText')
+        self.assertEqual(headers['Authorization'], 'Bearer DUMMY_TOKEN')
+        self.assertEqual(headers['x-goog-user-project'], 'test-project')
+        self.assertEqual(body['model'], 'projects/test-project/locations/global/models/general/nmt')
+        self.assertEqual(body['contents'], ['hello'])
+        self.assertEqual(body['targetLanguageCode'], 'ru')
+        self.assertEqual(body['mimeType'], 'text/plain')
+
+    def test_gemini_latency_controls(self):
+        for model, control in [('gemini-3.8-flash', {'thinkingLevel': 'low'}),
+                               ('gemini-2.5-flash', {'thinkingBudget': 0})]:
+            _, body, _ = tr.request_spec({'provider': 'gemini', 'model': model}, 'DUMMY_SECRET', 'hello', 'RU')
+            self.assertEqual(body['generationConfig']['thinkingConfig'], control)
 
     def test_complete_responses_and_thought_filter(self):
         result = {'candidates': [{'finishReason': 'STOP', 'content': {'parts': [
             {'text': 'private reasoning', 'thought': True}, {'text': 'Перевод'}]}}]}
         self.assertEqual(tr.response_text('gemini', result), 'Перевод')
-        result = {'status': 'completed', 'output': [{'type': 'message', 'content': [
-            {'type': 'output_text', 'text': 'Translation'}]}]}
-        self.assertEqual(tr.response_text('openai', result), 'Translation')
+        self.assertEqual(tr.response_text('deepl', {'translations': [{'text': 'Перевод'}]}), 'Перевод')
+        self.assertEqual(tr.response_text('google', {'translations': [{'translatedText': 'Translation'}]}), 'Translation')
 
     def test_truncation_refusal_and_malformed_response_are_errors(self):
         for provider, data in [('gemini', {'candidates': []}),
                 ('gemini', {'candidates': [{'finishReason': 'MAX_TOKENS'}]}),
                 ('gemini', {'candidates': 'bad'}), ('gemini', []),
-                ('openai', {'status': 'incomplete'}),
-                ('openai', {'status': 'completed', 'output': [{'type': 'message',
-                    'content': [{'type': 'refusal', 'refusal': 'refused'}]}]})]:
+                ('deepl', {'translations': []}), ('google', {'translations': [{}]}),
+                ('deepl', {'translations': [{'text': 15}]})]:
             with self.subTest(provider=provider, data=data), self.assertRaises(tr.TranslationError):
                 tr.response_text(provider, data)
 
@@ -114,6 +130,28 @@ class Translation(unittest.TestCase):
         self.assertEqual((self.config/'gemini.key').stat().st_mode & 0o777, 0o600)
         (self.config/'gemini.key').chmod(0o644)
         with self.assertRaises(tr.TranslationError): tr.api_key(config)
+
+    def test_provider_profiles_and_invalid_provider(self):
+        for provider in ('gemini', 'deepl'):
+            config = {'provider': provider, 'model': tr.PROVIDERS[provider]['model']}
+            tr.save_config(config)
+            self.assertEqual(tr.provider_config(provider), config)
+        self.assertEqual(tr.settings()['provider'], 'deepl')
+        with self.assertRaises(tr.TranslationError):
+            tr.validate_config({'provider': 'removed-provider', 'model': 'test'})
+        with self.assertRaises(tr.TranslationError):
+            tr.validate_config({'provider': 'google', 'model': 'general/nmt', 'project': 'bad/project'})
+        with self.assertRaises(tr.TranslationError):
+            tr.validate_config({'provider': 'deepl', 'model': 'unknown'})
+
+    def test_cloud_uses_token_helper_instead_of_api_key(self):
+        client = tr.Translator({'provider': 'google', 'project': 'test-project', 'model': 'general/nmt'})
+        with patch.object(tr, 'api_key', side_effect=AssertionError('API key must not be used')), \
+                patch.object(tr, 'cloud_token', return_value='DUMMY_TOKEN') as auth, \
+                patch.object(tr, 'post_json', return_value={'translations': [{'translatedText': 'Перевод'}]}) as post:
+            self.assertEqual(client.translate('hello')[0], 'Перевод')
+            self.assertEqual(post.call_args.args[2]['Authorization'], 'Bearer DUMMY_TOKEN')
+            self.assertEqual(auth.call_count, 1)
 
     def test_terminal_control_characters_are_not_printed(self):
         self.assertEqual(tr.printable('text\x1b\x07\x9b\r\nnext\tline'), 'text\nnext\tline')

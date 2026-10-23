@@ -248,7 +248,7 @@ url_encode = true
 unbind_proc = false
 
 [[modules]]
-description = "Перевод · LLM · EN ↔ RU"
+description = "Перевод · API · EN ↔ RU"
 prefix = "tr"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module tr --argument '{}'"
 with_argument = true
