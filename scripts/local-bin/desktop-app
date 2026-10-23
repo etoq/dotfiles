@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import fcntl
+import json
 import os
 from pathlib import Path
 import re
@@ -113,8 +114,25 @@ def activate(window):
         raise RuntimeError('Не удалось переключиться на окно.')
 
 
+def tray_open_id(layout):
+    """Accept only an explicit Open/Show item, never the adjacent Quit item."""
+    try:
+        children = layout['data'][1][2]
+        for child in children:
+            item_id, properties, _ = child['data']
+            label = properties.get('label', {}).get('data', '').replace('_', '').strip().casefold()
+            enabled = properties.get('enabled', {}).get('data', True)
+            visible = properties.get('visible', {}).get('data', True)
+            if (type(item_id) is int and enabled and visible and label in
+                    {'открыть', 'показать', 'open', 'show', 'open localsend', 'show localsend'}):
+                return item_id
+    except (KeyError, IndexError, TypeError, AttributeError, ValueError):
+        pass
+    return None
+
+
 def activate_localsend():
-    """GTK exports Activate even when LocalSend is withdrawn to its tray."""
+    """Invoke LocalSend's tray Open callback; GTK Activate starts another Flutter engine."""
     pids = set(main_processes('localsend'))
     if not pids:
         return False
@@ -125,12 +143,29 @@ def activate_localsend():
             continue
         if not fields[1].isdigit() or int(fields[1]) not in pids:
             continue
-        result = run(['gdbus', 'call', '--session', '--dest', fields[0],
-                      '--object-path', '/org/localsend/localsend_app',
-                      '--method', 'org.freedesktop.Application.Activate', '{}'])
-        if result.returncode == 0:
-            return True
-    raise RuntimeError('LocalSend запущен, но его окно не удалось открыть через GTK. Новый процесс не создан.')
+        name = fields[0]
+        objects = run(['busctl', '--user', '--list', 'tree', name])
+        for path in objects.stdout.splitlines():
+            path = path.strip()
+            if not (path.startswith('/org/ayatana/NotificationItem/') and path.endswith('/Menu')):
+                continue
+            menu = run(['busctl', '--user', '--json=short', 'call', name, path,
+                        'com.canonical.dbusmenu', 'GetLayout', 'iias', '0', '1', '3',
+                        'label', 'enabled', 'visible'])
+            if menu.returncode:
+                continue
+            try:
+                item_id = tray_open_id(json.loads(menu.stdout))
+            except ValueError:
+                continue
+            if item_id is None:
+                continue
+            result = run(['busctl', '--user', 'call', name, path,
+                          'com.canonical.dbusmenu', 'Event', 'isvu', str(item_id),
+                          'clicked', 's', '', '0'])
+            if result.returncode == 0:
+                return True
+    raise RuntimeError('LocalSend запущен, но пункт «Открыть» в трее не найден. Процесс не перезапускался.')
 
 
 def open_app(app):
