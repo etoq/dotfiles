@@ -105,7 +105,7 @@
     "raw_argument": false
   },
   "tr": {
-    "command": "xdg-open 'https://www.deepl.com/translator#en/ru/{}'",
+    "command": "exec kitty --class otter-tools -e \"$HOME/.local/bin/translate\" --ui --encoded='{}'",
     "url_encoded": true,
     "raw_argument": false
   },
