@@ -122,6 +122,7 @@ class TranslatorWindow(Gtk.ApplicationWindow):
         body.pack_start(row, False, False, 0)
         panes = Gtk.Box(spacing=14, homogeneous=True)
         self.source = self.text_pane(panes, 'Исходный текст', True)
+        self.source.connect('key-press-event', self.keypress)
         self.result = self.text_pane(panes, 'Перевод', False)
         body.pack_start(panes, True, True, 0)
         actions = Gtk.Box(spacing=10)
@@ -137,7 +138,7 @@ class TranslatorWindow(Gtk.ApplicationWindow):
         self.copy_button.connect('clicked', self.copy)
         actions.pack_end(self.copy_button, False, False, 0)
         body.pack_start(actions, False, False, 0)
-        self.status = Gtk.Label(label='Ctrl+Enter — перевести · Ctrl+Shift+C — копировать', xalign=0)
+        self.status = Gtk.Label(label='Enter — перевести · Shift+Enter — новая строка', xalign=0)
         self.status.set_line_wrap(True)
         self.status.get_style_context().add_class('muted')
         body.pack_start(self.status, False, False, 0)
@@ -340,12 +341,13 @@ class TranslatorWindow(Gtk.ApplicationWindow):
         self.stop_job()
         self.cache.clear()
 
-    def keypress(self, _window, event):
+    def keypress(self, widget, event):
         control = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
         if event.keyval == Gdk.KEY_Escape:
             self.close()
             return True
-        if control and event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+        if (widget is self.source or control) and not shift and event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             self.compute()
             return True
         if control and event.state & Gdk.ModifierType.SHIFT_MASK and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):

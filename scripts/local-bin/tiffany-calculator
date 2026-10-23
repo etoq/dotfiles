@@ -136,6 +136,7 @@ class CalculatorWindow(Gtk.ApplicationWindow):
 
         input_row = Gtk.Box(spacing=10)
         self.entry = Gtk.Entry()
+        self.entry.connect('key-press-event', self.on_key)
         self.entry.set_placeholder_text('2+2 · 0xFF to dec · 10 km to m')
         self.entry.connect('activate', lambda *_: self.compute())
         input_row.pack_start(self.entry, True, True, 0)
@@ -154,6 +155,7 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         self.result = Gtk.TextView(editable=False, cursor_visible=False)
         self.result.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
         self.result.set_accepts_tab(False)
+        self.result.connect('key-press-event', self.on_key)
         result_scroll = Gtk.ScrolledWindow()
         result_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         result_scroll.set_min_content_height(65)
@@ -169,7 +171,7 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         result_box.pack_start(result_actions, False, False, 0)
         body.pack_start(result_box, False, False, 0)
 
-        self.status = Gtk.Label(label='Enter — вычислить · Ctrl+L — новый ввод · Esc — закрыть', xalign=0)
+        self.status = Gtk.Label(label='Enter — вычислить · Ctrl+C — ответ · Ctrl+L — очистить · Esc — закрыть', xalign=0)
         self.status.get_style_context().add_class('muted')
         self.status.set_line_wrap(True)
         body.pack_start(self.status, False, False, 0)
@@ -276,7 +278,7 @@ class CalculatorWindow(Gtk.ApplicationWindow):
                 self.history = self.history[-30:]
                 try:
                     save_history(self.history)
-                    self.set_status('Готово · ans — последний результат')
+                    self.set_status('Готово · Ctrl+C — скопировать · ans — последний результат')
                 except OSError as failure:
                     self.set_status('Результат готов, но история не сохранена: ' + str(failure), True)
                 self.rebuild_history()
@@ -355,9 +357,14 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         if control and event.keyval in (Gdk.KEY_l, Gdk.KEY_L):
             self.clear_entry()
             return True
-        if control and event.state & Gdk.ModifierType.SHIFT_MASK and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
-            self.copy_result()
-            return True
+        if control and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
+            shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+            focus = self.get_focus()
+            selected = (isinstance(focus, Gtk.Entry) and bool(focus.get_selection_bounds())
+                        or isinstance(focus, Gtk.TextView) and focus.get_buffer().get_has_selection())
+            if shift or not selected and (self.answer or self.job):
+                self.copy_result()
+                return True
         return False
 
     def on_destroy(self, *_):
