@@ -59,7 +59,14 @@ def main():
     active = json.loads(nft('--json', 'list', 'chain', 'inet', 'filter', 'input'))
     comments = {row.get('rule', {}).get('comment') for row in active['nftables']}
     additions = [rule for rule in RULES if rule.rsplit('"', 2)[1] not in comments]
-    batch = ''.join('insert rule inet filter input ' + rule + '\n' for rule in additions)
+    # Insert at the same position as the saved rules, after invalid-packet rejection.
+    handles = [row['rule']['handle'] for row in active['nftables'] if 'rule' in row
+               and any(expr.get('match', {}).get('right') == 3427
+                       and expr.get('match', {}).get('left') == {'payload': {'protocol': 'tcp', 'field': 'dport'}}
+                       for expr in row['rule'].get('expr', []))]
+    if len(handles) != 1:
+        raise RuntimeError('Could not locate the existing input anchor; no changes made.')
+    batch = ''.join(f'insert rule inet filter input position {handles[0]} ' + rule + '\n' for rule in additions)
     if batch:
         nft('--check', '--file', '-', text=batch)
     backup = BACKUPS / ('localsend-firewall-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
