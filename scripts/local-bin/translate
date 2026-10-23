@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EN/RU translator: Gemini, DeepL and Google Cloud Translation Advanced."""
+"""EN/RU technical translator using the Gemini API."""
 import argparse
 import contextlib
 import getpass
@@ -21,8 +21,6 @@ import urllib.request
 CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'tiffany-translate'
 PROVIDERS = {
     'gemini': {'model': 'gemini-3.5-flash-lite', 'env': 'GEMINI_API_KEY'},
-    'deepl': {'model': 'latency_optimized', 'env': 'DEEPL_API_KEY'},
-    'google': {'model': 'general/nmt', 'env': ''},
 }
 LIMIT = 12000
 
@@ -44,16 +42,9 @@ def atomic_private(path, text):
 
 def validate_config(data):
     if not isinstance(data, dict) or data.get('provider') not in PROVIDERS:
-        raise TranslationError('Выберите Gemini, DeepL или Google Cloud в настройках.')
+        raise TranslationError('Выберите Gemini в настройках.')
     if not isinstance(data.get('model'), str) or not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,250}', data['model']):
         raise TranslationError('Некорректное имя модели.')
-    if data['provider'] == 'deepl' and data['model'] not in ('latency_optimized', 'quality_optimized', 'prefer_quality_optimized'):
-        raise TranslationError('DeepL: модель latency_optimized, quality_optimized или prefer_quality_optimized.')
-    if data['provider'] == 'google':
-        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:-]{2,127}', data.get('project', '')):
-            raise TranslationError('Google Cloud: укажите ID проекта.')
-        if not re.fullmatch(r'[a-z0-9-]{1,63}', data.get('location', 'global')):
-            raise TranslationError('Google Cloud: некорректный регион.')
     return data
 
 
@@ -82,8 +73,6 @@ def provider_config(provider):
 
 def api_key(config):
     provider = config['provider']
-    if provider == 'google':
-        raise TranslationError('Google Cloud Advanced использует OAuth, а не API-ключ.')
     secret = os.environ.get(PROVIDERS[provider]['env'], '').strip()
     if not secret:
         path = CONFIG / (provider + '.key')
@@ -100,58 +89,21 @@ def api_key(config):
 
 
 def credentials_ready(config):
-    if config['provider'] != 'google':
-        api_key(config)
-        return
-    helper = Path.home() / '.local/share/tiffany-translator/auth/bin/python'
-    if not helper.is_file():
-        raise TranslationError('Выполните translate-install-auth для поддержки Google Cloud.')
-    path = Path(config.get('credentials') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-                or Path.home() / '.config/gcloud/application_default_credentials.json').expanduser()
-    if not path.is_file():
-        raise TranslationError('Google Cloud: выберите JSON сервисного аккаунта или настройте ADC.')
-    if path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
-        raise TranslationError('JSON авторизации Google должен принадлежать вам и иметь права 600.')
-
-
-def cloud_token(config):
-    credentials_ready(config)
-    helper = Path(__file__).resolve().with_name('translate-cloud-auth')
-    python = Path.home() / '.local/share/tiffany-translator/auth/bin/python'
-    try:
-        process = sp.run([str(python), str(helper)], input=json.dumps(config), text=True,
-                         capture_output=True, timeout=25, check=False)
-        if process.returncode:
-            raise TranslationError(process.stdout.strip()[:300] or 'Не удалось авторизоваться в Google Cloud.')
-        token = json.loads(process.stdout)['token']
-        if not isinstance(token, str) or not token or any(c.isspace() for c in token):
-            raise ValueError
-        return token
-    except (ValueError, KeyError, sp.SubprocessError):
-        raise TranslationError('Ошибка получения OAuth-токена Google Cloud.') from None
+    api_key(config)
 
 
 def setup():
     if not sys.stdin.isatty():
         raise TranslationError('Настройку нужно открыть в терминале: translate --setup')
-    print('1 — Gemini\n2 — DeepL\n3 — Google Cloud Translation Advanced')
-    choice = input('Сервис [1]: ').strip() or '1'
-    if choice not in ('1', '2', '3'):
-        raise TranslationError('Выберите 1, 2 или 3.')
-    provider = {'1': 'gemini', '2': 'deepl', '3': 'google'}[choice]
-    config = provider_config(provider)
+    print('Настройка Gemini · ключ вводится локально и не отображается.')
+    config = provider_config('gemini')
     config['model'] = input(f'Модель [{config["model"]}]: ').strip() or config['model']
-    if provider == 'google':
-        config['project'] = input('ID проекта Google Cloud: ').strip()
-        config['location'] = input('Регион [global]: ').strip() or 'global'
-        config['credentials'] = input('Путь к JSON авторизации (пусто — ADC): ').strip()
-    else:
-        secret = getpass.getpass('API-ключ (ввод скрыт; пусто — сохранённый): ').strip()
-        if secret:
-            if len(secret) > 1024 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
-                raise TranslationError('Некорректный формат ключа.')
-            atomic_private(CONFIG / (provider + '.key'), secret + '\n')
     validate_config(config)
+    secret = getpass.getpass('API-ключ (ввод скрыт; пусто — сохранённый): ').strip()
+    if secret:
+        if len(secret) > 1024 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
+            raise TranslationError('Некорректный формат ключа.')
+        atomic_private(CONFIG / 'gemini.key', secret + '\n')
     credentials_ready(config)
     save_config(config)
     print('Настройки сохранены. Проверка подключения — при переводе.')
@@ -195,22 +147,6 @@ def request_spec(config, secret, text, target):
                    'contents': [{'role': 'user', 'parts': [{'text': text}]}],
                    'generationConfig': generation}
         headers = {'x-goog-api-key': secret}
-    elif provider == 'deepl':
-        host = 'api-free.deepl.com' if secret.endswith(':fx') else 'api.deepl.com'
-        url = f'https://{host}/v2/translate'
-        payload = {'text': [text], 'target_lang': target, 'preserve_formatting': True,
-                   'model_type': config['model'],
-                   'context': 'Technical documentation about Linux, reverse engineering, assembly and malware analysis.'}
-        headers = {'Authorization': 'DeepL-Auth-Key ' + secret}
-    elif provider == 'google':
-        project = config['project']
-        location = config.get('location', 'global')
-        parent = f'projects/{project}/locations/{location}'
-        url = f'https://translate.googleapis.com/v3/{parent}:translateText'
-        model = config['model']
-        payload = {'contents': [text], 'mimeType': 'text/plain', 'targetLanguageCode': target.lower(),
-                   'model': model if model.startswith('projects/') else parent + '/models/' + model}
-        headers = {'Authorization': 'Bearer ' + secret, 'x-goog-user-project': project}
     else:
         raise TranslationError('Неизвестный сервис перевода.')
     headers['Content-Type'] = 'application/json'
@@ -242,21 +178,18 @@ def post_json(url, payload, headers):
             if isinstance(details, dict):
                 reason = details.get('status', '')
                 reasons = {x.get('reason') for x in details.get('details', []) if isinstance(x, dict)}
-                for known in ('API_KEY_INVALID', 'SERVICE_DISABLED', 'BILLING_DISABLED'):
+                for known in ('API_KEY_INVALID',):
                     if known in reasons:
                         reason = known
                         break
         except (ValueError, OSError, AttributeError, TypeError):
             pass
-        specific = {'API_KEY_INVALID': 'API-ключ недействителен. Создайте новый ключ в настройках сервиса.',
-                    'SERVICE_DISABLED': 'Включите Cloud Translation API в проекте Google Cloud.',
-                    'BILLING_DISABLED': 'Для проекта Google Cloud не включён биллинг.'}
+        specific = {'API_KEY_INVALID': 'API-ключ недействителен. Создайте новый ключ в настройках сервиса.'}
         if reason in specific:
             raise TranslationError(specific[reason]) from None
         messages = {400: 'API не принял запрос или настройки модели.',
                     401: 'API-ключ не принят.', 403: 'Доступ API запрещён: проверь ключ и доступность сервиса.',
                     404: 'Модель недоступна; проверь её имя в настройках.',
-                    456: 'Квота символов DeepL исчерпана.',
                     429: 'Лимит запросов или квоты API исчерпан. Повторного запроса не было.'}
         raise TranslationError(messages.get(error.code, f'Ошибка сервиса HTTP {error.code}. Повторного запроса не было.')) from None
     except (urllib.error.URLError, TimeoutError, OSError):
@@ -275,10 +208,6 @@ def parsed_response_text(provider, data):
             raise TranslationError('Перевод не завершён или отклонён моделью. Попробуй меньший фрагмент.')
         result = ''.join(part.get('text', '') for part in item.get('content', {}).get('parts', [])
                          if not part.get('thought'))
-    elif provider == 'deepl':
-        result = data['translations'][0]['text']
-    elif provider == 'google':
-        result = data['translations'][0]['translatedText']
     else:
         raise TranslationError('Неизвестный сервис перевода.')
     if not result.strip():
@@ -306,7 +235,7 @@ class Translator:
         language = target_language(text, target)
         key = (text, language)
         if key not in self.cache:
-            url, payload, headers = request_spec(self.config, cloud_token(self.config) if self.config['provider'] == 'google' else api_key(self.config), text, language)
+            url, payload, headers = request_spec(self.config, api_key(self.config), text, language)
             result = response_text(self.config['provider'], post_json(url, payload, headers))
             if len(self.cache) >= 32:
                 self.cache.pop(next(iter(self.cache)))
