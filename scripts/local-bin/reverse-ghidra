@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export _JAVA_AWT_WM_NONREPARENTING=1
-manual="$HOME/ghidra/build/dist/ghidra_12.2_DEV/ghidraRun"
+manual="$HOME/Tools/ghidra/build/dist/ghidra_12.2_DEV/ghidraRun"
 if [[ -x "$manual" ]]; then
     exec "$manual" "$@"
 elif command -v ghidra >/dev/null 2>&1; then

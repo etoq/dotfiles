@@ -187,7 +187,7 @@ if [ "$DO_PKGS" = "1" ]; then
     ok "Pacman пакеты установлены"
 
     # Keep the existing working Ghidra development build on this machine.
-    if [[ ! -x "$HOME/ghidra/build/dist/ghidra_12.2_DEV/ghidraRun" ]] && ! command -v ghidra >/dev/null; then
+    if [[ ! -x "$HOME/Tools/ghidra/build/dist/ghidra_12.2_DEV/ghidraRun" ]] && ! command -v ghidra >/dev/null; then
         sudo pacman -S --needed --noconfirm ghidra
     fi
 
@@ -351,6 +351,8 @@ if [ "$DO_CONFIGS" = "1" ]; then
     if [[ -n ${DISPLAY:-} ]] && command -v betterlockscreen >/dev/null; then
         betterlockscreen -u "$HOME/Images/system/lockscreen.png" --fx dim,dimblur || warn "Не удалось собрать кэш блокировки; повторите betterlockscreen -u ~/Images/system/lockscreen.png --fx dim,dimblur"
     fi
+    mkdir -p "$HOME/Images"
+    command -v xdg-user-dirs-update >/dev/null && xdg-user-dirs-update --set PICTURES "$HOME/Images"
     ok "Все конфиги подключены"
 fi
 
