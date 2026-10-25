@@ -61,6 +61,8 @@ class SensorWait(unittest.TestCase):
             interface.write_text('status:\t enabled\n')
             config = {'sensors': [{'hwmon': folder, 'name': 'coretemp', 'indices': [1]}], 'fans': [{'tpacpi': str(interface)}]}
             self.assertTrue(fan.ready(config))
+            config['sensors'][0]['max_errors'] = 3
+            self.assertTrue(fan.ready(config))
             (device / 'name').write_text('other')
             self.assertFalse(fan.ready(config))
 

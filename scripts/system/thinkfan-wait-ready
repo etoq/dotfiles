@@ -8,7 +8,7 @@ import yaml
 
 def ready(config):
     for sensor in config['sensors']:
-        if set(sensor) != {'hwmon', 'name', 'indices'}:
+        if set(sensor) - {'hwmon', 'name', 'indices', 'max_errors'} or not {'hwmon', 'name', 'indices'} <= set(sensor):
             raise ValueError('Unsupported sensor definition')
         candidates = [p for p in Path(sensor['hwmon']).glob('hwmon*')
                       if (p / 'name').read_text().strip() == sensor['name']]
