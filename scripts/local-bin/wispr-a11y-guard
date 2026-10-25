@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Recover a stalled Wispr helper before its AT-SPI queue blocks other apps.
+"""Recover Wispr when its helper stalls or disappears, with a restart cooldown.
 
-Only broker accounting is read. No accessibility text or clipboard is queried.
+Only process metadata and broker accounting are read. No accessibility text or clipboard is queried.
 """
 import argparse
 import json
@@ -49,19 +49,153 @@ def queued_helpers(stats):
     return result
 
 
-def recover(pid, identity):
-    # pidfd pins the process identity; a recycled numeric PID cannot be killed.
+APP_EXES = {
+    '/opt/wispr-flow-appimage/usr/lib/wispr-flow/wispr-flow',
+    '/usr/lib/wispr-flow/wispr-flow',
+}
+
+
+def app_processes():
+    result = {}
+    for proc in Path('/proc').iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            exe = str((proc / 'exe').resolve())
+            args = (proc / 'cmdline').read_bytes().split(b'\0')
+            if proc.stat().st_uid != os.getuid() or exe not in APP_EXES:
+                continue
+            if any(arg.startswith(b'--type=') for arg in args):
+                continue
+            fields = (proc / 'stat').read_text().rsplit(')', 1)[1].split()
+            result[int(proc.name)] = (exe, fields[19])
+        except (OSError, IndexError):
+            continue
+    return result
+
+
+def restart_app(pid, identity):
+    # Pin the main process and its verified descendants to prevent PID reuse.
+    if app_processes().get(pid) != identity:
+        return False
     try:
         fd = os.pidfd_open(pid)
     except ProcessLookupError:
         return False
     try:
-        if helper_identity(pid) != identity:
+        if app_processes().get(pid) != identity:
             return False
+        descendants = []
+        rows = {}
+        for proc in Path('/proc').iterdir():
+            if not proc.name.isdigit():
+                continue
+            try:
+                fields = (proc / 'stat').read_text().rsplit(')', 1)[1].split()
+                if proc.stat().st_uid == os.getuid():
+                    rows[int(proc.name)] = (int(fields[1]), str((proc / 'exe').resolve()), fields[19])
+            except (OSError, IndexError, ValueError):
+                pass
+        family = {pid}
+        for _ in range(10):
+            more = {child for child, row in rows.items() if row[0] in family}
+            if more <= family:
+                break
+            family |= more
+        for child in family - {pid}:
+            parent, exe, start = rows[child]
+            if not any(exe.startswith(str(Path(app).parent) + '/') for app in APP_EXES):
+                continue
+            childfd = None
+            try:
+                childfd = os.pidfd_open(child)
+                proc = Path('/proc') / str(child)
+                current = (proc / 'stat').read_text().rsplit(')', 1)[1].split()
+                if current[19] == start and str((proc / 'exe').resolve()) == exe:
+                    descendants.append(childfd)
+                    childfd = None
+            except (OSError, IndexError):
+                pass
+            finally:
+                if childfd is not None:
+                    os.close(childfd)
         signal.pidfd_send_signal(fd, signal.SIGTERM)
-        return True
+        for _ in range(30):
+            if app_processes().get(pid) != identity:
+                break
+            time.sleep(.1)
+        if app_processes().get(pid) == identity:
+            signal.pidfd_send_signal(fd, signal.SIGKILL)
+            time.sleep(.2)
     finally:
         os.close(fd)
+        for childfd in locals().get('descendants', []):
+            try:
+                signal.pidfd_send_signal(childfd, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        time.sleep(.2)
+        for childfd in locals().get('descendants', []):
+            try:
+                signal.pidfd_send_signal(childfd, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            finally:
+                os.close(childfd)
+    subprocess.Popen([str(Path.home() / '.local/bin/wispr-flow'), '--hidden'],
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+    return True
+
+
+def app_health(candidates, runtime, execute):
+    """Recover an absent helper after 90 seconds or a repeatedly stuck queue.
+
+    Maximum two recoveries per hour, at least 30 minutes apart. No popup,
+    no launch if the user closed Flow, no clipboard/dictation text access.
+    """
+    path = runtime / 'wispr-app-health.json'
+    try:
+        old = json.loads(path.read_text())
+    except (OSError, ValueError):
+        old = {}
+    now = time.monotonic()
+    restarts = [t for t in old.get('restarts', []) if 0 <= now-t < 3600]
+    apps = app_processes()
+    states = {}
+    live_helpers = set()
+    for proc in Path('/proc').iterdir():
+        if proc.name.isdigit() and helper_identity(int(proc.name)) is not None:
+            try:
+                fields = (proc / 'stat').read_text().rsplit(')', 1)[1].split()
+                live_helpers.add(int(fields[1]))
+            except (OSError, IndexError, ValueError):
+                pass
+    for pid, identity in apps.items():
+        key = str(pid) + ':' + identity[1]
+        previous = old.get('apps', {}).get(key, {})
+        missing_since = previous.get('missing_since', now) if pid not in live_helpers else now
+        queued = False
+        for helper in candidates:
+            if helper_identity(int(helper)) is None:
+                continue
+            try:
+                parent = int((Path('/proc') / helper / 'stat').read_text().rsplit(')', 1)[1].split()[1])
+                queued = queued or parent == pid
+            except (OSError, IndexError, ValueError):
+                pass
+        repeated = queued and previous.get('queued', False)
+        reason = 'stalled AT-SPI queue' if repeated else 'helper absent for 90 seconds'
+        unhealthy = repeated or (pid not in live_helpers and now-missing_since >= 90)
+        states[key] = {'missing_since': missing_since, 'queued': queued}
+        if execute and unhealthy and len(restarts) < 2 and (not restarts or now-restarts[-1] >= 1800):
+            if restart_app(pid, identity):
+                restarts.append(now)
+                print(f'Restarted Wispr PID {pid}: {reason}', flush=True)
+    temp = path.with_suffix('.tmp')
+    temp.write_text(json.dumps({'apps': states, 'restarts': restarts}))
+    temp.chmod(0o600)
+    temp.replace(path)
 
 
 def main():
@@ -71,6 +205,8 @@ def main():
     runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
     # Do not start an accessibility bus just for monitoring.
     if not (runtime / 'at-spi/bus_0').exists():
+        if args.run:
+            app_health({}, runtime, True)
         return
     address = 'unix:path=' + str(runtime / 'at-spi/bus_0')
     response = subprocess.run([
@@ -82,28 +218,8 @@ def main():
     if not args.run:
         print(json.dumps({'threshold_bytes': LIMIT, 'stalled_helpers': candidates}))
         return
-    state = runtime / 'wispr-a11y-guard.json'
-    try:
-        previous = json.loads(state.read_text())
-    except (OSError, ValueError):
-        previous = {}
-    now = time.monotonic()
-    for pid, info in candidates.items():
-        old = previous.get(pid, {})
-        # Require a second observation 5–35 seconds later for the same process.
-        if old.get('start') == info['start'] and 5 <= now - old.get('time', 0) <= 35:
-            if recover(int(pid), info['start']):
-                print(f'Recovered Wispr helper PID {pid}: stalled AT-SPI queue {info["bytes"]} bytes', flush=True)
-                # Recovery is logged by the user service, without a desktop popup.
-        info['time'] = now
-    if candidates:
-        # Runtime directory is private and removed at logout.
-        temp = state.with_suffix('.tmp')
-        temp.write_text(json.dumps(candidates))
-        temp.chmod(0o600)
-        temp.replace(state)
-    else:
-        state.unlink(missing_ok=True)
+    app_health(candidates, runtime, True)
+
 
 
 if __name__ == '__main__':

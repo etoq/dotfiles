@@ -1,27 +1,70 @@
 #!/usr/bin/env python3
-"""Read-only validation of installed Arch kernels, NVIDIA DKMS and initramfs."""
-import re,subprocess as sp,sys
+"""Validate package-owned Arch kernels; report inaccessible images separately."""
+import os
 from pathlib import Path
-errors=[];kernels=[]
-def run(args):return sp.run(args,capture_output=True,text=True,timeout=45)
-dkms=run(['dkms','status']).stdout
-for p in sorted(Path('/usr/lib/modules').glob('*/pkgbase')):
- base=p.read_text().strip()
- if base not in ('linux','linux-lts'):continue
- k=p.parent.name;kernels.append(k)
- for module in ('nvidia','nvidia_drm','nvidia_modeset','nvidia_uvm'):
-  r=run(['modinfo','-k',k,'-F','vermagic',module])
-  if r.returncode or not r.stdout.startswith(k+' '):errors.append(f'{k}: missing or mismatched {module}')
- if not any(l.startswith('nvidia/') and ', '+k+',' in l and l.rstrip().endswith(': installed') for l in dkms.splitlines()):errors.append(f'{k}: NVIDIA DKMS is not installed')
- image=Path('/boot')/f'initramfs-{base}.img'
- if not image.is_file() or image.stat().st_size==0:errors.append(f'{k}: missing initramfs')
- else:
-  r=run(['lsinitcpio',str(image)])
-  if r.returncode:errors.append(f'{k}: cannot read initramfs ({r.stderr.strip()[:120]})')
-  elif not any('/modules/'+k+'/' in l for l in r.stdout.splitlines()):errors.append(f'{k}: initramfs does not contain its kernel modules')
- print(f'Checked {base}: {k}')
-if not kernels:errors.append('No installed Arch kernel pkgbase files found')
-if errors:
- for e in errors:print('ERROR:',e,file=sys.stderr)
- sys.exit(1)
-print('OK: installed kernels, NVIDIA modules and initramfs match.')
+import subprocess as sp
+import sys
+
+
+def run(args):
+    return sp.run(args, capture_output=True, text=True, timeout=45)
+
+
+def installed_kernels():
+    result = []
+    for base in ('linux', 'linux-lts'):
+        package = run(['pacman', '-Ql', base])
+        if package.returncode:
+            continue
+        paths = [line.split(' ', 1)[1] for line in package.stdout.splitlines()
+                 if ' ' in line and line.endswith('/pkgbase') and '/usr/lib/modules/' in line]
+        if len(paths) != 1:
+            raise ValueError('Cannot identify package-owned kernel: ' + base)
+        path = Path(paths[0])
+        if path.read_text().strip() != base:
+            raise ValueError('Unexpected pkgbase contents: ' + str(path))
+        result.append((base, path.parent.name))
+    return result
+
+
+def main():
+    errors, unavailable = [], []
+    kernels = installed_kernels()
+    dkms = run(['dkms', 'status']).stdout
+    for base, kernel in kernels:
+        for module in ('nvidia', 'nvidia_drm', 'nvidia_modeset', 'nvidia_uvm'):
+            r = run(['modinfo', '-k', kernel, '-F', 'vermagic', module])
+            if r.returncode or not r.stdout.startswith(kernel + ' '):
+                errors.append(f'{kernel}: missing or mismatched {module}')
+        if not any(line.startswith('nvidia/') and ', ' + kernel + ',' in line
+                   and line.rstrip().endswith(': installed') for line in dkms.splitlines()):
+            errors.append(f'{kernel}: NVIDIA DKMS is not installed')
+        image = Path('/boot') / f'initramfs-{base}.img'
+        if not image.is_file() or image.stat().st_size == 0:
+            errors.append(f'{kernel}: missing initramfs')
+        elif not os.access(image, os.R_OK):
+            unavailable.append(f'{kernel}: initramfs requires root access')
+        else:
+            r = run(['lsinitcpio', str(image)])
+            if r.returncode:
+                errors.append(f'{kernel}: cannot read initramfs ({r.stderr.strip()[:120]})')
+            elif not any('/modules/' + kernel + '/' in line for line in r.stdout.splitlines()):
+                errors.append(f'{kernel}: initramfs does not contain its kernel modules')
+        print(f'Checked {base}: {kernel}')
+    if not kernels:
+        errors.append('No installed Arch kernel packages found')
+    for text in errors:
+        print('ERROR:', text, file=sys.stderr)
+    for text in unavailable:
+        print('NOT CHECKED:', text, file=sys.stderr)
+    if errors:
+        return 1
+    if unavailable:
+        print('PARTIAL: installed kernels and NVIDIA match; run with sudo to inspect initramfs.')
+        return 2
+    print('OK: installed kernels, NVIDIA modules and initramfs match.')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -52,7 +52,7 @@ def read_profiles():
 
 def check_sensors(data):
     for sensor in data['sensors']:
-        if set(sensor) != {'hwmon', 'name', 'indices'} or sensor['hwmon'] != '/sys/class/hwmon':
+        if set(sensor) - {'hwmon', 'name', 'indices', 'max_errors'} or not {'hwmon', 'name', 'indices'} <= set(sensor) or sensor['hwmon'] != '/sys/class/hwmon':
             raise RuntimeError('Неизвестный тип датчика.')
         candidates = [p for p in Path(sensor['hwmon']).glob('hwmon*')
                       if (p / 'name').read_text().strip() == sensor['name']]
