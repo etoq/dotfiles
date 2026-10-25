@@ -44,6 +44,18 @@ class Recovery(unittest.TestCase):
             self.assertEqual(run.call_args_list[-1].args[0], ['systemctl', '--user', 'restart', 'wispr-flow.service'])
             spawn.assert_not_called()
 
+    def test_electron_flattened_process_titles_are_not_main(self):
+        self.assertFalse(wispr.is_main_args([b'/opt/wispr-flow --type=zygote --no-sandbox']))
+        self.assertFalse(wispr.is_main_args([b'/opt/wispr-flow', b'--type=renderer']))
+        self.assertTrue(wispr.is_main_args([b'/opt/wispr-flow --hidden --class=Wispr Flow']))
+
+    def test_unmanaged_process_is_never_killed_or_spawned(self):
+        reply = subprocess.CompletedProcess([], 0, '999\n', '')
+        with patch.object(wispr, 'app_processes', return_value={123: ('exe', 'start')}), patch.object(wispr.subprocess, 'run', return_value=reply) as run, patch.object(wispr.subprocess, 'Popen') as spawn:
+            self.assertFalse(wispr.restart_app(123, ('exe', 'start')))
+            self.assertEqual(run.call_count, 1)
+            spawn.assert_not_called()
+
     def test_pid_reuse_does_not_signal(self):
         with patch.object(wispr, 'app_processes', return_value={123: ('exe', 'new-start')}), patch.object(wispr.os, 'pidfd_open') as opening:
             self.assertFalse(wispr.restart_app(123, ('exe', 'old-start')))
