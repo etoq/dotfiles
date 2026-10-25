@@ -69,7 +69,7 @@ dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESK
 systemctl --user start throne.service
 systemctl --user start easyeffects.service &
 systemctl --user start udiskie.service &
-pgrep -u "$(id -u)" -x wispr-flow >/dev/null || "$HOME/.local/bin/wispr-flow" --hidden &
+systemctl --user start wispr-flow.service &
 
 # Обои
 "$HOME/bin/random_wallpaper" --restore &

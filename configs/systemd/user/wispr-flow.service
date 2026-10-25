@@ -1,0 +1,16 @@
+[Unit]
+Description=Wispr Flow background dictation
+PartOf=graphical-session.target
+Wants=pipewire.service pipewire-pulse.service wireplumber.service
+After=pipewire.service pipewire-pulse.service wireplumber.service
+ConditionEnvironment=DISPLAY
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=exec
+ExecStart=%h/.local/bin/wispr-flow --hidden
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+KillMode=control-group

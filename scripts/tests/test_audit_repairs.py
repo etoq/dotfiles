@@ -36,6 +36,14 @@ class Recovery(unittest.TestCase):
             wispr.app_health({}, Path(folder), True)
             restart.assert_not_called()
 
+    def test_managed_app_restarts_through_systemd(self):
+        replies = [subprocess.CompletedProcess([], 0, '123\n', ''),
+                   subprocess.CompletedProcess([], 0, b'', b'')]
+        with patch.object(wispr, 'app_processes', return_value={123: ('exe', 'start')}), patch.object(wispr.subprocess, 'run', side_effect=replies) as run, patch.object(wispr.subprocess, 'Popen') as spawn:
+            self.assertTrue(wispr.restart_app(123, ('exe', 'start')))
+            self.assertEqual(run.call_args_list[-1].args[0], ['systemctl', '--user', 'restart', 'wispr-flow.service'])
+            spawn.assert_not_called()
+
     def test_pid_reuse_does_not_signal(self):
         with patch.object(wispr, 'app_processes', return_value={123: ('exe', 'new-start')}), patch.object(wispr.os, 'pidfd_open') as opening:
             self.assertFalse(wispr.restart_app(123, ('exe', 'old-start')))

@@ -78,6 +78,13 @@ def restart_app(pid, identity):
     # Pin the main process and its verified descendants to prevent PID reuse.
     if app_processes().get(pid) != identity:
         return False
+    managed = subprocess.run(['systemctl', '--user', 'show', 'wispr-flow.service',
+                              '-p', 'MainPID', '--value'], capture_output=True, text=True, timeout=5)
+    if managed.returncode == 0 and managed.stdout.strip() == str(pid):
+        # systemd stops the entire old cgroup before starting the replacement.
+        result = subprocess.run(['systemctl', '--user', 'restart', 'wispr-flow.service'],
+                                capture_output=True, timeout=20)
+        return result.returncode == 0
     try:
         fd = os.pidfd_open(pid)
     except ProcessLookupError:

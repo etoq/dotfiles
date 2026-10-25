@@ -48,7 +48,7 @@ once('battery-alert',[H/'bin/battery-alert'])
 
 # One supervised audio service; keep an existing dictation session.
 call(['systemctl','--user','start','easyeffects.service'])
-once('wispr-flow',[H/'.local/bin/wispr-flow','--hidden'])
+call(['systemctl','--user','start','wispr-flow.service'])
 
 # LocalSend stays in the tray until Win+S is pressed.
 once('localsend',['/usr/bin/localsend','--hidden'])
