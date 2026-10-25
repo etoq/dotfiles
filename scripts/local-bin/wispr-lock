@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Pause supervised Wispr around screen locking; preserve intentional exit."""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess as sp
+import sys
+
+
+def control(*args):
+    return sp.run(['systemctl', '--user', *args], capture_output=True, text=True, timeout=25)
+
+
+def active(unit):
+    return control('is-active', unit).stdout.strip() in ('active', 'activating', 'reloading')
+
+
+def before(marker):
+    if not marker.exists():
+        state = {'flow': active('wispr-flow.service'),
+                 'guard': active('wispr-a11y-guard.timer')}
+        temporary = marker.with_suffix('.tmp')
+        temporary.write_text(json.dumps(state))
+        temporary.chmod(0o600)
+        temporary.replace(marker)
+    # The marker also blocks any already-running guard from recovering Flow.
+    for units in [('wispr-a11y-guard.timer', 'wispr-a11y-guard.service'), ('wispr-flow.service',)]:
+        result = control('stop', *units)
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or 'Could not stop ' + ', '.join(units))
+
+
+def after(marker):
+    if not marker.exists():
+        return
+    # A concurrent locker must keep Flow stopped until the last lock ends.
+    if sp.run(['pgrep', '-u', str(os.getuid()), '-x', 'i3lock'], stdout=sp.DEVNULL).returncode == 0:
+        return
+    state = json.loads(marker.read_text())
+    marker.unlink()
+    errors = []
+    for key, unit in [('flow', 'wispr-flow.service'), ('guard', 'wispr-a11y-guard.timer')]:
+        if state.get(key):
+            if key == 'flow':
+                control('reset-failed', unit)
+            result = control('start', unit)
+            if result.returncode:
+                errors.append(result.stderr.strip() or unit)
+    if errors:
+        raise RuntimeError('; '.join(errors))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=('before', 'after'))
+    args = parser.parse_args()
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    if runtime.stat().st_uid != os.getuid():
+        raise RuntimeError('Unexpected runtime directory owner')
+    with (runtime / 'wispr-screen-lock.flock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        marker = runtime / 'wispr-screen-lock.json'
+        (before if args.action == 'before' else after)(marker)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as error:
+        print('Wispr lock hook:', error, file=sys.stderr)
+        raise SystemExit(1)

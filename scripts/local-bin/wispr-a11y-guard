@@ -86,6 +86,8 @@ def app_processes():
 def restart_app(pid, identity):
     # Never signal arbitrary Electron processes, even if they share the executable.
     # Only systemd may recover the verified main PID and its service cgroup.
+    if (Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'wispr-screen-lock.json').exists():
+        return False
     if app_processes().get(pid) != identity:
         return False
     managed = subprocess.run(['systemctl', '--user', 'show', 'wispr-flow.service',
@@ -154,6 +156,8 @@ def main():
     parser.add_argument('--run', action='store_true', help='recover after two consecutive large-queue observations')
     args = parser.parse_args()
     runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    if (runtime / 'wispr-screen-lock.json').exists():
+        return
     # Do not start an accessibility bus just for monitoring.
     if not (runtime / 'at-spi/bus_0').exists():
         if args.run:

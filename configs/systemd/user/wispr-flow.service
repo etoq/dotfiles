@@ -12,5 +12,5 @@ Type=exec
 ExecStart=%h/.local/bin/wispr-flow --hidden
 Restart=on-failure
 RestartSec=10
-TimeoutStopSec=10
-KillMode=control-group
+TimeoutStopSec=3
+KillMode=mixed
