@@ -74,6 +74,11 @@
     "url_encoded": false,
     "raw_argument": false
   },
+  "nlm": {
+    "command": "xdg-open https://notebooklm.google.com/",
+    "url_encoded": false,
+    "raw_argument": false
+  },
   "aai": {
     "command": "xdg-open https://arena.ai/",
     "url_encoded": false,

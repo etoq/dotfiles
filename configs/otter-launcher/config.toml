@@ -194,6 +194,12 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module gai"
 unbind_proc = false
 
 [[modules]]
+description = "NotebookLM"
+prefix = "nlm"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module nlm"
+unbind_proc = false
+
+[[modules]]
 description = "Arena AI"
 prefix = "aai"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module aai"
