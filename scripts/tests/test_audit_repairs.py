@@ -23,6 +23,13 @@ kernel = load('audit_kernel', ROOT / 'scripts/local-bin/verify-kernel-stack')
 
 
 class Recovery(unittest.TestCase):
+    def setUp(self):
+        runtime = tempfile.TemporaryDirectory()
+        self.addCleanup(runtime.cleanup)
+        environment = patch.dict(wispr.os.environ, {"XDG_RUNTIME_DIR": runtime.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+
     def test_missing_helper_grace_period_and_cooldown(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(wispr, 'app_processes', return_value={123: ('exe', 'start')}), patch.object(wispr, 'helper_identity', return_value=None), patch.object(wispr, 'restart_app', return_value=True) as restart:
             runtime = Path(folder)

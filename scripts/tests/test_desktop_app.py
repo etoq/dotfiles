@@ -88,6 +88,27 @@ class Lifecycle(unittest.TestCase):
             self.assertIn('view_only()', run.call_args.args[0][1])
 
 
+class ServiceSession(unittest.TestCase):
+    def test_old_display_restarts_only_selected_service(self):
+        def respond(args, **kwargs):
+            return completed(args, 'MainPID=100\nControlGroup=/user.slice/test\n' if 'show' in args else '')
+        with patch.dict(app.os.environ, {'DISPLAY': ':1'}), patch.object(app, 'service_displays', return_value={':0'}), patch.object(app, 'run', side_effect=respond) as calls:
+            self.assertEqual(app.ensure_gui_service('throne'), 'restart')
+            self.assertEqual(calls.call_args_list[-1].args[0], ['systemctl', '--user', 'restart', 'throne.service'])
+
+    def test_same_display_does_not_restart(self):
+        with patch.dict(app.os.environ, {'DISPLAY': ':1'}), patch.object(app, 'service_displays', return_value={':1'}), patch.object(app, 'run', return_value=completed([], 'MainPID=100\n')) as calls:
+            self.assertEqual(app.ensure_gui_service('throne'), 'start')
+            self.assertEqual(calls.call_args_list[-1].args[0], ['systemctl', '--user', 'start', 'throne.service'])
+
+    def test_visible_throne_is_focused_without_restarting_network(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(app.os.environ, {'XDG_RUNTIME_DIR': tmp}), patch.object(app, 'managed_windows', return_value=[{'window': 789}]), patch.object(app, 'activate') as activate, patch.object(app, 'ensure_gui_service') as ensure, patch.object(app.sp, 'Popen') as spawn:
+            app.open_app('throne')
+            activate.assert_called_once_with(789)
+            ensure.assert_not_called()
+            spawn.assert_not_called()
+
+
 
 if __name__ == '__main__':
     unittest.main()

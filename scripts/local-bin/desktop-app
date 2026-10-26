@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open or restore existing ChatGPT, Discord and LocalSend windows."""
+"""Open existing desktop apps and reconnect GUI services after a new login."""
 import argparse
 import contextlib
 import fcntl
@@ -12,8 +12,8 @@ import sys
 import time
 
 HOME = Path.home()
-LAUNCH = {'chatgpt': ['/usr/bin/chatgpt'], 'discord': ['/usr/bin/discord'], 'localsend': ['/usr/bin/localsend']}
-CLASSES = {'chatgpt': 'chatgpt', 'discord': 'discord', 'localsend': 'org.localsend.localsend_app'}
+LAUNCH = {'chatgpt': ['/usr/bin/chatgpt'], 'discord': ['/usr/bin/discord'], 'localsend': ['/usr/bin/localsend'], 'throne': ['/usr/bin/throne']}
+CLASSES = {'chatgpt': 'chatgpt', 'discord': 'discord', 'localsend': 'org.localsend.localsend_app', 'throne': 'throne'}
 
 
 def run(args, timeout=4):
@@ -26,6 +26,8 @@ def app_of_pid(pid):
         if proc.stat().st_uid != os.getuid():
             return None
         exe = (proc / 'exe').resolve(strict=True)
+        if exe == Path('/usr/lib/throne/Throne'):
+            return 'throne'
         if exe == Path('/opt/localsend/localsend'):
             return 'localsend'
         if exe == Path('/usr/lib/chatgpt/ChatGPT'):
@@ -168,6 +170,60 @@ def activate_localsend():
     raise RuntimeError('LocalSend запущен, но пункт «Открыть» в трее не найден. Процесс не перезапускался.')
 
 
+SERVICES = {name: name + '.service' for name in (
+    'throne', 'idle-screen-lock', 'easyeffects', 'udiskie', 'wispr-flow')}
+
+
+def process_display(pid):
+    try:
+        proc = Path('/proc') / str(pid)
+        if proc.stat().st_uid != os.getuid():
+            return ''
+        fields = dict(item.split(b'=', 1) for item in (proc / 'environ').read_bytes().split(b'\0') if b'=' in item)
+        return fields.get(b'DISPLAY', b'').decode()
+    except (OSError, ValueError):
+        return ''
+
+
+def service_displays(properties):
+    pid = properties.get('MainPID', '0')
+    found = {process_display(pid)} if pid != '0' else set()
+    group = properties.get('ControlGroup', '')
+    prefix = f'/user.slice/user-{os.getuid()}.slice/'
+    if group.startswith(prefix) and '..' not in group.split('/'):
+        try:
+            for child in (Path('/sys/fs/cgroup') / group.lstrip('/') / 'cgroup.procs').read_text().split():
+                found.add(process_display(child))
+        except OSError:
+            pass
+    return found - {''}
+
+
+def ensure_gui_service(name):
+    unit = SERVICES[name]
+    display = os.environ.get('DISPLAY', '')
+    if not display:
+        raise RuntimeError('Для запуска приложения нужен графический сеанс.')
+    result = run(['systemctl', '--user', 'show', unit, '-p', 'MainPID', '-p', 'ControlGroup'])
+    if result.returncode:
+        raise RuntimeError('Не удалось проверить службу ' + unit)
+    props = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+    old_displays = service_displays(props)
+    # A user manager survives while a TTY login remains open. Its GUI clients
+    # must reconnect to the current X server instead of the abandoned one.
+    action = 'restart' if old_displays and old_displays != {display} else 'start'
+    names = [key for key in ('DISPLAY', 'XAUTHORITY', 'XDG_SESSION_ID', 'XDG_CURRENT_DESKTOP', 'XDG_SESSION_TYPE') if key in os.environ]
+    imported = run(['systemctl', '--user', 'import-environment', *names])
+    if imported.returncode:
+        raise RuntimeError('Не удалось обновить окружение графического сеанса.')
+    result = run(['systemctl', '--user', action, unit], timeout=45)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or 'Не удалось запустить ' + unit)
+    if action == 'restart':
+        print('Reconnected ' + unit + ' to ' + display, flush=True)
+    return action
+
+
 def open_app(app):
     runtime = Path(os.environ.get('XDG_RUNTIME_DIR', HOME / '.cache')) / 'desktop-app'
     runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -180,6 +236,17 @@ def open_app(app):
         if existing:
             activate(existing[0]['window'])
             return
+        if app == 'throne':
+            display = os.environ.get('DISPLAY', '')
+            if not any(process_display(pid) == display for pid in main_processes('throne')):
+                ensure_gui_service('throne')
+                # Wait for Qt's primary instance before asking its IPC to show UI.
+                deadline = time.monotonic() + 8
+                while not any(process_display(pid) == display for pid in main_processes('throne')):
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('Throne service did not start on the current display.')
+                    time.sleep(.1)
+                time.sleep(.5)
         # When all windows were withdrawn to the tray, let Electron's native
         # single-instance IPC call BrowserWindow.show(). XMapWindow alone leaves
         # Electron's internal visibility state false and breaks menu accelerators.
@@ -207,8 +274,13 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     cmd = commands.add_parser('open')
     cmd.add_argument('app', choices=LAUNCH)
+    service = commands.add_parser('ensure-service')
+    service.add_argument('app', choices=SERVICES)
     args = parser.parse_args()
-    open_app(args.app)
+    if args.command == 'ensure-service':
+        ensure_gui_service(args.app)
+    else:
+        open_app(args.app)
 
 
 if __name__ == '__main__':

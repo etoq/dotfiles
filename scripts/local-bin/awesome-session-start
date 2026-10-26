@@ -24,7 +24,7 @@ def once(name,args):
  if any(comm==name or any(os.fsencode(name)==a.rsplit(b'/',1)[-1] for a in argv[:2]) for _,comm,argv in existing):return
  with (state/'session.log').open('ab') as f:sp.Popen([str(a) for a in args],stdin=sp.DEVNULL,stdout=f,stderr=f,start_new_session=True)
 def call(args):sp.run([str(a) for a in args],stdout=sp.DEVNULL,stderr=sp.DEVNULL)
-call(['dbus-update-activation-environment','--systemd','DISPLAY','XAUTHORITY','XDG_CURRENT_DESKTOP','XDG_SESSION_TYPE','XDG_SESSION_DESKTOP','QT_QPA_PLATFORMTHEME'])
+call(['dbus-update-activation-environment','--systemd','DISPLAY','XAUTHORITY','XDG_CURRENT_DESKTOP','XDG_SESSION_TYPE','XDG_SESSION_DESKTOP','XDG_SESSION_ID','QT_QPA_PLATFORMTHEME'])
 call(['xsetroot','-cursor_name','left_ptr'])
 call([H/'.local/bin/disable-middle-click'])
 # A WM reload must preserve the active keyboard group.
@@ -33,22 +33,26 @@ keyboard_fields=dict(line.split(':',1) for line in keyboard.splitlines() if ':' 
 if keyboard_fields.get('layout','').strip()!='us,ru' or 'grp:alt_shift_toggle' not in keyboard_fields.get('options',''):
  call(['setxkbmap','-layout','us,ru','-option','grp:alt_shift_toggle'])
 call(['xrdb','-merge',H/'.Xresources'])
-call(['systemctl','--user','start','idle-screen-lock.service'])
+call([H/'.local/bin/desktop-app','ensure-service','idle-screen-lock'])
 call(['systemctl','--user','start','study.service'])
 call(['systemctl','--user','start','wallpaper-rotate.timer'])
 once('dunst',['dunst'])
 once('xsettingsd',['xsettingsd'])
-call(['systemctl','--user','start','throne.service'])
-call(['systemctl','--user','start','udiskie.service'])
+call([H/'.local/bin/desktop-app','ensure-service','throne'])
+call([H/'.local/bin/desktop-app','ensure-service','udiskie'])
 once('picom',['picom','--config',H/'.config/picom/picom.conf'])
 once('greenclip',['greenclip','daemon'])
 once('flameshot',['flameshot'])
 once('gammastep',['gammastep','-m','randr'])
 once('battery-alert',[H/'bin/battery-alert'])
 
+# Remove a lock marker left by the terminated old graphical session.
+call([H/'.local/bin/wispr-lock','after'])
 # One supervised audio service; keep an existing dictation session.
-call(['systemctl','--user','start','easyeffects.service'])
-call(['systemctl','--user','start','wispr-flow.service'])
+call([H/'.local/bin/desktop-app','ensure-service','easyeffects'])
+call([H/'.local/bin/desktop-app','ensure-service','wispr-flow'])
 
 # LocalSend stays in the tray until Win+S is pressed.
 once('localsend',['/usr/bin/localsend','--hidden'])
+
+call(['systemctl','--user','start','wispr-a11y-guard.timer'])

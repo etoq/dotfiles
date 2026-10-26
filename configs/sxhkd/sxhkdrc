@@ -37,7 +37,7 @@ super + shift + l
 super + shift + {z,o,s,n,p,t,c,v,x,k,e,r}
 	{zen, \
     obsidian, \
-    throne, \
+    "$HOME/.local/bin/desktop-app" open throne, \
 	kitty -- yazi, \
 	pavucontrol, \
 	"$HOME/.local/bin/AyuGram", \
