@@ -1,0 +1,32 @@
+name: Learning portability
+on:
+  push:
+    paths:
+      - 'learning/**'
+      - 'configs/concept-loom/**'
+      - 'scripts/maintenance/*-learning.py'
+      - 'scripts/tests/test_learning_portability.py'
+      - 'install.sh'
+      - '.github/workflows/learning-portability.yml'
+  pull_request:
+    paths:
+      - 'learning/**'
+      - 'configs/concept-loom/**'
+      - 'scripts/maintenance/*-learning.py'
+      - 'scripts/tests/test_learning_portability.py'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm run verify
+        working-directory: learning/concept-loom
+      - run: python3 -m unittest discover -s scripts/tests -p test_learning_portability.py -v

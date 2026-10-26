@@ -25,10 +25,14 @@ ask()  { echo -e "${CYN}[?]${R} $1 [y/N] "; read -r ans; [[ "$ans" =~ ^[Yy]$ ]];
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
+if [[ ${1:-} == --learning ]]; then
+    shift
+    exec python3 "$DOTFILES_DIR/scripts/maintenance/install-learning.py" "$@"
+fi
 if [[ ${1:-} == --check ]]; then
     exec python "$DOTFILES_DIR/scripts/maintenance/audit-dotfiles.py"
 fi
-[[ $# == 0 ]] || { echo 'Usage: install.sh [--check]'; exit 2; }
+[[ $# == 0 ]] || { echo 'Usage: install.sh [--check | --learning [--apply] [--data-backup FILE]]'; exit 2; }
 
 # ── Баннер ─────────────────────────────────────────────────────────
 clear
@@ -152,7 +156,7 @@ if [ "$DO_PKGS" = "1" ]; then
 
     step "ПАКЕТЫ PACMAN"
     PACMAN_PKGS=(
-        base base-devel git curl wget sudo nano vim rust
+        base base-devel git curl wget sudo nano vim rust nodejs npm python
         man-db man-pages linux linux-headers linux-lts linux-lts-headers
         linux-firmware intel-ucode grub efibootmgr grub-btrfs
         btrfs-progs smartmontools cryptsetup snap-pac snapper

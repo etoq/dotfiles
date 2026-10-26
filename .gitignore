@@ -24,3 +24,12 @@ configs/fish/fish_variables
 *.kdbx
 *.kdbx.*
 *.keyx
+
+# Personal learning content stays in a private recovery archive, never GitHub.
+.learning-private/
+**/.concept-loom/
+**/English_For_Linux_RE.md
+**/Linux_Malware_Roadmap.md
+**/Learning_System.md
+concept-loom-recovery-*.tar.gz*
+learning-data-*.tar.gz*

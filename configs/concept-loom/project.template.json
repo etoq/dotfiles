@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "name": "Linux RE — Arch host, Debian lab, Obsidian",
+  "primarySessionId": "linux-re",
+  "allowedSessionIds": [
+    "linux-re"
+  ],
+  "notebookRoots": [
+    "progress"
+  ],
+  "allowedExports": [
+    "@VAULT@/03 - Active/Current_Stage.md"
+  ],
+  "requireBoundCheckpoints": true,
+  "requireRouteApproval": true,
+  "allowLegacyRoute": true,
+  "review": {
+    "minimumDelayHours": 24,
+    "intervalDays": [
+      1,
+      3,
+      7,
+      14,
+      30
+    ],
+    "note": "Practical scheduling policy, not a scientifically optimal interval."
+  },
+  "environment": {
+    "language": "ru",
+    "host": "Arch Linux",
+    "lab": "Debian VM root@debianRE",
+    "labNetwork": "10.10.10.0/24",
+    "temporaryNat": "disabled according to project rules",
+    "labCommandExecutor": "learner",
+    "temporaryFiles": "verify with learner before resuming",
+    "primaryRules": [
+      "notes/active/Learning_System.md",
+      "notes/active/Linux_Malware_Roadmap.md",
+      "notes/active/English_For_Linux_RE.md"
+    ],
+    "materialsRole": "original transfer snapshot; never auto synchronize",
+    "otherProjects": "isolated; do not inspect or modify English project state"
+  },
+  "projections": {
+    "sessionId": "linux-re",
+    "notebookPath": "progress/linux-re-notebook.md",
+    "stagePath": "@VAULT@/03 - Active/Current_Stage.md",
+    "stageIsExport": true
+  },
+  "instructionFiles": [
+    "AGENTS.md",
+    ".codex/skills/concept-coach/SKILL.md",
+    ".codex/skills/concept-coach/references/coaching-reference.md"
+  ]
+}

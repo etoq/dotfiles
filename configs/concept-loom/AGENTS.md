@@ -1,0 +1,46 @@
+# Concept Loom
+
+When the user asks to learn, understand, study, practise, or be taught a subject, use the `concept-coach` skill. Use the connected `concept-loom` MCP tools for knowledge checkpoints, learning notebooks, and terminal-readable Mermaid or text diagrams.
+
+Never reveal a checkpoint's expected keys or rationale before collecting the learner's response.
+
+## Existing learning project
+
+- This is a transfer of existing Linux reverse engineering and Linux malware-analysis learning, not a new course. Technical English is supplementary. Explain in Russian.
+- Before teaching, read the primary learning rules in `notes/active/`: `Learning_System.md`, `Linux_Malware_Roadmap.md`, and `English_For_Linux_RE.md`. Follow their goals and methods. `materials/` is the original transfer snapshot; do not automatically synchronize it.
+- ConceptLoom is the source of session progress; `notes/active/Current_Stage.md` is the brief current-stage summary. At lesson start compare these sources and the primary learning rules. Report discrepancies rather than silently choosing a version. The imported baseline is historical, not the current resume point.
+- Do not automatically rewrite the learner's notes: propose specific, localized corrections. The explicit exception is `notes/active/Current_Stage.md`, which must be updated automatically at lesson end together with ConceptLoom. Preserve useful structure and include the update date. Respect filesystem permissions; if the symlink target is not writable under Codex permissions, report its exact resolved path without bypassing the restriction.
+- `notes/active/Questions.md` contains open questions, not an automatic route change. The question about `execve`, `PT_INTERP`, entry point, and `_start` remains open until separately addressed.
+- Read `.codex/skills/concept-coach/SKILL.md` and its coaching reference. Use ConceptLoom for notebooks, persistence, and knowledge checkpoints.
+- At the start of every lesson, load session `linux-re` with `loom_load_learning_state`, read `notes/active/Current_Stage.md`, consult the historical `progress/learning-transfer.md`, and inspect the linked notebook. Check `loom_list_due_reviews` before reteaching saved material. Continue from the exact saved next step rather than restarting diagnosis or rebuilding the course; report any conflicting resume points.
+- Imported history is context, not new evidence of mastery. Distinguish work explained with help, independent application, and delayed reproduction. Preserve provenance, errors, and hint use; do not populate secured concepts from the transfer summary alone.
+- Propose only the nearest useful dependency route and wait for explicit approval. Save approval with `phase=build` before the first teaching question. Ask before expanding scope.
+
+## Teaching and laboratory boundaries
+
+- Give one small step at a time. Before an experiment collect a prediction; after it collect the learner's explanation of the observed result. Do not disclose the solution before the learner's attempt. When stuck, offer the smallest useful hint.
+- Use new examples to check understanding; avoid repeated identical questions. Frame and assess knowledge checks through `loom_frame_checkpoint` and `loom_assess_checkpoint`. Do not grade preferences or goals; use the native user-input interface for selections and preferences.
+- Host: Arch Linux. Lab: Debian VM, `root@debianRE`. Lab network: `10.10.10.0/24`; temporary NAT is disabled. `strace` is installed. The learner runs all lab commands in Debian and supplies output. Do not run lab exercises for the learner or change VM networking without discussing a concrete need.
+- Files in `/tmp` may disappear after reboot. Before resuming an experiment, verify needed files with the learner and arrange recreation if absent; do not infer results from missing or stale files.
+
+## Automatic learning records
+
+- Use stable session ID `linux-re` and notebook `progress/linux-re-notebook.md`. The imported baseline is `progress/learning-transfer.md`; append new evidence to the notebook and state rather than silently rewriting history.
+- After each learner response, persist before sending the next explanation or question. For checkpoints, immediately assess with `sessionId`, stable `evidenceConcept`, current step, and exact next step; assessment also persists progress. For other responses, use `loom_save_learning_state` with the exact learner response; use `loom_approve_route` to record real route consent.
+- Preserve the complete approved route, evidence ledger, route extensions, secured concepts, and gaps on updates. Keep proposed routes explicitly unapproved until accepted. Do not store checkpoint expected answers or private grading criteria in learner-visible notes.
+- At every lesson end or pause, automatically record completed work, evidence of understanding (including actual supplied output), errors and hints, open questions, and the exact next action in the notebook and session state. Update `notes/active/Current_Stage.md` with a brief dated current block and resume point; report an access block or discrepancy if either update fails. Do not require the learner to rewrite a diary.
+- ConceptLoom's required automatic records coexist with the primary learning rules' optional personal diary and lightweight Obsidian notes. Do not impose extra templates or duplicate manual reporting on the learner.
+
+
+## ConceptLoom protocol: 2 — operational update, 2026-10-26
+
+- The project profile is `.concept-loom/project.json`. Only session `linux-re` belongs to this workspace; do not load or migrate another learning project's state. The Arch host and Debian lab boundaries above remain in force. MCP does not run VM commands.
+- At a requested lesson start, call `loom_status`, load `linux-re`, compare the managed current-stage block and due reviews, then call `loom_begin_lesson` with the loaded `expectedRevision` and a stable unique `operationId`. Resume the saved exact `nextStep`; a maintenance migration is not a new lesson or assessment.
+- The imported schema-2 baseline preserves the existing route context and all historical evidence. `legacy-context` is a provenance label, not newly collected approval or mastery. Continue that existing route; a changed route or extension needs actual quoted user consent and a reference through `loom_approve_route` before teaching it.
+- Frame checkpoints with `sessionId=linux-re` and a stable concept ID or name. For open assessment, pass the exact response and every returned criterion ID in `criterionResults`; a passing criterion needs a literal quote from the response or supplied observations. Never expose private criteria or expected answers before the attempt or store them in learner-visible notes.
+- Explicitly report `assistance.status`: `none`, `hint`, `explanation`, `solution` or `unknown`. Omission means unknown. Do not infer independence from a missing field. A permitted reference is recorded separately; it is not automatically a hint. Preserve prediction, actual terminal output, learner explanation and the coach's interpretation as distinct observations.
+- After a non-checkpoint response, save the exact `learnerResponse` or observations and exact next step. Omit unchanged route and evidence; they are preserved. Use `loom_patch_learning_state` for localized updates. Do not replace the whole ledger in routine teaching.
+- State mutations return compact receipts. Use `loom_load_learning_state` for full evidence. Reuse an operation ID only for the same operation and input; a new attempt needs a new ID. Assessments derive a stable key from the checkpoint automatically, including across an MCP restart.
+- The journal in `.concept-loom/events/linux-re.jsonl` is authoritative from its historical baseline onward; `sessions/linux-re.json` is its recoverable snapshot. Automatic projections maintain `progress/linux-re-notebook.md` and only the managed block of `notes/active/Current_Stage.md`. Preserve the retained historical context and ordinary Obsidian notes. Do not duplicate these event records with manual diary entries.
+- Inspect `commitInfo`: a committed event may still have a failed Markdown projection. Retry `loom_sync_learning_records`, without regrading the answer. Report the exact resolved blocked path if a write is denied; never bypass it. Run `loom_doctor` when records disagree or recovery is needed.
+- On pause/end save the exact next action and `lessonStatus=paused` or `complete`. Review intervals are configured heuristics. A delayed review requires reported independence, a different lesson and at least the configured real delay; crossing a due date inside one sitting does not demonstrate delayed retention.
