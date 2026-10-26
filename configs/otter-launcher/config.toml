@@ -254,6 +254,12 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module tr --argument '{}'"
 with_argument = true
 url_encode = true
 unbind_proc = false
+[[modules]]
+description = "Claude Desktop"
+prefix = "acl"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module acl"
+unbind_proc = false
+
 # ── Разработка и файлы ──────────────────────────────────────────────
 
 [[modules]]

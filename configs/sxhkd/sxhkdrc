@@ -85,8 +85,11 @@ super + space
 #
 
 # set the window state
-super + {t,ctrl + t,f}
+super + {alt + t,ctrl + t,f}
 	bspc node -t {tiled,pseudo_tiled,fullscreen}
+
+super + t
+    ~/.local/bin/tiffany-translator
 	
 
 # Change focus to next window, including floating window
