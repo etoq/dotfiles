@@ -360,6 +360,7 @@ if [ "$DO_CONFIGS" = "1" ]; then
     fi
     mkdir -p "$HOME/Images"
     command -v xdg-user-dirs-update >/dev/null && xdg-user-dirs-update --set PICTURES "$HOME/Images"
+    python "$DOTFILES_DIR/scripts/maintenance/apply-codex-theme.py"
     ok "Все конфиги подключены"
 fi
 
