@@ -70,7 +70,7 @@
     "raw_argument": false
   },
   "gai": {
-    "command": "xdg-open 'https://www.google.com/search?udm=50&mtid=GWMIasbCILKK9u8PkZiaaA'",
+    "command": "xdg-open 'https://gemini.google.com/u/3/app'",
     "url_encoded": false,
     "raw_argument": false
   },
