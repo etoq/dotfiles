@@ -67,9 +67,9 @@
     "learning/concept-loom/test/setup.test.mjs": "d4506baa4cffd69539e1ce9308f027bc3d68238c6db812db96e4e7d7e8343a9b",
     "learning/concept-loom/test-support/fixtures.mjs": "75d1956efdfd32161302d8775b1dc42a93726832eaad10075d19def9a59eee5d",
     "learning/concept-loom/test-support/mcp-client.mjs": "fc28381385644a88dcf5b0cb88479dd07e1f0b8958a89f6704b7c0a29a87f8cd",
-    "configs/concept-loom/AGENTS.md": "19f8025c239ad1fdfc519a11e49b70425a5a2ffadbd056e1554c0b20d8bcd283",
+    "configs/concept-loom/AGENTS.md": "493354bd75310b082f8aacf32f92cde4fbcc99a10ec5c0e2f23921c2320ef5ce",
     "configs/concept-loom/project.template.json": "c4802c9e58e6db09ae765ce40cc9298d2e6618bd4cc538dc524db0fbef4708ca",
-    "configs/concept-loom/skills/concept-coach/SKILL.md": "ae515d4dda84491999918fc26ac93d35e131b7f362c1a8c8b722146def0b4c1e",
-    "configs/concept-loom/skills/concept-coach/references/coaching-reference.md": "b94bb2b7801470ddfc47a2ca7ea9946346158e4af6799f3531d0fd2749e19f69"
+    "configs/concept-loom/skills/concept-coach/SKILL.md": "2dec64be930b23923619d18c3605cf39d62eaab6b2c3351aa7a3859b81d1f7eb",
+    "configs/concept-loom/skills/concept-coach/references/coaching-reference.md": "350d3c8b343f672c751deacbdbf243080fdd3ae9880278cc22d55df1e1457445"
   }
 }

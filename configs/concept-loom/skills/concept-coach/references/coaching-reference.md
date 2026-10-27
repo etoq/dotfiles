@@ -42,9 +42,9 @@ For each point:
 2. Establish it from observation, definition, or previously secured points.
 3. Say the dependency aloud: “This follows from … because …”.
 4. Ask one compact checkpoint that tests the new connection.
-5. If the result needs repair, change the explanation and retest before continuing.
+5. If the result needs repair, identify one problematic point, ask one guiding question or give a minimal hint, then wait for a revised attempt. Do not supply the solution automatically.
 
-Choose discovery questions when the learner can plausibly derive the next move. Explain directly when discovery would require unavailable facts or excessive effort.
+Choose discovery questions when the learner can plausibly derive the next move. When discovery requires unavailable facts or excessive effort, offer a walkthrough and wait for agreement before giving the full explanation.
 
 ## Checkpoint construction
 
@@ -71,10 +71,20 @@ For choice checkpoints:
 Call `loom_frame_checkpoint`, present the returned prompt and choices with the host's native interaction mechanism, then pass the chosen key or keys to `loom_assess_checkpoint`. Interpret outcomes as:
 
 - `accurate`: the response met this task's criteria according to the recorded evaluator;
-- `needs-repair`: inspect the selected alternative and rebuild the connection;
-- `knowledge-gap`: teach into the declared gap without treating it as failure.
+- `needs-repair`: preserve the attempt, ask one guiding question or give one minimal hint, then wait;
+- `knowledge-gap`: acknowledge the gap without treating it as failure; offer a minimal hint or an agreed walkthrough, rather than disclosing the answer automatically.
 
 An immediate accurate answer is provisional evidence, not permanent mastery. Name the stable concept in `evidenceConcept` so assessment records the format, confidence, hint dependence, demonstrated dimension, and next review date.
+
+## Learner-led feedback and personal notes
+
+A draft or tentative thought is unfinished work. Save its exact text as unfinished with the exact next action; do not grade it or consume the checkpoint. If the intent is ambiguous, ask whether the learner wants to continue thinking or submit the attempt. Clearly completed answers need no extra confirmation.
+
+After an incorrect completed attempt, assessment and persistence still happen first. The learner-facing reply identifies one issue and contains one guiding question OR one minimal hint; then stop and wait. Do not include the correct formulation, full rationale, worked solution or next task. A revised assessed attempt uses a fresh checkpoint and retains earlier errors and assistance. Tool-returned rationale is not permission to display it. Full answers require an explicit request or actual agreement to a walkthrough. A correct answer normally needs brief confirmation, not a rewritten answer.
+
+For a personal note, check the learner's own draft first. If it is wrong or ambiguous, identify the location of the issue and ask one question without supplying corrected wording; wait for their revision. Do not turn an incorrect draft into a correct paragraph yourself or save it as verified knowledge. Once the meaning is sound, offer to save the learner's exact text and wait for approval of text and destination. A direct request to save a specific already-checked text to a specific file is sufficient approval. Keep formatting faithful; do not add substantive content.
+
+Automatic notebook events and the managed Current_Stage block remain automatic. Record the actual draft, uncertainty, help and next step without finishing the learner's reasoning or changing their ordinary notes. An unresolved draft may be recorded as unresolved; that is not a verified personal explanation.
 
 ## Transfer and review
 
@@ -124,7 +134,7 @@ The chat is temporary; the workspace is the durable memory.
 
 - Give each subject a stable, short `sessionId`.
 - Immediately after route approval, call `loom_approve_route` with the real quoted user consent, its message reference, the loaded revision, a stable operation ID and the first teaching action. This records `phase=build`; only then begin teaching.
-- For a knowledge checkpoint, call `loom_assess_checkpoint` immediately after the answer and provide `sessionId`, `currentStep`, and the exact `nextStep`. Assessment and progress persistence happen in the same tool call.
+- For a knowledge checkpoint, call `loom_assess_checkpoint` after a completed attempt (not a draft or intermediate thought) and provide `sessionId`, `currentStep`, and the exact `nextStep`. Assessment and progress persistence happen in the same tool call.
 - For every other learner response, call `loom_save_learning_state` before continuing. Also save before any pause or session end.
 - Omit unchanged route, secured/gap lists and evidence on saves; the server preserves them. Use `loom_patch_learning_state` with the loaded revision and a stable operation ID for partial updates. Explicit list replacements remain replacements; do not clear them accidentally.
 - Preserve the complete evidence ledger and route extensions by omitting unchanged fields on updates. Treat `secured` as a compatibility summary; use evidence dimensions to decide whether recognition, recall, application, and transfer have actually been demonstrated.
