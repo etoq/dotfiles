@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Non-modal Black Tiffany calculator; qalc handles expressions, never Python eval."""
+"""Non-modal Black Tiffany calculator: bounded RE integers and qalc mathematics."""
+import ast
+from fractions import Fraction
 import json
 import os
 from pathlib import Path
@@ -110,6 +112,209 @@ def clipboard_text(answer):
     return answer.strip().replace('\N{MINUS SIGN}', '-')
 
 
+# Explicit integer semantics for RE expressions; no eval, attributes or Python calls.
+RE_HELP = r"""Размеры: 1 byte = 8 bits · kB/KB = 1000 B · KiB = 1024 B.
+B — байты, b — биты; MB и MiB различаются. Дробные байты допустимы.
+1 MiB to bits  ·  4096 bytes to KiB  ·  32 bits to bytes
+1.5 MB to MiB  ·  0x100 bytes to bits
+
+Системы: hex(255), dec(0xff), bin(0xff), oct(255).
+Два HEX-операнда дают HEX; «to dec» явно выбирает DEC.
+Биты: & | ^ ~ << >> · ^ — XOR в RE-выражениях; степень — **.
+~0 — это -1; u32(~0) ограничивает результат 32 битами.
+u8/u16/u32/u64 — обрезать до ширины unsigned.
+i8/i16/i32/i64 — signed, дополнительный код.
+i32(0xffffffff) = -1  ·  u8(0x1234) = 0x34
+rol(0x81, 1, 8), ror(0x81, 1, 8); ширина по умолчанию 64 бита.
+mask(12), popcount(0xff), align(0x1001, 0x1000).
+
+Порядок байтов: le(0x12345678, 4), be(0x12345678, 4).
+В le/be размер в БАЙТАХ; переполнение — ошибка, без обрезания.
+bswap16/32/64: bswap32(0x12345678).
+fromle("78 56 34 12"), frombe("12 34 56 78").
+ascii("48 69 00") — непечатные байты как \xNN.
+utf8("Привет") — UTF-8 в HEX-байты.
+Целые: до 4096 бит. /, дроби и обычные единицы считает qalc.
+ans — прошлый ответ; Ctrl+C — скопировать его."""
+
+
+RE_FUNCTIONS = {'hex', 'dec', 'bin', 'oct', 'rol', 'ror', 'align', 'mask',
+                'popcount', 'le', 'be', 'fromle', 'frombe', 'ascii', 'utf8'}
+RE_FUNCTIONS |= {prefix + str(width) for prefix in ('u', 'i', 'bswap') for width in (8, 16, 32, 64)}
+
+
+def bounded(value):
+    if type(value) is int and value.bit_length() <= 4096:
+        return value
+    raise ValueError('Нужно целое число размером не более 4096 бит.')
+
+
+def width_bits(value):
+    if type(value) is not int or not 1 <= value <= 64:
+        raise ValueError('Ширина слова должна быть от 1 до 64 бит.')
+    return value
+
+
+def byte_data(value):
+    if not isinstance(value, str) or len(value) > 1024:
+        raise ValueError('Нужна строка HEX-байтов в кавычках, например "41 42 00".')
+    try:
+        return bytes.fromhex(value)
+    except ValueError:
+        raise ValueError('HEX-байты: пары цифр 00–FF, например "41 42 00".') from None
+
+
+def re_call(name, args):
+    counts = {'rol': (2, 3), 'ror': (2, 3), 'align': (2,), 'le': (2,), 'be': (2,)}
+    if len(args) not in counts.get(name, (1,)):
+        raise ValueError('Неверное число аргументов: ' + name)
+    if name in ('fromle', 'frombe', 'ascii'):
+        data = byte_data(args[0])
+        if name == 'ascii':
+            return ''.join(chr(b) if 32 <= b <= 126 else r'\x' + format(b, '02x') for b in data)
+        return bounded(int.from_bytes(data, 'little' if name == 'fromle' else 'big'))
+    if name == 'utf8':
+        if not isinstance(args[0], str) or len(args[0]) > 1024:
+            raise ValueError('utf8 ожидает строку длиной до 1024 символов.')
+        return args[0].encode('utf-8').hex(' ')
+    values = [bounded(v) for v in args]
+    value = values[0]
+    if name in ('hex', 'dec', 'bin', 'oct'):
+        return {'hex': hex, 'dec': str, 'bin': bin, 'oct': oct}[name](value)
+    if name[0] in ('u', 'i') and name[1:].isdigit():
+        bits = int(name[1:]); value &= (1 << bits) - 1
+        return value - (1 << bits) if name[0] == 'i' and value & (1 << (bits - 1)) else value
+    if name.startswith('bswap'):
+        size = int(name[5:]) // 8
+        if not 0 <= value < 1 << (size * 8):
+            raise ValueError('Число не помещается в выбранную ширину bswap.')
+        return int.from_bytes(value.to_bytes(size, 'little'), 'big')
+    if name in ('le', 'be'):
+        size = values[1]
+        if not 1 <= size <= 64 or not 0 <= value < 1 << (size * 8):
+            raise ValueError('le/be: размер 1–64 байта; число должно помещаться без обрезания.')
+        return value.to_bytes(size, 'little' if name == 'le' else 'big').hex(' ')
+    if name in ('rol', 'ror'):
+        bits = width_bits(values[2] if len(values) == 3 else 64)
+        if values[1] < 0:
+            raise ValueError('Сдвиг не может быть отрицательным.')
+        shift = values[1] % bits; word_mask = (1 << bits) - 1; value &= word_mask
+        if name == 'ror':
+            shift = (-shift) % bits
+        return ((value << shift) | (value >> ((bits - shift) % bits))) & word_mask
+    if name == 'align':
+        alignment = values[1]
+        if value < 0 or alignment <= 0:
+            raise ValueError('align: адрес >= 0, выравнивание > 0.')
+        return bounded(((value + alignment - 1) // alignment) * alignment)
+    if name == 'mask':
+        if not 0 <= value <= 4096:
+            raise ValueError('mask: число битов от 0 до 4096.')
+        return (1 << value) - 1
+    if name == 'popcount':
+        if value < 0:
+            raise ValueError('Для отрицательного числа сначала задай ширину: popcount(u32(-1)).')
+        return value.bit_count()
+    raise ValueError('Неизвестная функция: ' + name)
+
+
+def integer_expression(expression):
+    tree = ast.parse(expression, mode='eval')
+    if sum(1 for _ in ast.walk(tree)) > 256:
+        raise ValueError('Слишком сложное выражение.')
+
+    def walk(node):
+        if isinstance(node, ast.Constant) and type(node.value) in (int, str):
+            return bounded(node.value) if type(node.value) is int else node.value
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub, ast.Invert)):
+            value = bounded(walk(node.operand))
+            return bounded(value if isinstance(node.op, ast.UAdd) else -value if isinstance(node.op, ast.USub) else ~value)
+        if isinstance(node, ast.BinOp):
+            a, b = bounded(walk(node.left)), bounded(walk(node.right))
+            if isinstance(node.op, (ast.LShift, ast.RShift, ast.Pow)) and not 0 <= b <= 4096:
+                raise ValueError('Сдвиг или степень должны быть от 0 до 4096.')
+            if isinstance(node.op, ast.Pow) and a.bit_length() * b > 8192:
+                raise ValueError('Результат степени слишком большой.')
+            operations = {ast.Add: lambda: a+b, ast.Sub: lambda: a-b, ast.Mult: lambda: a*b,
+                          ast.FloorDiv: lambda: a//b, ast.Mod: lambda: a%b,
+                          ast.BitAnd: lambda: a&b, ast.BitOr: lambda: a|b, ast.BitXor: lambda: a^b,
+                          ast.LShift: lambda: a<<b, ast.RShift: lambda: a>>b, ast.Pow: lambda: a**b}
+            if type(node.op) in operations:
+                return bounded(operations[type(node.op)]())
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in RE_FUNCTIONS and not node.keywords:
+            return re_call(node.func.id, [walk(arg) for arg in node.args])
+        raise ValueError('RE: целые числа, + - * // % & | ^ ~ << >> и функции из справки.')
+    return walk(tree.body)
+
+
+def unit_bits(unit):
+    aliases = {'bit': 1, 'bits': 1, 'бит': 1, 'битов': 1, 'byte': 8, 'bytes': 8,
+               'байт': 8, 'байта': 8, 'байты': 8, 'байтов': 8, 'бита': 1, 'биты': 1, 'b': 1, 'B': 8}
+    if unit in aliases:
+        return aliases[unit]
+    match = re.fullmatch(r'([kKMGTPE])(i?)([bB])', unit)
+    if match:
+        power = 'KMGTPE'.index(match[1].upper()) + 1
+        return (1024 if match[2] else 1000) ** power * (8 if match[3] == 'B' else 1)
+    return None
+
+
+def calculate_re(expression):
+    """Return None for ordinary qalc input; implement RE operations exactly."""
+    if len(expression) > 2048:
+        raise ValueError('Выражение слишком длинное (максимум 2048 символов).')
+    unit_match = re.fullmatch(r'(.+?)\s*([A-Za-zА-Яа-я]+)\s*(?:to|->|→|в)\s*([A-Za-zА-Яа-я]+)', expression)
+    if unit_match:
+        amount, source, target = unit_match.groups()
+        source_bits, target_bits = unit_bits(source), unit_bits(target)
+        if source_bits is not None and target_bits is not None:
+            amount = amount.strip()
+            number = Fraction(amount.replace(',', '.')) if re.fullmatch(r'[+-]?\d+(?:[.,]\d+)?', amount.replace(',', '.')) else Fraction(bounded(integer_expression(amount)))
+            if max(number.numerator.bit_length(), number.denominator.bit_length()) > 4096:
+                raise ValueError('Размер данных слишком большой (максимум 4096 бит точности).')
+            if number < 0:
+                raise ValueError('Размер данных не может быть отрицательным.')
+            result = number * source_bits / target_bits
+            # Decimal when exact, otherwise keep a fraction instead of rounding.
+            denominator = result.denominator
+            for factor in (2, 5):
+                while denominator % factor == 0:
+                    denominator //= factor
+            if denominator == 1:
+                from decimal import Decimal, localcontext
+                with localcontext() as context:
+                    context.prec = 1600
+                    text = format(Decimal(result.numerator) / Decimal(result.denominator), 'f')
+                text = text.rstrip('0').rstrip('.') if '.' in text else text
+            else:
+                text = str(result)
+            return text + ' ' + target
+    conversion = re.fullmatch(r'(.+?)\s+(?:to|->|→)\s+(hex|dec|bin|oct)', expression, re.I)
+    body = conversion[1] if conversion else expression
+    functions = set(re.findall(r'\b([a-zA-Z][a-zA-Z0-9]*)\s*\(', body))
+    if not (functions & RE_FUNCTIONS or re.search(r'<<|>>|[&|~]|0[bBoO][0-9]|\^', body)):
+        return None
+    value = integer_expression(body)
+    if isinstance(value, str):
+        if conversion:
+            raise ValueError('Преобразование системы счисления требует числа, а не строки.')
+        return value
+    if conversion:
+        return {'hex': hex, 'dec': str, 'bin': bin, 'oct': oct}[conversion[2].lower()](value)
+    decimal_result = re.match(r'\s*(?:i(?:8|16|32|64)|popcount)\s*\(', body)
+    return hex(value) if not decimal_result and re.search(r'0x[0-9a-f]+', body, re.I) else str(value)
+
+
+def number_summary(answer):
+    try:
+        value = int(clipboard_text(answer), 0) if re.match(r'-?0[xbo]', clipboard_text(answer), re.I) else int(answer)
+    except ValueError:
+        return ''
+    if value.bit_length() > 64:
+        return 'Целое число · ' + str(value.bit_length()) + ' бит'
+    return f'HEX {hex(value)}  ·  DEC {value}  ·  BIN {bin(value)}'
+
+
 class CalculatorWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title='Калькулятор · Black Tiffany')
@@ -130,14 +335,14 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         heading = Gtk.Label(label='Калькулятор', xalign=0)
         heading.get_style_context().add_class('heading')
         body.pack_start(heading, False, False, 0)
-        subtitle = Gtk.Label(label='Числа · единицы измерения · HEX / DEC', xalign=0)
+        subtitle = Gtk.Label(label='RE · адреса · биты и байты · endian · signed / unsigned', xalign=0)
         subtitle.get_style_context().add_class('muted')
         body.pack_start(subtitle, False, False, 0)
 
         input_row = Gtk.Box(spacing=10)
         self.entry = Gtk.Entry()
         self.entry.connect('key-press-event', self.on_key)
-        self.entry.set_placeholder_text('2+2 · 0xFF to dec · 10 km to m')
+        self.entry.set_placeholder_text('1 MiB to bits · i32(0xffffffff) · le(0x1234, 4)')
         self.entry.connect('activate', lambda *_: self.compute())
         input_row.pack_start(self.entry, True, True, 0)
         self.compute_button = Gtk.Button(label='Вычислить')
@@ -161,6 +366,12 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         result_scroll.set_min_content_height(65)
         result_scroll.add(self.result)
         result_box.pack_start(result_scroll, True, True, 0)
+        self.number_info = Gtk.Label(xalign=0)
+        self.number_info.set_selectable(True)
+        self.number_info.set_line_wrap(True)
+        self.number_info.set_max_width_chars(65)
+        self.number_info.get_style_context().add_class('muted')
+        result_box.pack_start(self.number_info, False, False, 0)
         result_actions = Gtk.Box(spacing=8)
         self.copy_button = Gtk.Button(label='Скопировать')
         self.copy_button.connect('clicked', lambda *_: self.copy_result())
@@ -175,6 +386,18 @@ class CalculatorWindow(Gtk.ApplicationWindow):
         self.status.get_style_context().add_class('muted')
         self.status.set_line_wrap(True)
         body.pack_start(self.status, False, False, 0)
+        help_box = Gtk.Expander(label='Справка RE · примеры и единицы')
+        help_text = Gtk.Label(label=RE_HELP, xalign=0, yalign=0)
+        help_text.set_selectable(True)
+        help_text.set_line_wrap(True)
+        help_text.set_max_width_chars(65)
+        help_text.get_style_context().add_class('muted')
+        help_scroll = Gtk.ScrolledWindow()
+        help_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        help_scroll.set_min_content_height(180)
+        help_scroll.add(help_text)
+        help_box.add(help_scroll)
+        body.pack_start(help_box, False, False, 0)
         history_heading = Gtk.Box()
         history_heading.pack_start(Gtk.Label(label='История', xalign=0), True, True, 0)
         clear = Gtk.Button(label='Очистить историю')
@@ -200,6 +423,7 @@ class CalculatorWindow(Gtk.ApplicationWindow):
 
     def set_result(self, answer, expression):
         self.answer = answer
+        self.number_info.set_text(number_summary(answer))
         self.result.get_buffer().set_text(answer)
         self.expression_label.set_text(expression)
         self.copy_button.set_sensitive(bool(answer))
@@ -228,6 +452,14 @@ class CalculatorWindow(Gtk.ApplicationWindow):
                 return
             expression = re.sub(r'\bans\b', lambda _: '(' + self.answer + ')', expression)
         self.stop_job()
+        try:
+            re_answer = calculate_re(expression)
+        except (ValueError, SyntaxError, ArithmeticError, RecursionError) as error:
+            self.set_status(str(error)[:500], True)
+            return
+        if re_answer is not None:
+            self.accept_result(re_answer, expression)
+            return
         self.entry.set_sensitive(False)
         self.compute_button.set_sensitive(False)
         self.copy_button.set_sensitive(False)
@@ -273,18 +505,21 @@ class CalculatorWindow(Gtk.ApplicationWindow):
             elif not proc.get_successful() or not answer or re.search(r'error:|ошибка:', answer + (error or ''), re.I):
                 self.set_status((error or answer or 'Не удалось вычислить выражение.').strip()[:500], True)
             else:
-                self.set_result(answer, expression)
-                self.history = [row for row in self.history if row[0] != expression] + [[expression, answer]]
-                self.history = self.history[-30:]
-                try:
-                    save_history(self.history)
-                    self.set_status('Готово · Ctrl+C — скопировать · ans — последний результат')
-                except OSError as failure:
-                    self.set_status('Результат готов, но история не сохранена: ' + str(failure), True)
-                self.rebuild_history()
+                self.accept_result(answer, expression)
 
         self.timeout = GLib.timeout_add_seconds(8, timeout)
         process.communicate_utf8_async(None, None, done)
+
+    def accept_result(self, answer, expression):
+        self.set_result(answer, expression)
+        self.history = ([row for row in self.history if row[0] != expression] + [[expression, answer]])[-30:]
+        try:
+            save_history(self.history)
+            self.set_status('Готово · Ctrl+C — скопировать · ans — последний результат')
+        except OSError as failure:
+            self.set_status('Результат готов, но история не сохранена: ' + str(failure), True)
+        self.rebuild_history()
+        self.entry.grab_focus()
 
     def copy_result(self):
         if self.job:
