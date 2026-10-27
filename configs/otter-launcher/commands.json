@@ -385,7 +385,7 @@
     "raw_argument": false
   },
   "ssh": {
-    "command": "exec kitty --override font_size=14.7 --class otter-tools --start-as maximized -e \"$HOME/.local/bin/lazyssh\"",
+    "command": "exec kitty --override font_size=14.7 --class lazyssh-terminal -e \"$HOME/.local/bin/lazyssh\"",
     "url_encoded": false,
     "raw_argument": false
   }

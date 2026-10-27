@@ -174,6 +174,7 @@ awful.rules.rules={
  {rule={class='panel-monitor'},properties={fullscreen=true}},
  {rule_any={class={'TiffanyCalculator','TiffanyTranslator'}},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},
  {rule={class='kitty'},properties={maximized=false,maximized_horizontal=false,maximized_vertical=false}},
+ {rule={class='lazyssh-terminal'},properties={floating=false,ontop=false,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='calendar'},properties={floating=true,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(900,c.screen.workarea.height-80)end},callback=place_popup},
  {rule={class='otter'},properties={floating=true,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false,width=500,height=420,screen=function()return awful.screen.focused()end},callback=place_popup},
  {rule={class='tiffany-scratch'},properties={floating=true,sticky=true,ontop=true,skip_taskbar=true,width=1000,height=600,placement=awful.placement.centered}},
