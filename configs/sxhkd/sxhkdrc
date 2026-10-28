@@ -157,4 +157,6 @@ super + shift + g
 super + alt + s
 	"$HOME/.local/bin/dictation-control" handy-toggle
 super + ctrl + alt + s
-	"$HOME/.local/bin/dictation-control" hypr-toggle
+	"$HOME/.local/bin/dictation-control" live-toggle
+super + ctrl + alt + Escape
+	"$HOME/.local/bin/dictation-control" live-cancel

@@ -400,7 +400,7 @@
     "raw_argument": false
   },
   "wh": {
-    "command": "exec \"$HOME/.local/bin/dictation-control\" hypr-toggle",
+    "command": "exec \"$HOME/.local/bin/dictation-control\" live-toggle",
     "url_encoded": false,
     "raw_argument": false
   }

@@ -10,7 +10,11 @@ elif action=='handy':
  sp.Popen([str(H/'.local/bin/handy')],stdin=sp.DEVNULL,stdout=sp.DEVNULL,stderr=sp.DEVNULL,start_new_session=True)
 elif action=='handy-toggle':
  sp.Popen([str(H/'.local/bin/handy'),'--start-hidden','--toggle-transcription'],stdin=sp.DEVNULL,stdout=sp.DEVNULL,stderr=sp.DEVNULL,start_new_session=True)
-elif action=='hypr-toggle':
+elif action in ('hypr-toggle','live-toggle'):
+ sp.run([str(H/'.local/bin/dictation-live'),'toggle'],check=True)
+elif action=='live-cancel':sp.run([str(H/'.local/bin/dictation-live'),'cancel'],check=True)
+elif action=='live-stop':sp.run(['systemctl','--user','stop','dictation-live.service'],check=True)
+elif action=='hypr-legacy-toggle':
  start=sp.run(['systemctl','--user','start','hyprwhspr.service'],capture_output=True,text=True)
  if start.returncode:raise SystemExit(start.stderr.strip())
  path=Path('/run/user')/str(__import__('os').getuid())/'hyprwhspr/hyprwhspr.sock'

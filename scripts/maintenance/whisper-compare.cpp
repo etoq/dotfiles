@@ -20,7 +20,8 @@ static uint16_t u16(const std::vector<unsigned char>&b,size_t n){return u32(b,n)
 int main(int argc,char **argv){
  whisper_context *ctx=nullptr;
  try{
-  if(argc!=5)throw std::runtime_error("model wav prompt-file cpu|vulkan required");
+  if(argc!=5&&argc!=6)throw std::runtime_error("model wav prompt-file cpu|vulkan [1|2] required");
+  int repeats=argc==6?std::stoi(argv[5]):2;if(repeats<1||repeats>2)throw std::runtime_error("Repeat must be 1 or 2");
   std::ifstream f(argv[2],std::ios::binary);std::vector<unsigned char>b((std::istreambuf_iterator<char>(f)),{});
   if(b.size()<12||std::string(b.begin(),b.begin()+4)!="RIFF"||std::string(b.begin()+8,b.begin()+12)!="WAVE")throw std::runtime_error("Invalid WAV");
   std::vector<float>audio;bool format=false;
@@ -34,13 +35,15 @@ int main(int argc,char **argv){
   auto start=Clock::now();ctx=whisper_init_from_file_with_params(argv[1],cp);if(!ctx)throw std::runtime_error("Cannot load Whisper");double load=ms(start);
   if(gpu){bool found=false;for(size_t i=0;i<ggml_backend_dev_count();i++)if(ggml_backend_dev_type(ggml_backend_dev_get(i))==GGML_BACKEND_DEVICE_TYPE_GPU)found=true;if(!found)throw std::runtime_error("No GPU backend available; Vulkan test cannot silently fall back to CPU");}
   std::vector<double>times;std::vector<std::string>texts;
-  for(int r=0;r<2;r++){
+  for(int r=0;r<repeats;r++){
    auto p=whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);p.n_threads=4;p.language="ru";p.translate=false;p.initial_prompt=prompt.c_str();
    p.no_context=true;p.print_realtime=false;p.print_progress=false;p.print_timestamps=false;p.print_special=false;p.beam_search.beam_size=5;p.beam_search.patience=-1.0f;p.temperature_inc=0;
    start=Clock::now();if(whisper_full(ctx,p,audio.data(),audio.size()))throw std::runtime_error("Transcription failed");times.push_back(ms(start));
    std::string text;for(int i=0;i<whisper_full_n_segments(ctx);i++)text+=whisper_full_get_segment_text(ctx,i);texts.push_back(text);
   }
   whisper_free(ctx);ctx=nullptr;
-  std::cout<<"{\"text\":"<<quote(texts.back())<<",\"texts\":["<<quote(texts[0])<<","<<quote(texts[1])<<"],\"load_ms\":"<<load<<",\"transcribe_ms\":["<<times[0]<<","<<times[1]<<"],\"audio_secs\":"<<audio.size()/16000.0<<",\"backend\":"<<quote(gpu?"Vulkan":"CPU")<<",\"decoding\":\"beam_size=5; flash_attn=1; ru; RE prompt; no LLM\"}\n";
+  std::cout<<"{\"text\":"<<quote(texts.back())<<",\"texts\":[";for(size_t i=0;i<texts.size();i++){if(i)std::cout<<',';std::cout<<quote(texts[i]);}
+  std::cout<<"],\"load_ms\":"<<load<<",\"transcribe_ms\":[";for(size_t i=0;i<times.size();i++){if(i)std::cout<<',';std::cout<<times[i];}
+  std::cout<<"],\"audio_secs\":"<<audio.size()/16000.0<<",\"backend\":"<<quote(gpu?"Vulkan":"CPU")<<",\"decoding\":\"beam_size=5; flash_attn=1; ru; RE prompt; no LLM\"}\n";
  }catch(const std::exception&e){if(ctx)whisper_free(ctx);std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -1,14 +1,29 @@
 #!/usr/bin/env python3
-"""Handy external paste: clipboard text; terminal-aware chord; never Enter."""
-import json
+"""Text-only clipboard insertion, terminal aware, with an optional focus guard."""
+import argparse,json,os,subprocess as sp
 from pathlib import Path
-import subprocess as sp
-import sys
-text=sys.argv[1] if len(sys.argv)>1 else ''
-if not text:raise SystemExit(0)
-p=sp.run([str(Path.home()/'.local/bin/wispr-context'),'--json'],capture_output=True,text=True,timeout=3)
-try:context=json.loads(p.stdout)
-except ValueError:context={}
-sp.run(['xclip','-selection','clipboard','-in'],input=text.encode(),stdout=sp.DEVNULL,stderr=sp.DEVNULL,check=True,timeout=3)
-chord='ctrl+shift+v' if context.get('appName')=='Terminal' else 'ctrl+v'
-sp.run(['xdotool','key','--clearmodifiers',chord],check=True,timeout=3)
+
+def context():
+ p=sp.run([str(Path.home()/'.local/bin/wispr-context'),'--json'],capture_output=True,text=True,timeout=3)
+ try:return json.loads(p.stdout)
+ except ValueError:return {}
+
+def locked():
+ runtime=Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))
+ return (runtime/'wispr-screen-lock.json').exists() or sp.run(['pgrep','-u',str(os.getuid()),'-x','i3lock'],stdout=sp.DEVNULL).returncode==0
+
+def paste(text,target=None):
+ if not text:return 'empty'
+ if locked():return 'locked'
+ sp.run(['xclip','-selection','clipboard','-target','UTF8_STRING','-in'],input=text.encode(),stdout=sp.DEVNULL,stderr=sp.DEVNULL,check=True,timeout=3)
+ current=context()
+ if target and current.get('windowId')!=target:return 'clipboard'
+ if locked():return 'locked'
+ chord='ctrl+shift+v' if current.get('appName')=='Terminal' else 'ctrl+v'
+ sp.run(['xdotool','key','--clearmodifiers',chord],check=True,timeout=3)
+ return 'pasted'
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('text',nargs='?',default='');p.add_argument('--file',type=Path);p.add_argument('--target-window');args=p.parse_args()
+ print(paste(args.file.read_text() if args.file else args.text,args.target_window))
+if __name__=='__main__':main()

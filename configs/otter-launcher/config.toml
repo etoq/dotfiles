@@ -582,6 +582,6 @@ unbind_proc = false
 
 [[modules]]
 prefix = "wh"
-description = "Whisper · запись / остановка"
+description = "Medium Vulkan · запись / остановка"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module wh"
 unbind_proc = false

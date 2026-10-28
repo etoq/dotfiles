@@ -41,6 +41,7 @@ def main():
   if not args.keep_source:(TURBO/'codeswitch-source/model.safetensors').unlink()
  cfg=json.loads((HOME/'.config/hyprwhspr/config.json').read_text());TURBO.mkdir(parents=True,exist_ok=True)
  (TURBO/'prompt.txt').write_text(cfg.get('whisper_prompt',''))
- for name in ['dictation-turbo-engine','dictation-turbo-install']:helpers['link'](ROOT/'scripts/local-bin'/name,HOME/'.local/bin'/name)
+ for name in ['dictation-live','dictation-turbo-engine','dictation-turbo-install']:helpers['link'](ROOT/'scripts/local-bin'/name,HOME/'.local/bin'/name)
+ helpers['link'](ROOT/'configs/systemd/user/dictation-live.service',HOME/'.config/systemd/user/dictation-live.service')
  print('Turbo ready. Open vc; choose Whisper Vulkan. No mic, autostart or driver changes.')
 if __name__=='__main__':main()
