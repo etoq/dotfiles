@@ -152,3 +152,7 @@ super + shift + b
 # Ghidra, consistent with Awesome
 super + shift + g
     "$HOME/.local/bin/panel-action" ghidra
+
+# Soniox streaming dictation (independent from Wispr)
+super + alt + s
+	"$HOME/.local/bin/soniox" toggle

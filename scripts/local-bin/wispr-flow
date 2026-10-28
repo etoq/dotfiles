@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
-# Scope the packaged launcher's supported software-rendering workaround to Wispr.
+# Keep software rendering and prefer the version-matched private context patch.
 set -euo pipefail
 export WISPR_DISABLE_GPU=1
+runtime="$HOME/.local/lib/wispr-context-runtime"
+if python - "$runtime/manifest.json" <<'PY'
+import json,sys
+from pathlib import Path
+try:
+ d=json.loads(Path(sys.argv[1]).read_text());s=Path('/opt/wispr-flow-appimage/usr/lib/wispr-flow/resources/app.asar').stat()
+ assert d['source_bytes']==s.st_size and d['source_mtime_ns']==s.st_mtime_ns
+except (OSError,ValueError,KeyError,AssertionError): raise SystemExit(1)
+PY
+then
+    exec "$runtime/AppRun" "$@"
+fi
 exec /usr/bin/wispr-flow "$@"

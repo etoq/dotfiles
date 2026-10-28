@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""Soniox streaming dictation for X11; explicit start/stop, private local key."""
+import json
+import os
+from pathlib import Path
+import re
+import selectors
+import signal
+import subprocess as sp
+import sys
+import tempfile
+import threading
+import time
+
+H = Path.home()
+VENV = H / '.local/share/soniox/venv'
+CONFIG = H / '.config/soniox'
+STATE = H / '.local/state/soniox'
+KEY = CONFIG / 'api-key'
+MODEL = 'stt-rt-v5'
+ENDPOINT = 'wss://stt-rt.soniox.com/transcribe-websocket'
+TERMS = ['Ghidra', 'IDA', 'Hex-Rays', 'Binary Ninja', 'radare2', 'Rizin', 'Cutter',
+         'GDB', 'pwndbg', 'GEF', 'LLDB', 'ptrace', 'strace', 'ltrace', 'syscall',
+         'mmap', 'mprotect', 'malloc', 'free', 'dlopen', 'dlsym', 'LD_PRELOAD',
+         'ELF', 'PE', 'GOT', 'PLT', 'ASLR', 'PIE', 'NX', 'RELRO', 'ROP', 'RIP',
+         'RSP', 'RBP', 'RAX', 'EAX', 'shellcode', 'rootkit', 'keylogger',
+         'use-after-free', 'double free', 'buffer overflow', 'heap', 'stack',
+         'YARA', 'CAPA', 'UPX', 'Rust', 'Python', 'assembler', 'Linux', 'Codex']
+PHRASES = [
+    'Открой ELF в Ghidra и найди вызов ptrace перед main.',
+    'Проверь GOT и PLT, затем посмотри RELRO, PIE, NX и ASLR.',
+    'Поставь breakpoint в pwndbg и проверь регистры RIP, RSP и RAX.',
+    'После malloc происходит double free, а затем use-after-free.',
+    'Перехвати mmap и mprotect через strace, библиотеку подключи через LD_PRELOAD.',
+    'Найди shellcode, распакуй UPX и проверь образец правилом YARA.'
+]
+
+
+def atomic_json(path, value):
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as out: json.dump(value, out, ensure_ascii=False, indent=2)
+        os.replace(temporary, path)
+    finally: Path(temporary).unlink(missing_ok=True)
+
+
+def load_key():
+    value = KEY.read_text().strip() if KEY.exists() else ''
+    if not value or any(c.isspace() for c in value):
+        raise RuntimeError('Открой sx в Otter и сохрани API-ключ Soniox.')
+    return value
+
+
+def stream_config():
+    return {'model': MODEL, 'audio_format': 'pcm_s16le', 'sample_rate': 16000,
+            'num_channels': 1, 'language_hints': ['ru', 'en'],
+            'context': {'general': [{'key': 'domain', 'value': 'Linux reverse engineering and malware analysis'}], 'terms': TERMS}}
+
+
+def collect_tokens(message, final):
+    provisional = []
+    for token in message.get('tokens', []):
+        text = token.get('text', '')
+        if text in ('<end>', '<fin>'):
+            continue
+        (final if token.get('is_final') else provisional).append(text)
+    return ''.join(final) + ''.join(provisional)
+
+
+def context():
+    try:
+        result = sp.run([str(H / '.local/bin/wispr-context'), '--json'], capture_output=True, text=True, timeout=3)
+        return json.loads(result.stdout)
+    except (OSError, ValueError, sp.SubprocessError):
+        return {}
+
+
+def score(reference, transcript):
+    def words(text): return re.findall(r'[\w]+(?:-[\w]+)*', text.casefold())
+    expected, actual = words(reference), words(transcript)
+    previous = list(range(len(actual) + 1))
+    for i, word in enumerate(expected, 1):
+        row = [i]
+        for j, other in enumerate(actual, 1):
+            row.append(min(row[-1] + 1, previous[j] + 1, previous[j-1] + (word != other)))
+        previous = row
+    terms = [term for term in TERMS if term.casefold() in reference.casefold()]
+    return {'wer_percent': round(100 * previous[-1] / max(1, len(expected)), 1),
+            'terms_correct': sum(term.casefold() in transcript.casefold() for term in terms), 'terms_total': len(terms)}
+
+
+class Session:
+    def __init__(self, update, complete):
+        self.update, self.complete = update, complete
+        self.stop = threading.Event()
+        self.cancelled = False
+        self.stop_at = None
+        self.started = None
+        self.target = context()
+
+    def finish(self):
+        if self.stop_at is None: self.stop_at = time.monotonic()
+        self.stop.set()
+
+    def cancel(self):
+        self.cancelled = True
+        self.finish()
+
+    def run(self):
+        import websocket
+        ws, recorder = None, None
+        final, errors = [], []
+        finished = threading.Event()
+        first_token = [None]
+        key = ''
+        try:
+            key = load_key()
+            ws = websocket.create_connection(ENDPOINT, header=['Authorization: Bearer ' + key], timeout=15, enable_multithread=True)
+            ws.send(json.dumps(stream_config()))
+            ws.settimeout(1)
+            def receive():
+                try:
+                    while not finished.is_set():
+                        try:
+                            data = ws.recv()
+                        except websocket.WebSocketTimeoutException:
+                            continue
+                        if not data:
+                            if not finished.is_set(): errors.append('Soniox закрыл соединение до завершения.')
+                            break
+                        msg = json.loads(data)
+                        if msg.get('error_code') or msg.get('error_type'):
+                            errors.append(str(msg.get('error_type') or msg['error_code']))
+                            break
+                        if msg.get('tokens') and first_token[0] is None: first_token[0] = time.monotonic()
+                        text = collect_tokens(msg, final)
+                        self.update(text, 'Запись · повтори Win+Alt+S для остановки')
+                        if msg.get('finished'): break
+                except Exception as error:
+                    if not self.cancelled: errors.append(type(error).__name__)
+                finally: finished.set()
+            receiver = threading.Thread(target=receive, daemon=True); receiver.start()
+            if self.cancelled or self.stop.is_set():
+                self.cancelled = True
+                ws.send(''); return
+            recorder = sp.Popen(['pw-record', '--raw', '--format', 's16', '--rate', '16000', '--channels', '1', '-'],
+                                stdout=sp.PIPE, stderr=sp.DEVNULL)
+            self.started = time.monotonic()
+            self.update('', 'Запись · повтори Win+Alt+S для остановки')
+            selector = selectors.DefaultSelector(); selector.register(recorder.stdout, selectors.EVENT_READ)
+            try:
+                while not self.stop.is_set() and not finished.is_set():
+                    if time.monotonic() - self.started > 300:
+                        self.finish(); break
+                    if (Path(os.environ.get('XDG_RUNTIME_DIR', '/run/user/' + str(os.getuid()))) / 'wispr-screen-lock.json').exists():
+                        self.cancel(); break
+                    if selector.select(.1):
+                        data = os.read(recorder.stdout.fileno(), 3200)
+                        if not data: raise RuntimeError('Микрофон не вернул аудио.')
+                        ws.send_binary(data)
+            finally: selector.close()
+            self.finish()
+            recorder.terminate(); recorder.wait(timeout=3); recorder = None
+            if self.cancelled:
+                ws.close(); return
+            self.update(''.join(final), 'Завершаю распознавание…')
+            ws.send('')  # Empty TEXT frame ends the stream, not an empty binary frame.
+            if not finished.wait(15): raise RuntimeError('Soniox не завершил ответ за 15 секунд.')
+            if errors: raise RuntimeError('Soniox: ' + errors[0])
+            text = ''.join(final).strip()
+            if not text: raise RuntimeError('Речь не распознана.')
+            result = {'text': text, 'model': MODEL, 'recorded_seconds': round(self.stop_at - self.started, 2),
+                      'first_token_seconds': round(first_token[0] - self.started, 2) if first_token[0] else None,
+                      'stop_to_result_seconds': round(time.monotonic() - self.stop_at, 2),
+                      'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'target': self.target.get('appName', '')}
+            atomic_json(STATE / 'last.json', result)
+            self.complete(result, None, self.target)
+        except Exception as error:
+            detail = str(error).replace(key, '[скрыто]') if key else str(error)
+            if not self.cancelled: self.complete(None, detail[:240], self.target)
+        finally:
+            if recorder:
+                recorder.terminate()
+                try: recorder.wait(timeout=3)
+                except sp.TimeoutExpired: recorder.kill(); recorder.wait()
+            if ws: ws.close()
+            if self.cancelled: self.complete(None, 'Запись отменена.', self.target)
+
+
+def run_gui():
+    import gi
+    gi.require_version('Gtk', '3.0')
+    from gi.repository import Gtk, Gdk, Gio, GLib
+
+    class App(Gtk.Application):
+        def __init__(self):
+            super().__init__(application_id='org.eto.Soniox', flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+            self.window = None; self.session = None; self.worker = None
+        def do_activate(self): self.show()
+        def ensure(self):
+            if self.window: return
+            self.window = Gtk.ApplicationWindow(application=self, title='Soniox · сравнение диктовки')
+            self.window.set_wmclass('tiffany-soniox', 'TiffanySoniox'); self.window.set_default_size(680, 650)
+            self.window.connect('delete-event', lambda *args: self.hide())
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12); box.set_border_width(24); self.window.add(box)
+            heading = Gtk.Label(label='Soniox · русский + RE', xalign=0); heading.get_style_context().add_class('title');box.pack_start(heading,False,False,0)
+            hint = Gtk.Label(label='Win+Alt+S — начать / закончить запись в нужном окне.\nАудио уходит в Soniox; локально хранится только последний текст. Лимит — 5 минут.', xalign=0)
+            hint.set_line_wrap(True); box.pack_start(hint,False,False,0)
+            row = Gtk.Box(spacing=8)
+            self.key = Gtk.Entry(); self.key.set_visibility(False);self.key.set_placeholder_text('API-ключ Soniox (сохраняется локально)');row.pack_start(self.key,True,True,0)
+            save = Gtk.Button(label='Сохранить ключ');save.connect('clicked',self.save_key);row.pack_start(save,False,False,0);box.pack_start(row,False,False,0)
+            link=Gtk.LinkButton.new_with_label('https://console.soniox.com/','Получить ключ · проект → API Keys → Speech-to-text, real-time');box.pack_start(link,False,False,0)
+            self.status = Gtk.Label(label='Ключ сохранён. Готов к записи.' if KEY.exists() else 'Для реального теста нужен API-ключ.', xalign=0);self.status.set_line_wrap(True);box.pack_start(self.status,False,False,0)
+            self.result=Gtk.TextView();self.result.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+            scroll=Gtk.ScrolledWindow();scroll.set_min_content_height(100);scroll.add(self.result);box.pack_start(scroll,True,True,0)
+            buttons=Gtk.Box(spacing=8)
+            for label,callback in [('Копировать',self.copy),('Остановить',lambda *_:self.stop_recording()),('Отменить',lambda *_:self.cancel_recording())]:
+                button=Gtk.Button(label=label);button.connect('clicked',callback);buttons.pack_start(button,False,False,0)
+            box.pack_start(buttons,False,False,0)
+            self.reference=Gtk.ComboBoxText()
+            for phrase in PHRASES:self.reference.append_text(phrase)
+            self.reference.set_active(0);box.pack_start(self.reference,False,False,0)
+            explanation=Gtk.Label(label='Прочитай выбранную фразу в Wispr и Soniox. Для оценки вставь\nлюбой результат в поле выше, затем нажми «Оценить».', xalign=0);explanation.set_line_wrap(True);box.pack_start(explanation,False,False,0)
+            evaluate=Gtk.Button(label='Оценить текст · ошибки и термины');evaluate.connect('clicked',self.evaluate);box.pack_start(evaluate,False,False,0)
+            try:
+                last=json.loads((STATE/'last.json').read_text());self.result.get_buffer().set_text(last['text'])
+            except (OSError,ValueError,KeyError):pass
+            css=Gtk.CssProvider();css.load_from_data(b'window {background:#080D10;color:#C5D6D8;} label {color:#C5D6D8;} .title {font-size:23px;color:#A3F0E7;} entry,textview,textview text {background:#101B20;color:#A3F0E7;font:15px monospace;} button,combobox {background:#183039;color:#C5D6D8;border:1px solid #0ABAB5;box-shadow:none;text-shadow:none;}')
+            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),css,Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        def hide(self):
+            self.cancel_recording();self.quit();return True
+        def do_shutdown(self):
+            self.cancel_recording()
+            if self.worker and self.worker.is_alive():self.worker.join(timeout=3)
+            Gtk.Application.do_shutdown(self)
+        def show(self):self.ensure();self.window.show_all();self.window.present()
+        def text(self):
+            b=self.result.get_buffer();return b.get_text(b.get_start_iter(),b.get_end_iter(),True)
+        def save_key(self,*_):
+            value=self.key.get_text().strip()
+            if not value or any(c.isspace() for c in value):self.status.set_text('Нужен ключ без пробелов.');return
+            CONFIG.mkdir(mode=0o700,parents=True,exist_ok=True)
+            fd,path=tempfile.mkstemp(dir=CONFIG)
+            with os.fdopen(fd,'w') as file:file.write(value+'\n')
+            os.replace(path,KEY);self.key.set_text('');self.status.set_text('Ключ сохранён локально. Записывай через Win+Alt+S в нужном окне.')
+        def copy(self,*_):
+            sp.run(['xclip','-selection','clipboard','-in'],input=self.text().encode(),stdout=sp.DEVNULL,stderr=sp.DEVNULL,timeout=2)
+        def update(self,text,status):
+            def change():self.ensure();self.result.get_buffer().set_text(text);self.status.set_text(status)
+            GLib.idle_add(change)
+        def done(self,result,error,target):
+            def change():
+                self.session=None;self.ensure()
+                if error:self.status.set_text(error);self.show()
+                else:
+                    self.result.get_buffer().set_text(result['text'])
+                    self.status.set_text(f"Готово · после остановки {result['stop_to_result_seconds']} с · запись {result['recorded_seconds']} с")
+                    try:
+                        self.copy()
+                        current=context()
+                        if target.get('appName') != 'TiffanySoniox' and target.get('windowId') and current.get('windowId')==target['windowId']:
+                            chord='ctrl+shift+v' if current.get('appName')=='Terminal' else 'ctrl+v'
+                            sp.run(['xdotool','key','--clearmodifiers',chord],check=True,timeout=3)
+                            message='Текст вставлен. Enter не нажимается.'
+                        else:message='Фокус изменился: текст в буфере, вставь вручную.'
+                        sp.Popen(['notify-send','Soniox',message])
+                    except (OSError,sp.SubprocessError):self.status.set_text('Ответ готов. Скопируй его из окна sx.')
+            GLib.idle_add(change)
+        def toggle(self):
+            self.ensure()
+            if self.session:self.stop_recording();return
+            try:load_key()
+            except RuntimeError as error:self.status.set_text(str(error));self.show();return
+            self.session=Session(self.update,self.done)
+            self.status.set_text('Подключение к Soniox…')
+            self.worker=threading.Thread(target=self.session.run,daemon=True);self.worker.start()
+            sp.Popen(['notify-send','Soniox','Начало диктовки. Win+Alt+S — закончить.'])
+        def stop_recording(self):
+            if self.session:self.session.finish();self.status.set_text('Завершаю запись…')
+        def cancel_recording(self):
+            if self.session:self.session.cancel()
+        def evaluate(self,*_):
+            data=score(self.reference.get_active_text(),self.text())
+            self.status.set_text(f"WER: {data['wer_percent']}% (меньше лучше) · термины: {data['terms_correct']}/{data['terms_total']}. Регистр и пунктуация не учитываются.")
+        def do_command_line(self,cmd):
+            args=cmd.get_arguments()[1:]
+            self.hold();self.ensure()
+            if 'toggle' in args:self.toggle()
+            elif 'stop' in args:self.stop_recording()
+            else:self.show()
+            self.release()
+            return 0
+    app=App()
+    return app.run(sys.argv)
+
+
+if __name__ == '__main__':
+    os.umask(0o077)
+    if sys.prefix != str(VENV):
+        interpreter=VENV/'bin/python'
+        if not interpreter.exists():raise SystemExit('Сначала: soniox-install')
+        os.execv(str(interpreter),[str(interpreter),str(Path(__file__).resolve()),*sys.argv[1:]])
+    raise SystemExit(run_gui())

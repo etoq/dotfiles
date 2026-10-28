@@ -372,7 +372,7 @@ if [ "$DO_SCRIPTS" = "1" ]; then
 
     mkdir -p "$HOME/.local/bin" "$HOME/bin"
 
-    LOCAL_SCRIPTS=(wispr-lock workstation-update tiffany-translator lazyssh lazyssh-install translate desktop-app study tiffany-calculator cheat-data workstation-tools workstation-files fan-toggle wallpaper-rotate workstation-away idle-screen-lock imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
+    LOCAL_SCRIPTS=(soniox soniox-install wispr-context wispr-lock workstation-update tiffany-translator lazyssh lazyssh-install translate desktop-app study tiffany-calculator cheat-data workstation-tools workstation-files fan-toggle wallpaper-rotate workstation-away idle-screen-lock imhex proton-quota workstation-status workstation-backup wispr-flow wispr-a11y-guard proton-drive proton-drive-install workstation-root-audit deck-system tiffany-theme verify-kernel-stack polybar-workspaces disable-middle-click awesome-session-start awesome-preview panel-action panel-data panel-switch panel-dashboard panel-autostart reverse-ghidra AyuGram cheat-fish cheat-sxhkd check-sleep-callback check-nvidia-sleep clean-meta clipmenu.sh fix-ethernet-autoconnect tiffany-calendar otter-apps otter-exec otter-launcher otter-new-note otter-tools otter-install-assets otter-run polybar-temperature sys-update syshealth tiffany-reload tiffany-reload-polybar weekly-clean)
     for s in "${LOCAL_SCRIPTS[@]}"; do
         if [ -f "$DOTFILES_DIR/scripts/local-bin/$s" ]; then
             link "scripts/local-bin/$s" "$HOME/.local/bin/$s"
@@ -389,6 +389,12 @@ if [ "$DO_SCRIPTS" = "1" ]; then
     done
     if [[ "$DO_PKGS" == 1 ]]; then
         "$HOME/.local/bin/otter-install-assets" || warn "Ресурсы Otter: повтори otter-install-assets при доступном интернете"
+    fi
+    if [[ "$DO_PKGS" == 1 ]] && command -v uv >/dev/null 2>&1; then
+        "$HOME/.local/bin/soniox-install" || warn "Soniox: повтори soniox-install"
+    fi
+    if [[ -f /opt/wispr-flow-appimage/usr/lib/wispr-flow/resources/app.asar ]]; then
+        python "$DOTFILES_DIR/scripts/maintenance/install-wispr-context.py" || warn "Wispr context: оригинальная сборка сохранена"
     fi
     if [[ "$DO_PKGS" == 1 ]] && command -v go >/dev/null 2>&1; then
         "$HOME/.local/bin/lazyssh-install" || warn "SSH-менеджер: повтори lazyssh-install"

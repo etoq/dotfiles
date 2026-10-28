@@ -57,6 +57,7 @@ end
 key({mod},'Return',function()spawn({'kitty','--override','font_size=14.7'})end,'Терминал · масштаб 130%','Приложения')
 key({mod},'d',function()action('launcher')end,'Otter launcher','Приложения')
 key({mod},'s',function()spawn({home..'/.local/bin/desktop-app','open','localsend'})end,'LocalSend · показать окно','Приложения')
+key({mod,'Mod1'},'s',function()spawn({home..'/.local/bin/soniox','toggle'})end,'Soniox · запись / остановка','Инструменты')
 key({mod},'x',function()spawn({'kitty','--class','codex-terminal','--override','font_size=14.7','--directory',home..'/learning/linux-re','-e','/usr/bin/codex','resume'})end,'Codex resume · learning/linux-re','Приложения')
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')
 key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/desktop-app','open','discord'})end,'Discord','Приложения')
@@ -173,6 +174,7 @@ awful.rules.rules={
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
  {rule_any={class={'TiffanyCalculator','TiffanyTranslator'}},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},
+ {rule={class='TiffanySoniox'},properties={floating=true,ontop=false,fullscreen=false,maximized=false,placement=awful.placement.centered}},
  {rule={class='kitty'},properties={maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='lazyssh-terminal'},properties={floating=false,ontop=false,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='calendar'},properties={floating=true,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(900,c.screen.workarea.height-80)end},callback=place_popup},

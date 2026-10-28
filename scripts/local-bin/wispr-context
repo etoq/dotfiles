@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Read only X11 window metadata; normalize desktop apps for Wispr's catalog."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess as sp
+
+
+def query(args):
+    return sp.run(args, capture_output=True, text=True, timeout=1).stdout
+
+
+def classify(wm_class, instance='', title='', executables=()):
+    identity = (wm_class + ' ' + instance).casefold()
+    result = {'appName': wm_class, 'bundleId': wm_class, 'url': ''}
+    if 'ayugram' in identity or 'telegram' in identity or '64gram' in identity:
+        result.update(appName='Telegram', bundleId='Telegram')
+    elif 'chatgpt' in identity:
+        result.update(appName='ChatGPT', bundleId='com.openai.chat')
+    elif 'claude' in identity:
+        result.update(appName='Claude', bundleId='com.anthropic.claudefordesktop')
+    elif 'gemini' in identity:
+        result.update(appName='Gemini', bundleId='Gemini')
+    elif any(name in identity for name in ('kitty', 'codex-terminal', 'alacritty', 'wezterm', 'ghostty')):
+        result.update(appName='Terminal', bundleId=wm_class)
+        for name in ('codex', 'claude', 'gemini', 'aider', 'opencode'):
+            if name in executables:
+                result.update(codingCliAgent=name, codingCliAgentConfidence='high')
+                break
+    elif any(name in identity for name in ('zen', 'firefox', 'chrome', 'chromium')):
+        # A title hint is not the browser URL. Do not invent or read a URL.
+        clean = re.sub(r'\s*[—–-]\s*(?:Zen Browser|Mozilla Firefox|Google Chrome|Chromium)\s*$', '', title, flags=re.I)
+        for name, bundle in [('ChatGPT', 'com.openai.chat'), ('Claude', 'com.anthropic.claudefordesktop'), ('Gemini', 'Gemini'), ('NotebookLM', 'NotebookLM')]:
+            if re.search(r'(?:^|\s[—–-]\s)' + re.escape(name) + r'\s*$', clean, re.I):
+                result.update(appName=name, bundleId=bundle)
+                break
+    return result
+
+
+def descendants(pid):
+    result, pending, seen = set(), [str(pid)], set()
+    # Only executable names, never arguments, terminal output or clipboard.
+    while pending and len(seen) < 512:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        proc = Path('/proc') / current
+        try:
+            if proc.stat().st_uid != os.getuid():
+                continue
+            result.add((proc / 'exe').resolve().name)
+            pending.extend((proc / 'task' / current / 'children').read_text().split())
+        except OSError:
+            pass
+    return result
+
+
+def active_context():
+    root = query(['xprop', '-root', '-f', '_NET_ACTIVE_WINDOW', '32x', '_NET_ACTIVE_WINDOW'])
+    match = re.search(r'0x[0-9a-fA-F]+', root)
+    if not match or int(match[0], 16) == 0:
+        return {}
+    window = match[0]
+    properties = query(['xprop', '-id', window, 'WM_CLASS', '_NET_WM_NAME', '_NET_WM_PID'])
+    classes = re.search(r'WM_CLASS[^=]*=\s*"([^"\n]*)",\s*"([^"\n]*)"', properties)
+    if not classes:
+        return {}
+    title = re.search(r'_NET_WM_NAME[^=]*=\s*"(.*)"', properties)
+    pid = re.search(r'_NET_WM_PID[^=]*=\s*(\d+)', properties)
+    wm_class = classes[2]
+    terminal = any(name in wm_class.lower() for name in ('kitty', 'codex-terminal', 'alacritty', 'wezterm', 'ghostty'))
+    info = classify(wm_class, classes[1], title[1] if title else '', descendants(pid[1]) if pid and terminal else ())
+    info['windowId'] = window
+    return info
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--json', action='store_true')
+    args = parser.parse_args()
+    try:
+        result = active_context()
+    except (OSError, sp.SubprocessError):
+        result = {}
+    print(json.dumps(result, ensure_ascii=False) if args.json else '\n'.join(f'{key}: {value}' for key, value in result.items()))
+
+
+if __name__ == '__main__':
+    main()

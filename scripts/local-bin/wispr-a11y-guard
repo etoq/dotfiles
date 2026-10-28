@@ -49,6 +49,7 @@ def queued_helpers(stats):
 
 
 APP_EXES = {
+    str(Path.home() / '.local/lib/wispr-context-runtime/usr/lib/wispr-flow/wispr-flow'),
     '/opt/wispr-flow-appimage/usr/lib/wispr-flow/wispr-flow',
     '/usr/lib/wispr-flow/wispr-flow',
 }

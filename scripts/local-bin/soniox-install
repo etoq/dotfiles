@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ! -x "$HOME/.local/share/soniox/venv/bin/python" ]]; then
+    uv venv --system-site-packages "$HOME/.local/share/soniox/venv"
+fi
+uv pip install --python "$HOME/.local/share/soniox/venv/bin/python" 'websocket-client==1.9.0'
+printf '%s\n' 'Soniox установлен. Открой sx в Otter и введи API-ключ локально.'
