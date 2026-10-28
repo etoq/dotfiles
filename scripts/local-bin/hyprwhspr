@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-root="$HOME/.local/share/hyprwhspr"
-if [[ $# == 0 ]]; then
-    exec "$root/venv/bin/python" "$root/src/lib/main.py"
-fi
-exec "$root/venv/bin/python" "$root/src/lib/cli.py" "$@"

@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-export GDK_BACKEND=x11
-exec "$HOME/.local/opt/handy/0.9.8/AppRun" "$@"

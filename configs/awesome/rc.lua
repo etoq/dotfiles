@@ -174,7 +174,6 @@ awful.rules.rules={
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
  {rule_any={class={'TiffanyCalculator','TiffanyTranslator'}},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},
- {rule={class='DictationCompare'},properties={floating=true,ontop=false,fullscreen=false,maximized=false,placement=awful.placement.centered}},
  {rule={class='wispr-flow',name='^Wispr Flow$'},properties={floating=true,fullscreen=false,maximized=false,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(850,c.screen.workarea.height-80)end},callback=place_popup},
  {rule={class='kitty'},properties={maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='lazyssh-terminal'},properties={floating=false,ontop=false,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false}},

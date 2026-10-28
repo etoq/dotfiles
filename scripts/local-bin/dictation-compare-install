@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-root="$(dirname "$(dirname "$(dirname "$(readlink -f "$0")")")")"
-exec python "$root/scripts/maintenance/prepare-free-dictation.py" "$@"
