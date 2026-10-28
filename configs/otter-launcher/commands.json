@@ -388,10 +388,5 @@
     "command": "exec kitty --override font_size=14.7 --class lazyssh-terminal -e \"$HOME/.local/bin/lazyssh\"",
     "url_encoded": false,
     "raw_argument": false
-  },
-  "sx": {
-    "command": "exec \"$HOME/.local/bin/soniox\"",
-    "url_encoded": false,
-    "raw_argument": false
   }
 }

@@ -567,9 +567,3 @@ description = "SSH · lazyssh"
 with_argument = false
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ssh"
 unbind_proc = false
-
-[[modules]]
-prefix = "sx"
-description = "Soniox · диктовка и сравнение с Wispr"
-cmd = "exec \"$HOME/.local/bin/otter-run\" --module sx"
-unbind_proc = false
