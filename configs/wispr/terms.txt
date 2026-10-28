@@ -49,3 +49,51 @@ assembler
 Linux
 Codex
 main
+PT_LOAD
+PT_INTERP
+PT_DYNAMIC
+DT_NEEDED
+e_entry
+_start
+load bias
+load base
+p_vaddr
+program header
+ELF header
+magic bytes
+dynamic linker
+relocation
+symbol resolution
+runtime
+auxv
+argc
+argv
+FD_CLOEXEC
+stdout
+stdin
+stderr
+dup
+dup2
+read
+write
+open
+close
+exec
+execve
+fork
+clone
+wait
+pipe
+trap
+SIGTERM
+SIGKILL
+capability
+CAP_CHOWN
+CAP_DAC_OVERRIDE
+CapEff
+PID
+cmdline
+exe
+copy-on-write
+RSS
+Aqua Voice

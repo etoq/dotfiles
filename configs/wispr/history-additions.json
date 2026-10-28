@@ -1,0 +1,122 @@
+{
+  "vocabulary": [
+    "PT_LOAD",
+    "PT_INTERP",
+    "PT_DYNAMIC",
+    "DT_NEEDED",
+    "e_entry",
+    "_start",
+    "load bias",
+    "load base",
+    "p_vaddr",
+    "program header",
+    "ELF header",
+    "magic bytes",
+    "dynamic linker",
+    "relocation",
+    "symbol resolution",
+    "runtime",
+    "auxv",
+    "argc",
+    "argv",
+    "FD_CLOEXEC",
+    "stdout",
+    "stdin",
+    "stderr",
+    "dup",
+    "dup2",
+    "read",
+    "write",
+    "open",
+    "close",
+    "exec",
+    "execve",
+    "fork",
+    "clone",
+    "wait",
+    "pipe",
+    "trap",
+    "SIGTERM",
+    "SIGKILL",
+    "capability",
+    "CAP_CHOWN",
+    "CAP_DAC_OVERRIDE",
+    "CapEff",
+    "PID",
+    "cmdline",
+    "exe",
+    "copy-on-write",
+    "RSS",
+    "Aqua Voice"
+  ],
+  "corrections": [
+    {
+      "from": "PT_LOT",
+      "to": "PT_LOAD"
+    },
+    {
+      "from": "ptlod",
+      "to": "PT_LOAD"
+    },
+    {
+      "from": "PT Dynamic",
+      "to": "PT_DYNAMIC"
+    },
+    {
+      "from": "E-entry",
+      "to": "e_entry"
+    },
+    {
+      "from": "Е-entry",
+      "to": "e_entry"
+    },
+    {
+      "from": "E_empty",
+      "to": "e_entry"
+    },
+    {
+      "from": "fd_clexec",
+      "to": "FD_CLOEXEC"
+    },
+    {
+      "from": "fdclose exec",
+      "to": "FD_CLOEXEC"
+    },
+    {
+      "from": "Capchaun",
+      "to": "CAP_CHOWN"
+    },
+    {
+      "from": "Capchaon",
+      "to": "CAP_CHOWN"
+    },
+    {
+      "from": "Капчаун",
+      "to": "CAP_CHOWN"
+    },
+    {
+      "from": "K_dak_override",
+      "to": "CAP_DAC_OVERRIDE"
+    },
+    {
+      "from": "Kpf",
+      "to": "CapEff"
+    },
+    {
+      "from": "sickterm",
+      "to": "SIGTERM"
+    },
+    {
+      "from": "Load_bins",
+      "to": "load bias"
+    },
+    {
+      "from": "load bees",
+      "to": "load bias"
+    },
+    {
+      "from": "lotbiz",
+      "to": "load bias"
+    }
+  ]
+}
