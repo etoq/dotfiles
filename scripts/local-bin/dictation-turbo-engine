@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Two passes on one local WAV using a pinned whisper.cpp runtime."""
+import argparse,json,subprocess,sys
+from pathlib import Path
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('wav',type=Path);p.add_argument('--model',choices=['base','codeswitch','medium'],required=True);p.add_argument('--device',choices=['cpu','vulkan'],default='vulkan');args=p.parse_args()
+ root=Path.home()/'.local/share/dictation-compare';name='ggml-large-v3-turbo-q5_0.bin' if args.model=='base' else 'ggml-codeswitch-q5_0.bin'
+ model=root/'turbo/models'/name;runner=root/'whisper.cpp-build/bin/whisper-compare';prompt=root/'turbo/prompt.txt'
+ if args.model=='medium':model=Path.home()/'.local/share/pywhispercpp/models/ggml-medium-q5_0.bin'
+ for file in (model,runner,prompt):
+  if not file.is_file():raise SystemExit('Missing local runtime/model: '+str(file)+'; run dictation-turbo-install')
+ # exec keeps cancellation signals connected to the actual GPU process.
+ import os
+ os.execv(str(runner),[str(runner),str(model),str(args.wav),str(prompt),args.device])
+if __name__=='__main__':main()

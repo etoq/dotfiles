@@ -26,6 +26,16 @@ class Compare(unittest.TestCase):
   for profile in c.PROFILES:
    argv=c.command(profile,self.root/'sample.wav');self.assertFalse(any('http' in a for a in argv))
   self.assertIn('--repeat',c.command('parakeet',self.root/'sample.wav'))
+  self.assertIn('vulkan',c.command('turbo-code-gpu',self.root/'sample.wav'))
+  self.assertIn('codeswitch',c.command('turbo-code-gpu',self.root/'sample.wav'))
+  self.assertIn('cpu',c.command('turbo-base-cpu',self.root/'sample.wav'))
+ def test_selected_profiles_only(self):
+  class Proc:
+   returncode=0
+   def communicate(self,timeout=None):return json.dumps({'text':'ELF','load_ms':10,'transcribe_ms':[30,20]}).encode(),None
+  with patch.object(c.sp,'Popen',return_value=Proc()) as launch:
+   result=c.run_all(self.wav(),'ELF',self.root/'turbo',profiles=['turbo-base-gpu','turbo-code-gpu'])
+   self.assertEqual([r['profile'] for r in result],['turbo-base-gpu','turbo-code-gpu']);self.assertEqual(launch.call_count,2)
  def test_batch_preserves_errors_and_exports(self):
   class Proc:
    returncode=0
@@ -36,6 +46,12 @@ class Compare(unittest.TestCase):
  def test_cancel_does_not_launch_engine(self):
   event=threading.Event();event.set()
   with patch.object(c.sp,'Popen') as launch:self.assertEqual(c.run_all(self.wav(),'Ghidra',self.root/'results',cancel=event),[]);launch.assert_not_called()
+ def test_terminal_interrupt_terminates_engine(self):
+  from unittest.mock import Mock
+  proc=Mock();proc.communicate.side_effect=[KeyboardInterrupt(),(b'',None)]
+  with patch.object(c.sp,'Popen',return_value=proc):
+   with self.assertRaises(KeyboardInterrupt):c.run_all(self.wav(),'Ghidra',self.root/'interrupted',profiles=['medium-gpu'])
+  proc.terminate.assert_called_once()
  def test_checksum_verification_rejects_changed_file(self):
   import hashlib
   p=self.root/'model';p.write_bytes(b'model');manifest={'sha256':hashlib.sha256(b'model').hexdigest(),'size_bytes':5}

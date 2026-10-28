@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
-"""Local A/B dictation: one WAV, four configured engines, timings and RE errors."""
-import argparse,csv,datetime,json,os,re,signal,subprocess as sp,sys,threading,time,uuid,wave
+"""Local A/B dictation: one WAV, selected engines, timings and RE errors."""
+import argparse,csv,datetime,hashlib,json,os,re,signal,subprocess as sp,sys,threading,time,uuid,wave
 from pathlib import Path
 H=Path.home();DATA=H/'.local/state/dictation-compare';ASSETS=H/'.config/dictation-compare'
 PROFILES={
  'parakeet':('Handy · Parakeet V3 INT8','parakeet-tdt-0.6b-v3'),
  'gigaam':('Handy · GigaAM v3 INT8','gigaam-v3-e2e-ctc'),
  'handy-whisper':('Handy · Whisper Medium Q5_K_M','handy-computer/whisper-medium-gguf/whisper-medium-Q5_K_M.gguf'),
- 'hypr-whisper':('hyprwhspr · Whisper Medium Q5_0',None)}
+ 'hypr-whisper':('hyprwhspr · Whisper Medium Q5_0',None),
+ 'turbo-base-gpu':('Turbo · обычная · Vulkan Q5_0',None),
+ 'turbo-code-gpu':('Turbo · RU+EN техническая · Vulkan Q5_0',None),
+ 'turbo-base-cpu':('Turbo · обычная · CPU Q5_0',None),
+ 'turbo-code-cpu':('Turbo · RU+EN техническая · CPU Q5_0',None),
+ 'medium-gpu':('Whisper Medium · Vulkan Q5_0',None)}
+SETS={'Whisper · Vulkan (Medium + 2 Turbo)':['medium-gpu','turbo-base-gpu','turbo-code-gpu'],
+ 'Turbo · Vulkan (2 модели)':['turbo-base-gpu','turbo-code-gpu'],
+ 'Turbo · CPU (2 модели)':['turbo-base-cpu','turbo-code-cpu'],
+ 'Исходные четыре':list(PROFILES)[:4],
+ 'Все: исходные + Turbo CPU/GPU':list(PROFILES)}
 
 
 def words(text):return re.findall(r'[\w]+',text.casefold())
@@ -37,27 +47,35 @@ def validate_wav(path):
 
 
 def command(profile,path):
+ if profile=='medium-gpu':return [str(H/'.local/bin/dictation-turbo-engine'),str(path),'--model','medium','--device','vulkan']
+ if profile.startswith('turbo-'):
+  return [str(H/'.local/bin/dictation-turbo-engine'),str(path),'--model','base' if '-base-' in profile else 'codeswitch','--device','cpu' if profile.endswith('-cpu') else 'vulkan']
  model=PROFILES[profile][1]
  if model:return [str(H/'.local/bin/handy'),'--transcribe-file',str(path),'--model',model,'--repeat','2','--json']
  return [str(H/'.local/share/hyprwhspr/venv/bin/python'),str(H/'.local/bin/dictation-compare-engine'),str(path)]
 
 
-def run_all(path,reference,out,update=lambda *_:None,cancel=None):
+def run_all(path,reference,out,update=lambda *_:None,cancel=None,profiles=None):
  validate_wav(path);out.mkdir(parents=True,exist_ok=True,mode=0o700)
+ with path.open('rb') as stream:digest=hashlib.file_digest(stream,'sha256').hexdigest()
+ (out/'audio-source.json').write_text(json.dumps({'path':str(path.resolve()),'sha256':digest},ensure_ascii=False,indent=2))
  (out/'reference.txt').write_text(reference);rows=[]
- for profile,(name,_) in PROFILES.items():
+ for profile in (profiles if profiles is not None else list(PROFILES)[:4]):
+  name=PROFILES[profile][0]
   if cancel and cancel.is_set():break
   update(name,'Вычисляю…');start=time.monotonic()
   with (out/(profile+'.log')).open('wb') as log:
    proc=sp.Popen(command(profile,path),stdout=sp.PIPE,stderr=log)
-   while True:
-    try:raw,_=proc.communicate(timeout=.2);break
-    except sp.TimeoutExpired:
-     if (cancel and cancel.is_set()) or time.monotonic()-start>900:
-      proc.terminate()
-      try:proc.communicate(timeout=5)
-      except sp.TimeoutExpired:proc.kill();proc.communicate()
-      raise RuntimeError('Тест остановлен.')
+   try:
+    while True:
+     try:raw,_=proc.communicate(timeout=.2);break
+     except sp.TimeoutExpired:
+      if (cancel and cancel.is_set()) or time.monotonic()-start>900:raise RuntimeError('Тест остановлен.')
+   except BaseException:
+    proc.terminate()
+    try:proc.communicate(timeout=5)
+    except sp.TimeoutExpired:proc.kill();proc.communicate()
+    raise
   if proc.returncode:
    result={'profile':profile,'name':name,'error':'Ошибка движка; смотри '+profile+'.log'}
   else:
@@ -84,7 +102,7 @@ def gui():
    super().__init__(title='Сравнение локальной диктовки');self.set_wmclass('dictation-compare','DictationCompare');self.set_default_size(850,760)
    self.recorder=None;self.worker=None;self.cancel=threading.Event();self.output=None;self.audio=None;self.record_started=0;self.closed=False
    box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=12);box.set_border_width(24);self.add(box)
-   label=Gtk.Label(label='Одна запись → четыре локальных варианта',xalign=0);label.get_style_context().add_class('title');box.pack_start(label,False,False,0)
+   label=Gtk.Label(label='Одна запись → сравнение локальных моделей',xalign=0);label.get_style_context().add_class('title');box.pack_start(label,False,False,0)
    note=Gtk.Label(label='Без облака и API. WAV и результаты сохраняются локально.\nНе запускай одновременно диктовку Wispr. Whisper Medium может считать долго.',xalign=0);note.set_line_wrap(True);box.pack_start(note,False,False,0)
    phrases=json.loads((ASSETS/'phrases.json').read_text());self.phrases=Gtk.ComboBoxText()
    for phrase in phrases:self.phrases.append_text(phrase)
@@ -94,37 +112,52 @@ def gui():
     if cell.find_property('max-width-chars'):cell.set_property('max-width-chars',75)
    box.pack_start(self.phrases,False,False,0)
    self.reference=Gtk.Entry();self.reference.set_text(phrases[0]);self.phrases.connect('changed',lambda *_:self.reference.set_text(self.phrases.get_active_text()));box.pack_start(self.reference,False,False,0)
+   self.profile_set=Gtk.ComboBoxText()
+   for name in SETS:self.profile_set.append_text(name)
+   self.profile_set.set_active(0);box.pack_start(self.profile_set,False,False,0)
    controls=Gtk.Box(spacing=10)
    self.record=Gtk.Button(label='Начать запись');self.record.connect('clicked',self.toggle_record)
-   self.run=Gtk.Button(label='Сравнить все 4');self.run.set_sensitive(False);self.run.connect('clicked',self.compare)
+   self.open=Gtk.Button(label='Открыть WAV');self.open.connect('clicked',self.open_wav)
+   self.run=Gtk.Button(label='Сравнить выбранные');self.run.set_sensitive(False);self.run.connect('clicked',self.compare)
    self.stop=Gtk.Button(label='Отменить тест');self.stop.connect('clicked',lambda *_:self.cancel.set())
-   for button in [self.record,self.run,self.stop]:controls.pack_start(button,False,False,0)
+   for button in [self.record,self.open,self.run,self.stop]:controls.pack_start(button,False,False,0)
    box.pack_start(controls,False,False,0)
    self.status=Gtk.Label(label='Прочитай фразу, останови запись, затем запусти сравнение.',xalign=0);self.status.set_line_wrap(True);box.pack_start(self.status,False,False,0)
    self.results=Gtk.TextView(editable=False);self.results.set_wrap_mode(Gtk.WrapMode.WORD_CHAR);scroll=Gtk.ScrolledWindow();scroll.add(self.results);box.pack_start(scroll,True,True,0)
    self.text='';self.connect('delete-event',self.close)
    css=Gtk.CssProvider();css.load_from_data(b'window {background:#080D10;color:#C5D6D8;} label {color:#C5D6D8;} .title {font-size:23px;color:#A3F0E7;} entry,textview,textview text {background:#101B20;color:#A3F0E7;font:15px monospace;} button,combobox {background:#183039;color:#C5D6D8;border:1px solid #0ABAB5;box-shadow:none;text-shadow:none;}')
    Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),css,Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+  def open_wav(self,*_):
+   dialog=Gtk.FileChooserDialog(title='Запись WAV для сравнения',transient_for=self,action=Gtk.FileChooserAction.OPEN)
+   dialog.add_buttons('Отмена',Gtk.ResponseType.CANCEL,'Открыть',Gtk.ResponseType.OK);dialog.set_current_folder(str(DATA/'runs'))
+   if dialog.run()==Gtk.ResponseType.OK:
+    path=Path(dialog.get_filename())
+    try:
+     validate_wav(path);self.audio=path;self.output=folder();reference=path.with_name('reference.txt')
+     if reference.exists():self.reference.set_text(reference.read_text())
+     self.run.set_sensitive(True);self.status.set_text('Запись: '+str(path))
+    except Exception as error:self.status.set_text(str(error))
+   dialog.destroy()
   def toggle_record(self,*_):
    if self.recorder:
     self.recorder.send_signal(signal.SIGINT)
     try:self.recorder.wait(timeout=4)
     except sp.TimeoutExpired:self.recorder.terminate();self.recorder.wait(timeout=3)
-    self.recorder=None;self.record.set_label('Записать заново');self.run.set_sensitive(True);self.status.set_text('Запись готова: '+str(self.audio));return
+    self.recorder=None;self.record.set_label('Записать заново');self.open.set_sensitive(True);self.run.set_sensitive(True);self.status.set_text('Запись готова: '+str(self.audio));return
    self.output=folder();self.audio=self.output/'audio.wav';self.record_started=time.monotonic()
    self.recorder=sp.Popen(['pw-record','--format','s16','--rate','16000','--channels','1',str(self.audio)],stdout=sp.DEVNULL,stderr=sp.DEVNULL)
-   self.record.set_label('Остановить запись');self.run.set_sensitive(False);self.status.set_text('Запись микрофона · прочитай выбранную фразу. Лимит — 60 секунд.')
+   self.record.set_label('Остановить запись');self.open.set_sensitive(False);self.run.set_sensitive(False);self.status.set_text('Запись микрофона · прочитай выбранную фразу. Лимит — 60 секунд.')
    GLib.timeout_add(250,self.check_recording)
   def check_recording(self):
    if not self.recorder:return False
    if self.recorder.poll() is not None:
-    self.recorder=None;self.record.set_label('Начать запись');self.status.set_text('Ошибка микрофона. Запись не готова.');return False
+    self.recorder=None;self.record.set_label('Начать запись');self.open.set_sensitive(True);self.status.set_text('Ошибка микрофона. Запись не готова.');return False
    locked=(Path(os.environ.get('XDG_RUNTIME_DIR','/run/user/'+str(os.getuid())))/'wispr-screen-lock.json').exists()
    if time.monotonic()-self.record_started>=60 or locked:self.toggle_record();return False
    return True
   def compare(self,*_):
-   self.cancel.clear();self.run.set_sensitive(False);self.record.set_sensitive(False);self.text='';self.results.get_buffer().set_text('')
-   reference=self.reference.get_text();audio=self.audio;output=self.output
+   self.cancel.clear();self.run.set_sensitive(False);self.record.set_sensitive(False);self.open.set_sensitive(False);self.text='';self.results.get_buffer().set_text('')
+   reference=self.reference.get_text();audio=self.audio;output=self.output;profiles=SETS[self.profile_set.get_active_text()];self.profile_set.set_sensitive(False)
    def update(name,result):
     def show():
      if self.closed:return
@@ -133,10 +166,10 @@ def gui():
     GLib.idle_add(show)
    def worker():
     error=None
-    try:run_all(audio,reference,output,update,self.cancel)
+    try:run_all(audio,reference,output,update,self.cancel,profiles)
     except Exception as failure:error=str(failure)
     def finish():
-     if not self.closed:self.status.set_text(error or 'Готово. Результаты: '+str(output));self.run.set_sensitive(True);self.record.set_sensitive(True)
+     if not self.closed:self.status.set_text(error or 'Готово. Результаты: '+str(output));self.run.set_sensitive(True);self.record.set_sensitive(True);self.open.set_sensitive(True);self.profile_set.set_sensitive(True)
     GLib.idle_add(finish)
    self.worker=threading.Thread(target=worker,daemon=True);self.worker.start()
   def close(self,*_):
@@ -155,9 +188,9 @@ def gui():
 
 
 def main():
- os.umask(0o077);parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='command');run=sub.add_parser('run');run.add_argument('wav',type=Path);run.add_argument('--reference',type=Path,required=True);run.add_argument('--output',type=Path)
+ os.umask(0o077);parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='command');run=sub.add_parser('run');run.add_argument('wav',type=Path);run.add_argument('--reference',type=Path,required=True);run.add_argument('--output',type=Path);run.add_argument('--profiles',nargs='+',choices=PROFILES)
  args=parser.parse_args()
  if args.command=='run':
-  out=args.output or folder();results=run_all(args.wav.resolve(),args.reference.read_text(),out,lambda n,r:print(n,render(r) if isinstance(r,dict) else r,flush=True));print('Results:',out);return 1 if any('error'in r for r in results)else 0
+  out=args.output or folder();results=run_all(args.wav.resolve(),args.reference.read_text(),out,lambda n,r:print(n,render(r) if isinstance(r,dict) else r,flush=True),profiles=args.profiles);print('Results:',out);return 1 if any('error'in r for r in results)else 0
  gui();return 0
 if __name__=='__main__':raise SystemExit(main())
