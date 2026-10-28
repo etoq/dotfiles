@@ -69,8 +69,8 @@ download = [
 	{ run = "ya emit download %S",        desc = "Download" },
 ]
 html = [
-    { run = 'zen %s', desc = "Открыть в Zen", orphan = true },
-    { run = 'kitty -e nvim %s', desc = "Открыть в nvim", block = true },
+    { run = 'nvim -- %s', desc = "Neovim", block = true, for = "unix" },
+    { run = 'zen %s', desc = "Браузер · Zen", orphan = true, for = "unix" },
 ]
 
 [open]
@@ -87,6 +87,7 @@ rules = [
     { mime = "application/xhtml+xml", use = "html" },
     { url = "*.html", use = "html" },
     { url = "*.htm",  use = "html" },
+    { url = "*.xhtml", use = "html" },
 	# Folder
 	{ url = "*/", use = [ "edit", "open", "reveal" ] },
 	# Text
