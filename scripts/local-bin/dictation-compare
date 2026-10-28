@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""Local A/B dictation: one WAV, four configured engines, timings and RE errors."""
+import argparse,csv,datetime,json,os,re,signal,subprocess as sp,sys,threading,time,uuid,wave
+from pathlib import Path
+H=Path.home();DATA=H/'.local/state/dictation-compare';ASSETS=H/'.config/dictation-compare'
+PROFILES={
+ 'parakeet':('Handy · Parakeet V3 INT8','parakeet-tdt-0.6b-v3'),
+ 'gigaam':('Handy · GigaAM v3 INT8','gigaam-v3-e2e-ctc'),
+ 'handy-whisper':('Handy · Whisper Medium Q5_K_M','handy-computer/whisper-medium-gguf/whisper-medium-Q5_K_M.gguf'),
+ 'hypr-whisper':('hyprwhspr · Whisper Medium Q5_0',None)}
+
+
+def words(text):return re.findall(r'[\w]+',text.casefold())
+
+def score(reference,text):
+ a,b=words(reference),words(text)
+ if not a:return {'wer_percent':None,'terms_correct':None,'terms_total':None}
+ row=list(range(len(b)+1))
+ for i,w in enumerate(a,1):
+  new=[i]
+  for j,v in enumerate(b,1):new.append(min(new[-1]+1,row[j]+1,row[j-1]+(w!=v)))
+  row=new
+ terms=(ASSETS/'terms.txt').read_text().splitlines()
+ def includes(haystack,needle):return (' '+ ' '.join(words(needle))+' ') in (' '+' '.join(words(haystack))+' ')
+ expected=[term for term in terms if term and includes(reference,term)]
+ return {'wer_percent':round(100*row[-1]/len(a),1),'terms_correct':sum(includes(text,term) for term in expected),'terms_total':len(expected)}
+
+
+def folder():
+ p=DATA/'runs'/(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:6]);p.mkdir(parents=True,mode=0o700);return p
+
+
+def validate_wav(path):
+ with wave.open(str(path),'rb') as f:
+  if (f.getnchannels(),f.getframerate(),f.getsampwidth())!=(1,16000,2):raise ValueError('Нужен WAV PCM16, 16000 Гц, mono.')
+  if f.getnframes()==0:raise ValueError('Запись пустая.')
+
+
+def command(profile,path):
+ model=PROFILES[profile][1]
+ if model:return [str(H/'.local/bin/handy'),'--transcribe-file',str(path),'--model',model,'--repeat','2','--json']
+ return [str(H/'.local/share/hyprwhspr/venv/bin/python'),str(H/'.local/bin/dictation-compare-engine'),str(path)]
+
+
+def run_all(path,reference,out,update=lambda *_:None,cancel=None):
+ validate_wav(path);out.mkdir(parents=True,exist_ok=True,mode=0o700)
+ (out/'reference.txt').write_text(reference);rows=[]
+ for profile,(name,_) in PROFILES.items():
+  if cancel and cancel.is_set():break
+  update(name,'Вычисляю…');start=time.monotonic()
+  with (out/(profile+'.log')).open('wb') as log:
+   proc=sp.Popen(command(profile,path),stdout=sp.PIPE,stderr=log)
+   while True:
+    try:raw,_=proc.communicate(timeout=.2);break
+    except sp.TimeoutExpired:
+     if (cancel and cancel.is_set()) or time.monotonic()-start>900:
+      proc.terminate()
+      try:proc.communicate(timeout=5)
+      except sp.TimeoutExpired:proc.kill();proc.communicate()
+      raise RuntimeError('Тест остановлен.')
+  if proc.returncode:
+   result={'profile':profile,'name':name,'error':'Ошибка движка; смотри '+profile+'.log'}
+  else:
+   try:
+    result=json.loads(raw);result.update(profile=profile,name=name,total_seconds=round(time.monotonic()-start,2));result.update(score(reference,result['text']))
+   except (ValueError,KeyError):result={'profile':profile,'name':name,'error':'Некорректный ответ движка; смотри журнал.'}
+  rows.append(result);(out/'results.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2));update(name,result)
+ with (out/'results.csv').open('w') as stream:
+  fields=['name','wer_percent','terms_correct','terms_total','load_ms','transcribe_ms','total_seconds','text','error'];writer=csv.DictWriter(stream,fieldnames=fields,extrasaction='ignore');writer.writeheader();writer.writerows(rows)
+ return rows
+
+
+def render(result):
+ if result.get('error'):return result['error']
+ times=result.get('transcribe_ms',[]);secs=' / '.join(f'{n/1000:.2f}' for n in times)
+ return f"WER {result['wer_percent']}% · термины {result['terms_correct']}/{result['terms_total']}\nЗагрузка {result.get('load_ms',0)/1000:.2f} с · распознавание 1/2: {secs} с\n{result['text']}"
+
+
+def gui():
+ import gi
+ gi.require_version('Gtk','3.0');from gi.repository import Gtk,Gdk,GLib,Gio,Pango
+ class Window(Gtk.Window):
+  def __init__(self):
+   super().__init__(title='Сравнение локальной диктовки');self.set_wmclass('dictation-compare','DictationCompare');self.set_default_size(850,760)
+   self.recorder=None;self.worker=None;self.cancel=threading.Event();self.output=None;self.audio=None;self.record_started=0;self.closed=False
+   box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=12);box.set_border_width(24);self.add(box)
+   label=Gtk.Label(label='Одна запись → четыре локальных варианта',xalign=0);label.get_style_context().add_class('title');box.pack_start(label,False,False,0)
+   note=Gtk.Label(label='Без облака и API. WAV и результаты сохраняются локально.\nНе запускай одновременно диктовку Wispr. Whisper Medium может считать долго.',xalign=0);note.set_line_wrap(True);box.pack_start(note,False,False,0)
+   phrases=json.loads((ASSETS/'phrases.json').read_text());self.phrases=Gtk.ComboBoxText()
+   for phrase in phrases:self.phrases.append_text(phrase)
+   self.phrases.set_active(0)
+   for cell in self.phrases.get_cells():
+    if cell.find_property('ellipsize'):cell.set_property('ellipsize',Pango.EllipsizeMode.END)
+    if cell.find_property('max-width-chars'):cell.set_property('max-width-chars',75)
+   box.pack_start(self.phrases,False,False,0)
+   self.reference=Gtk.Entry();self.reference.set_text(phrases[0]);self.phrases.connect('changed',lambda *_:self.reference.set_text(self.phrases.get_active_text()));box.pack_start(self.reference,False,False,0)
+   controls=Gtk.Box(spacing=10)
+   self.record=Gtk.Button(label='Начать запись');self.record.connect('clicked',self.toggle_record)
+   self.run=Gtk.Button(label='Сравнить все 4');self.run.set_sensitive(False);self.run.connect('clicked',self.compare)
+   self.stop=Gtk.Button(label='Отменить тест');self.stop.connect('clicked',lambda *_:self.cancel.set())
+   for button in [self.record,self.run,self.stop]:controls.pack_start(button,False,False,0)
+   box.pack_start(controls,False,False,0)
+   self.status=Gtk.Label(label='Прочитай фразу, останови запись, затем запусти сравнение.',xalign=0);self.status.set_line_wrap(True);box.pack_start(self.status,False,False,0)
+   self.results=Gtk.TextView(editable=False);self.results.set_wrap_mode(Gtk.WrapMode.WORD_CHAR);scroll=Gtk.ScrolledWindow();scroll.add(self.results);box.pack_start(scroll,True,True,0)
+   self.text='';self.connect('delete-event',self.close)
+   css=Gtk.CssProvider();css.load_from_data(b'window {background:#080D10;color:#C5D6D8;} label {color:#C5D6D8;} .title {font-size:23px;color:#A3F0E7;} entry,textview,textview text {background:#101B20;color:#A3F0E7;font:15px monospace;} button,combobox {background:#183039;color:#C5D6D8;border:1px solid #0ABAB5;box-shadow:none;text-shadow:none;}')
+   Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),css,Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+  def toggle_record(self,*_):
+   if self.recorder:
+    self.recorder.send_signal(signal.SIGINT)
+    try:self.recorder.wait(timeout=4)
+    except sp.TimeoutExpired:self.recorder.terminate();self.recorder.wait(timeout=3)
+    self.recorder=None;self.record.set_label('Записать заново');self.run.set_sensitive(True);self.status.set_text('Запись готова: '+str(self.audio));return
+   self.output=folder();self.audio=self.output/'audio.wav';self.record_started=time.monotonic()
+   self.recorder=sp.Popen(['pw-record','--format','s16','--rate','16000','--channels','1',str(self.audio)],stdout=sp.DEVNULL,stderr=sp.DEVNULL)
+   self.record.set_label('Остановить запись');self.run.set_sensitive(False);self.status.set_text('Запись микрофона · прочитай выбранную фразу. Лимит — 60 секунд.')
+   GLib.timeout_add(250,self.check_recording)
+  def check_recording(self):
+   if not self.recorder:return False
+   if self.recorder.poll() is not None:
+    self.recorder=None;self.record.set_label('Начать запись');self.status.set_text('Ошибка микрофона. Запись не готова.');return False
+   locked=(Path(os.environ.get('XDG_RUNTIME_DIR','/run/user/'+str(os.getuid())))/'wispr-screen-lock.json').exists()
+   if time.monotonic()-self.record_started>=60 or locked:self.toggle_record();return False
+   return True
+  def compare(self,*_):
+   self.cancel.clear();self.run.set_sensitive(False);self.record.set_sensitive(False);self.text='';self.results.get_buffer().set_text('')
+   reference=self.reference.get_text();audio=self.audio;output=self.output
+   def update(name,result):
+    def show():
+     if self.closed:return
+     self.status.set_text(name if isinstance(result,dict) else name+' · '+result)
+     if isinstance(result,dict):self.text+=name+'\n'+render(result)+'\n\n';self.results.get_buffer().set_text(self.text)
+    GLib.idle_add(show)
+   def worker():
+    error=None
+    try:run_all(audio,reference,output,update,self.cancel)
+    except Exception as failure:error=str(failure)
+    def finish():
+     if not self.closed:self.status.set_text(error or 'Готово. Результаты: '+str(output));self.run.set_sensitive(True);self.record.set_sensitive(True)
+    GLib.idle_add(finish)
+   self.worker=threading.Thread(target=worker,daemon=True);self.worker.start()
+  def close(self,*_):
+   self.closed=True;self.cancel.set()
+   if self.recorder:self.recorder.send_signal(signal.SIGINT);self.recorder.wait(timeout=4)
+   if self.worker:self.worker.join(timeout=6)
+   if Gtk.main_level():Gtk.main_quit()
+   elif self.get_application():self.get_application().quit()
+   return False
+ app=Gtk.Application(application_id='org.eto.DictationCompare',flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+ def activate(application):
+  windows=application.get_windows()
+  if windows:windows[0].present();return
+  win=Window();application.add_window(win);win.show_all();win.present()
+ app.connect('activate',activate);app.run([sys.argv[0]])
+
+
+def main():
+ os.umask(0o077);parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='command');run=sub.add_parser('run');run.add_argument('wav',type=Path);run.add_argument('--reference',type=Path,required=True);run.add_argument('--output',type=Path)
+ args=parser.parse_args()
+ if args.command=='run':
+  out=args.output or folder();results=run_all(args.wav.resolve(),args.reference.read_text(),out,lambda n,r:print(n,render(r) if isinstance(r,dict) else r,flush=True));print('Results:',out);return 1 if any('error'in r for r in results)else 0
+ gui();return 0
+if __name__=='__main__':raise SystemExit(main())

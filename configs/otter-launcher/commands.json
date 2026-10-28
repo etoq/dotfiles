@@ -388,5 +388,20 @@
     "command": "exec kitty --override font_size=14.7 --class lazyssh-terminal -e \"$HOME/.local/bin/lazyssh\"",
     "url_encoded": false,
     "raw_argument": false
+  },
+  "vc": {
+    "command": "exec \"$HOME/.local/bin/dictation-control\" compare",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "ha": {
+    "command": "exec \"$HOME/.local/bin/dictation-control\" handy",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "wh": {
+    "command": "exec \"$HOME/.local/bin/dictation-control\" hypr-toggle",
+    "url_encoded": false,
+    "raw_argument": false
   }
 }

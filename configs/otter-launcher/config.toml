@@ -567,3 +567,21 @@ description = "SSH · lazyssh"
 with_argument = false
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ssh"
 unbind_proc = false
+
+[[modules]]
+prefix = "vc"
+description = "Сравнение · локальная диктовка"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module vc"
+unbind_proc = false
+
+[[modules]]
+prefix = "ha"
+description = "Handy · модели и настройки"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ha"
+unbind_proc = false
+
+[[modules]]
+prefix = "wh"
+description = "Whisper · запись / остановка"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module wh"
+unbind_proc = false

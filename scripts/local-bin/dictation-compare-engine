@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Headless hyprwhspr engine, same configuration, repeated local WAV inference."""
+import json,os,sys,time
+from pathlib import Path
+root=Path.home()/'.local/share/hyprwhspr/src/lib/src';sys.path.insert(0,str(root))
+original=os.dup(1);os.dup2(2,1)
+from config_manager import ConfigManager
+from whisper_manager import WhisperManager
+from audio_file import decode_audio_file
+manager=WhisperManager(config_manager=ConfigManager())
+try:
+ audio,rate=decode_audio_file(Path(sys.argv[1]));start=time.monotonic()
+ if not manager.initialize():raise RuntimeError('hyprwhspr initialization failed')
+ load=round((time.monotonic()-start)*1000);times=[];text=''
+ for _ in range(2):
+  start=time.monotonic();text=manager.transcribe_audio(audio,sample_rate=rate,language_override='ru');times.append(round((time.monotonic()-start)*1000))
+ if not text:raise RuntimeError('No speech recognized')
+ # The batch comparison is raw output: dictation's replacement hooks are not used.
+ data={'model':'hyprwhspr / Whisper Medium Q5_0','text':text,'load_ms':load,'transcribe_ms':times,'audio_secs':len(audio)/rate,'postprocessing':'raw; RE initial_prompt enabled'}
+ manager.cleanup();sys.stdout.flush();os.write(original,json.dumps(data,ensure_ascii=False).encode()+b'\n')
+except Exception as error:
+ manager.cleanup();print(type(error).__name__+': '+str(error),file=sys.stderr);raise SystemExit(1)
