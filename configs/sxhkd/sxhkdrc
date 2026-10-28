@@ -153,10 +153,4 @@ super + shift + b
 super + shift + g
     "$HOME/.local/bin/panel-action" ghidra
 
-# Free local dictation comparison
-super + alt + s
-	"$HOME/.local/bin/dictation-control" handy-toggle
-super + ctrl + alt + s
-	"$HOME/.local/bin/dictation-control" live-toggle
-super + ctrl + alt + Escape
-	"$HOME/.local/bin/dictation-control" live-cancel
+# Wispr owns super+alt+s (toggle) and super+ctrl (hold).

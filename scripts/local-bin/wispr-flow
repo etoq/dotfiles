@@ -2,6 +2,25 @@
 # Keep software rendering and prefer the version-matched private context patch.
 set -euo pipefail
 export WISPR_DISABLE_GPU=1
+# GUI launches also go through the supervisor. The --hidden service invocation
+# bypasses this branch; wait for its single-instance lock before opening a UI.
+if [[ $# -eq 0 ]]; then
+    systemctl --user start wispr-flow.service
+    ready=false
+    for attempt in {1..50}; do
+        managed_pid=$(systemctl --user show wispr-flow.service -p MainPID --value)
+        singleton=$(readlink "$HOME/.config/Wispr Flow/SingletonLock" || true)
+        if [[ $managed_pid != 0 && $singleton == *-"$managed_pid" ]]; then
+            ready=true
+            break
+        fi
+        sleep 0.1
+    done
+    if [[ $ready != true ]]; then
+        notify-send 'Wispr Flow' 'Не удалось дождаться запуска службы. Проверь wispr-flow.service.'
+        exit 1
+    fi
+fi
 runtime="$HOME/.local/lib/wispr-context-runtime"
 if python - "$runtime/manifest.json" <<'PY'
 import json,sys

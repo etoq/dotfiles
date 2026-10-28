@@ -57,9 +57,7 @@ end
 key({mod},'Return',function()spawn({'kitty','--override','font_size=14.7'})end,'Терминал · масштаб 130%','Приложения')
 key({mod},'d',function()action('launcher')end,'Otter launcher','Приложения')
 key({mod},'s',function()spawn({home..'/.local/bin/desktop-app','open','localsend'})end,'LocalSend · показать окно','Приложения')
-key({mod,'Mod1'},'s',function()spawn({home..'/.local/bin/dictation-control','handy-toggle'})end,'Handy · диктовка / остановка','Инструменты')
-key({mod,'Mod1','Control'},'s',function()spawn({home..'/.local/bin/dictation-control','live-toggle'})end,'Medium Vulkan · диктовка / остановка','Инструменты')
-key({mod,'Mod1','Control'},'Escape',function()spawn({home..'/.local/bin/dictation-control','live-cancel'})end,'Medium Vulkan · отменить','Инструменты')
+-- Wispr owns Win+Alt+S (toggle) and Win+Ctrl (hold); do not grab them here.
 key({mod},'x',function()spawn({'kitty','--class','codex-terminal','--override','font_size=14.7','--directory',home..'/learning/linux-re','-e','/usr/bin/codex','resume'})end,'Codex resume · learning/linux-re','Приложения')
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')
 key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/desktop-app','open','discord'})end,'Discord','Приложения')
@@ -177,6 +175,7 @@ awful.rules.rules={
  {rule={class='panel-monitor'},properties={fullscreen=true}},
  {rule_any={class={'TiffanyCalculator','TiffanyTranslator'}},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},
  {rule={class='DictationCompare'},properties={floating=true,ontop=false,fullscreen=false,maximized=false,placement=awful.placement.centered}},
+ {rule={class='wispr-flow',name='^Wispr Flow$'},properties={floating=true,fullscreen=false,maximized=false,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(850,c.screen.workarea.height-80)end},callback=place_popup},
  {rule={class='kitty'},properties={maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='lazyssh-terminal'},properties={floating=false,ontop=false,fullscreen=false,maximized=false,maximized_horizontal=false,maximized_vertical=false}},
  {rule={class='calendar'},properties={floating=true,width=function(c)return math.min(1400,c.screen.workarea.width-80)end,height=function(c)return math.min(900,c.screen.workarea.height-80)end},callback=place_popup},
