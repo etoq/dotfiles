@@ -28,6 +28,12 @@ ueberzug_scale  = 1
 ueberzug_offset = [ 0, 0, 0, 0 ]
 
 [opener]
+writer = [
+    { run = 'libreoffice --writer %s', desc = "LibreOffice Writer", orphan = true, for = "unix" },
+]
+impress = [
+    { run = 'libreoffice --impress %s', desc = "LibreOffice Impress", orphan = true, for = "unix" },
+]
 image = [
     { run = "feh --scale-down -- %s", desc = "Image (separate window)", orphan = true, for = "unix" },
 ]
@@ -75,9 +81,15 @@ html = [
 
 [open]
 rules = [
+    # Office files go to their editor, including when MIME detection is generic.
+    { url = "*.{doc,docx,docm,dot,dotx,dotm,odt,ott,rtf,DOC,DOCX,DOCM,DOT,DOTX,DOTM,ODT,OTT,RTF}", use = "writer" },
+    { url = "*.{ppt,pptx,pptm,pps,ppsx,ppsm,pot,potx,potm,odp,otp,PPT,PPTX,PPTM,PPS,PPSX,PPSM,POT,POTX,POTM,ODP,OTP}", use = "impress" },
+    { mime = "application/{msword,vnd.openxmlformats-officedocument.wordprocessingml.document,vnd.openxmlformats-officedocument.wordprocessingml.template,vnd.ms-word.document.macroEnabled.12,vnd.ms-word.template.macroEnabled.12,vnd.oasis.opendocument.text,vnd.oasis.opendocument.text-template,rtf}", use = "writer" },
+    { mime = "text/rtf", use = "writer" },
+    { mime = "application/{vnd.ms-powerpoint,vnd.openxmlformats-officedocument.presentationml.presentation,vnd.openxmlformats-officedocument.presentationml.slideshow,vnd.openxmlformats-officedocument.presentationml.template,vnd.ms-powerpoint.presentation.macroEnabled.12,vnd.ms-powerpoint.slideshow.macroEnabled.12,vnd.ms-powerpoint.template.macroEnabled.12,vnd.oasis.opendocument.presentation,vnd.oasis.opendocument.presentation-template}", use = "impress" },
     # Explicit image filename rules take precedence over ebook handlers.
     { url = "*.{png,jpg,jpeg,jpe,webp,gif,bmp,tif,tiff,avif,heic,heif,jxl,svg}", use = [ "image", "reveal" ] },
-	# Все книги и документы открываем через KOReader напрямую
+	# Книги и PDF открываем через KOReader напрямую
 	{ mime = "application/{pdf,epub+zip,x-mobipocket-ebook,x-fictionbook+xml,x-fb2,vnd.comicbook+zip,vnd.comicbook+tar,x-cbz,x-cbr}", use = "koreader" },
 	{ mime = "image/vnd.djvu", use = "koreader" },
 	{ url = "*.{pdf,epub,mobi,fb2,djvu,cbz,cbr}", use = "koreader" },
