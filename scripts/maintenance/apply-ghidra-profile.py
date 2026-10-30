@@ -107,7 +107,7 @@ for pref in tool.findall('.//PREFERENCE_STATE'):
     for column in pref.findall('.//COLUMN'):
         name = column.get('NAME', '')
         is_name = 'NameTableColumn.Name' in name or name.endswith('LabelTableColumn')
-        is_address = 'AddressTableColumn' in name
+        is_address = name.startswith('ghidra.util.table.field.AddressTableColumn')
         column.set('VISIBLE', 'true' if is_name or is_address else 'false')
         if is_name or is_address:
             column.set('WIDTH', '235' if is_name else '100')
