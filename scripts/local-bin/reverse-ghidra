@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export _JAVA_AWT_WM_NONREPARENTING=1
+# FlatLaf scales controls/icons; Ghidra's custom code fonts are set in the theme.
+# Keep Java's device scale at 1 to avoid multiplying the two scale factors.
+export GHIDRA_GUI_JAVA_OPTIONS="${GHIDRA_GUI_JAVA_OPTIONS:-} -Dsun.java2d.uiScale=1 -Dflatlaf.uiScale=1.3"
 manual="$HOME/Tools/ghidra/build/dist/ghidra_12.2_DEV/ghidraRun"
 if [[ -x "$manual" ]]; then
     exec "$manual" "$@"

@@ -27,7 +27,7 @@ color.custom.color10 = #20484B
 color.custom.color11 = #2D5555
 color.custom.color2 = #0ABAB5
 color.custom.color3 = #4DDDD5
-color.custom.color4 = #7E999F
+color.custom.color4 = #91ADB2
 color.custom.color5 = #080D10
 color.custom.color6 = #C5D6D8
 color.custom.color7 = #79A9D1
@@ -76,9 +76,9 @@ color.fg.listing.underline = color.custom.color2
 color.fg.listing.xref = color.custom.color3
 color.fg.listing.xref.read = color.custom.color7
 color.fg.listing.xref.write = color.custom.color2
-font.decompiler = JetBrainsMono Nerd Font-PLAIN-15
-font.listing.base = JetBrainsMono Nerd Font-PLAIN-15
-font.monospaced = JetBrainsMono Nerd Font-PLAIN-12
+font.decompiler = JetBrainsMono Nerd Font-PLAIN-20
+font.listing.base = JetBrainsMono Nerd Font-PLAIN-20
+font.monospaced = JetBrainsMono Nerd Font-PLAIN-16
 
 # Shared controls, menus and selections.
 [color]system.color.bg.control = #101B20
@@ -103,3 +103,10 @@ color.cursor.focused = #0ABAB5
 color.cursor.unfocused = #7E999F
 color.bg.plugin.bookmark.error = #DE7C86
 color.bg.plugin.bookmark.warning = #D8B77B
+
+# Technical reading: errors, external calls and search matches remain distinct.
+color.fg.decompiler.error = #DE7C86
+color.fg.decompiler.special = #D8B77B
+color.fg.decompiler.external.function = #79A9D1
+color.bg.decompiler.highlights.find = #2D5555
+color.bg.decompiler.highlights.find.active = #346867
