@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Show the local KOReader library sync state without exposing credentials."""
+from pathlib import Path
+import json
+import sys
+import urllib.request
+import xml.etree.ElementTree as ET
+
+try:
+    root = ET.parse(Path.home()/'.local/state/koreader-syncthing/config.xml').getroot()
+    key = root.findtext('gui/apikey')
+    address = root.findtext('gui/address')
+    if address != '127.0.0.1:8385':
+        raise ValueError('Unexpected local API address')
+    def get(path):
+        request = urllib.request.Request('http://'+address+'/rest/'+path,
+                                         headers={'X-API-Key': key})
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return json.load(response)
+    status = get('db/status?folder=koreader-books')
+    connections = get('system/connections')['connections']
+    online = any(v.get('connected') for v in connections.values())
+    print('Samsung: ' + ('подключён' if online else 'не подключён'))
+    print('Библиотека: ~/Documents/Books ↔ Samsung /Books')
+    print(f"Файлов: {status['localFiles']} · получить: {status['needFiles']} · состояние: {status['state']}")
+    if status.get('error') or status.get('pullErrors'):
+        print('Ошибка:', status.get('error') or str(status['pullErrors']))
+        sys.exit(1)
+    if online:
+        remote = next(k for k,v in connections.items() if v.get('connected'))
+        completion = get('db/completion?folder=koreader-books&device='+remote)
+        print(f"Передано на телефон: {completion['completion']:.1f}%")
+except (OSError, ValueError, KeyError, ET.ParseError) as error:
+    print('KOReader sync: не удалось проверить состояние:', error, file=sys.stderr)
+    sys.exit(1)
