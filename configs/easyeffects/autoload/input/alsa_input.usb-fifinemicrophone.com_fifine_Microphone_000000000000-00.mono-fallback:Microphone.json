@@ -1,0 +1,6 @@
+{
+    "device": "alsa_input.usb-fifinemicrophone.com_fifine_Microphone_000000000000-00.mono-fallback",
+    "device-description": "fifine  Microphone Mono",
+    "device-profile": "Microphone",
+    "preset-name": "12(1)"
+}
