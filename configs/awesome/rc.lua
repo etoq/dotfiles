@@ -77,6 +77,7 @@ key({mod,'Shift'},'e',function()spawn({'rofi','-modi','emoji','-show','emoji'})e
 key({mod},'w',function()action('wallpaper')end,'Случайные обои','Оформление')
 key({mod},'p',function()spawn({home..'/.local/bin/panel-switch','toggle'})end,'Скрыть / показать панель','Оформление')
 key({mod,'Shift'},'b',function()action('switch')end,'Центр управления: звук, яркость, инструменты','Оформление')
+key({mod,'Shift'},'w',function()spawn({home..'/.local/bin/tiffany-weather'})end,'Погода · выбор города','Инструменты')
 key({mod,'Shift'},'l',function()action('lock')end,'Заблокировать экран','Сеанс')
 key({mod,'Shift'},'Escape',function()action('power')end,'Питание / сон / выход','Сеанс')
 key({mod,'Control'},'r',function()
@@ -171,6 +172,7 @@ awful.rules.rules={
  {rule_any={class={'otter','clipboard-manager','pkg-manager','sysmenu','panel-tool','panel-dashboard'},instance={'calendar','otter-tools'}},properties={floating=true,placement=awful.placement.centered}},
  {rule={type='utility'},rule_any={class={'flameshot','Flameshot'}},properties={floating=true,fullscreen=true,ontop=true,border_width=0,skip_taskbar=true,placement=function(c)c:geometry(c.screen.geometry)end},callback=place_capture},
  {rule_any={type={'dock'}},properties={border_width=0,focus=false,focusable=false,skip_taskbar=true,buttons={}}},
+ {rule={class='tiffany-weather'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
  {rule_any={class={'TiffanyCalculator','TiffanyTranslator'}},properties={floating=true,ontop=false,fullscreen=false,maximized=false,border_width=0,placement=awful.placement.centered}},

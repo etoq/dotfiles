@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+"""Compact weather card. Open-Meteo, explicit location, persistent city and cache."""
+import json
+import os
+from pathlib import Path
+import threading
+import time
+import urllib.parse
+import urllib.request
+from datetime import datetime
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, Gio, GLib, Pango
+
+STATE = Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state'))) / 'tiffany-weather'
+
+def read(name, default=None):
+    try:
+        return json.loads((STATE / name).read_text())
+    except (OSError, ValueError):
+        return default
+
+
+def save(name, data):
+    STATE.mkdir(parents=True, exist_ok=True)
+    tmp = STATE / (name + '.tmp')
+    tmp.write_text(json.dumps(data, ensure_ascii=False))
+    tmp.replace(STATE / name)
+
+
+def fetch(url, params):
+    req = urllib.request.Request(url + '?' + urllib.parse.urlencode(params), headers={'User-Agent': 'TiffanyWeather/1.0'})
+    with urllib.request.urlopen(req, timeout=12) as response:
+        return json.load(response)
+
+
+def condition(code):
+    if code == 0: return '☀', 'Ясно'
+    if code in (1, 2): return '⛅', 'Переменная облачность'
+    if code == 3: return '☁', 'Пасмурно'
+    if code in (45, 48): return '≋', 'Туман'
+    if code in (51, 53, 55, 56, 57): return '☂', 'Морось'
+    if code in (61, 63, 65, 66, 67, 80, 81, 82): return '☂', 'Дождь'
+    if code in (71, 73, 75, 77, 85, 86): return '❄', 'Снег'
+    if code in (95, 96, 99): return 'ϟ', 'Гроза'
+    return '—', 'Нет данных'
+
+
+def number(n, suffix=''):
+    return '—' if n is None else f'{round(n):d}{suffix}'
+
+
+def city_label(city):
+    return ', '.join(dict.fromkeys(str(city[k]) for k in ('name', 'admin1', 'country') if city.get(k)))
+
+
+CSS = b'''
+window.weather { background: #080D10; color: #C5D6D8; border: 1px solid #244145; border-radius: 16px; }
+.weather * { font-family: "Noto Sans"; font-size: 11pt; }
+.weather button, .weather entry { background: #101B20; color: #C5D6D8; border: 1px solid #244145; border-radius: 8px; padding: 7px 10px; box-shadow: none; }
+.weather button:hover { background: #183034; border-color: #0ABAB5; }
+.weather button:focus, .weather entry:focus { border-color: #4DDDD5; }
+.weather .temperature { font-size: 46pt; font-weight: 600; color: #4DDDD5; }
+.weather .muted { color: #89A6AB; font-size: 10pt; }
+.weather .section { color: #4DDDD5; font-size: 10pt; font-weight: 600; }
+.weather .tile { background: #101B20; border-radius: 9px; padding: 10px 5px; }
+.weather .city { font-size: 13pt; font-weight: 600; }
+.weather .error { color: #E4B478; }
+'''
+
+
+def box(vertical=True, spacing=8):
+    return Gtk.Box(orientation=Gtk.Orientation.VERTICAL if vertical else Gtk.Orientation.HORIZONTAL, spacing=spacing)
+
+
+def label(text='', style='', xalign=0):
+    widget = Gtk.Label(label=text, xalign=xalign)
+    if style: widget.get_style_context().add_class(style)
+    return widget
+
+
+class Weather(Gtk.Application):
+    def __init__(self):
+        display = ''.join(c if c.isalnum() else '_' for c in os.environ.get('DISPLAY', 'default'))
+        super().__init__(application_id='local.tiffany.Weather.d' + display)
+        self.win = None
+        self.config = read('cities.json', {'selected': None, 'favorites': []})
+        self.city = self.config.get('selected')
+        self.generation = 0
+        self.search_generation = 0
+        self.pending = False
+
+    def background(self, work, done):
+        def run():
+            try: result, error = work(), None
+            except Exception as exc: result, error = None, str(exc)
+            GLib.idle_add(done, result, error)
+        threading.Thread(target=run, daemon=True).start()
+
+    def do_activate(self):
+        if self.win:
+            self.quit()
+            return
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.win = Gtk.ApplicationWindow(application=self, title='Погода', decorated=False, resizable=False)
+        self.win.set_wmclass('tiffany-weather', 'tiffany-weather')
+        self.win.get_style_context().add_class('weather')
+        self.win.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+        self.win.set_keep_above(True)
+        self.win.set_skip_taskbar_hint(True)
+        self.win.set_position(Gtk.WindowPosition.CENTER)
+        self.win.set_default_size(580, -1)
+        display = Gdk.Display.get_default()
+        _, x, y = display.get_default_seat().get_pointer().get_position()
+        monitor = display.get_monitor_at_point(x, y)
+        last_size = [None]
+        def center(_win, size):
+            dimensions = (size.width, size.height)
+            if last_size[0] == dimensions: return
+            last_size[0] = dimensions
+            area = monitor.get_workarea()
+            self.win.move(area.x + max(0, (area.width-size.width)//2), area.y + max(0, (area.height-size.height)//2))
+        self.win.connect('size-allocate', center)
+        self.win.connect('key-press-event', self.keypress)
+        root = box(spacing=16)
+        root.set_border_width(22)
+        self.win.add(root)
+        header = box(False)
+        self.city_button = Gtk.Button(label='Выбрать город')
+        self.city_button.get_style_context().add_class('city')
+        self.city_button.set_hexpand(True)
+        self.city_button.connect('clicked', lambda *_: self.show_search())
+        header.pack_start(self.city_button, True, True, 0)
+        self.refresh = Gtk.Button(label='↻')
+        self.refresh.set_tooltip_text('Обновить прогноз')
+        self.refresh.connect('clicked', lambda *_: self.load())
+        header.pack_start(self.refresh, False, False, 0)
+        close = Gtk.Button(label='×')
+        close.connect('clicked', lambda *_: self.quit())
+        header.pack_start(close, False, False, 0)
+        root.pack_start(header, False, False, 0)
+        self.pages = Gtk.Stack(homogeneous=False, transition_type=Gtk.StackTransitionType.CROSSFADE)
+        root.pack_start(self.pages, False, False, 0)
+        self.main = box(spacing=14)
+        self.pages.add_named(self.main, 'weather')
+        current = box(False, 18)
+        self.temp = label('—', 'temperature')
+        current.pack_start(self.temp, False, False, 0)
+        summary = box(spacing=6)
+        summary.set_valign(Gtk.Align.CENTER)
+        self.description = label('')
+        self.feels = label('', 'muted')
+        summary.pack_start(self.description, False, False, 0)
+        summary.pack_start(self.feels, False, False, 0)
+        current.pack_start(summary, True, True, 0)
+        self.main.pack_start(current, False, False, 0)
+        self.details = label('', 'muted')
+        self.main.pack_start(self.details, False, False, 0)
+        self.main.pack_start(label('БЛИЖАЙШИЕ ЧАСЫ', 'section'), False, False, 0)
+        self.hours = box(False, 6)
+        self.hours.set_homogeneous(True)
+        self.main.pack_start(self.hours, False, False, 0)
+        self.main.pack_start(label('ПРОГНОЗ НА 3 ДНЯ', 'section'), False, False, 0)
+        self.days = box(spacing=8)
+        self.main.pack_start(self.days, False, False, 0)
+        self.status = label('Выбери город для прогноза', 'muted')
+        self.status.set_line_wrap(True)
+        self.status.set_max_width_chars(65)
+        self.main.pack_start(self.status, False, False, 0)
+        search = box(spacing=10)
+        self.entry = Gtk.SearchEntry(placeholder_text='Город — например, Екатеринбург')
+        self.entry.connect('activate', self.search)
+        search.pack_start(self.entry, False, False, 0)
+        search_button = Gtk.Button(label='Найти город')
+        search_button.connect('clicked', self.search)
+        search.pack_start(search_button, False, False, 0)
+        self.search_status = label('Укажи город и нажми Enter', 'muted')
+        search.pack_start(self.search_status, False, False, 0)
+        scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vscrollbar_policy=Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(210)
+        self.results = box(spacing=6)
+        scroll.add(self.results)
+        search.pack_start(scroll, True, True, 0)
+        self.pages.add_named(search, 'search')
+        self.win.show_all()
+        if self.city:
+            self.set_city_title()
+            self.load()
+        else:
+            self.show_search()
+        GLib.timeout_add_seconds(900, self.auto_refresh)
+
+    def keypress(self, _win, event):
+        if event.keyval == Gdk.KEY_Escape:
+            if self.pages.get_visible_child_name() == 'search' and self.city:
+                self.search_generation += 1
+                self.pages.set_visible_child_name('weather')
+            else: self.quit()
+            return True
+        return False
+
+    def set_city_title(self):
+        self.city_button.set_label(self.city['name'] + '  ▾')
+        self.city_button.set_tooltip_text(city_label(self.city))
+
+    def show_search(self):
+        self.pages.set_visible_child_name('search')
+        self.clear(self.results)
+        for city in self.config.get('favorites', []): self.city_row(city)
+        self.entry.grab_focus()
+
+    @staticmethod
+    def clear(container):
+        for child in container.get_children(): child.destroy()
+
+    def city_row(self, city):
+        button = Gtk.Button(label=city_label(city))
+        child = button.get_child()
+        child.set_ellipsize(Pango.EllipsizeMode.END)
+        child.set_max_width_chars(52)
+        button.connect('clicked', lambda *_: self.select(city))
+        self.results.pack_start(button, False, False, 0)
+        self.results.show_all()
+
+    def search(self, *_):
+        query = self.entry.get_text().strip()
+        if len(query) < 2:
+            self.search_status.set_text('Введи минимум две буквы')
+            return
+        self.search_generation += 1
+        generation = self.search_generation
+        self.search_status.set_text('Поиск…')
+        def done(data, error):
+            if generation != self.search_generation: return
+            self.clear(self.results)
+            if error:
+                self.search_status.set_text('Не удалось найти город. Проверь соединение и повтори.')
+                return
+            cities = data.get('results', [])
+            self.search_status.set_text('Выбери город и область' if cities else 'Город не найден. Попробуй другое написание.')
+            for city in cities: self.city_row(city)
+        self.background(lambda: fetch('https://geocoding-api.open-meteo.com/v1/search', {'name': query, 'count': 8, 'language': 'ru', 'format': 'json'}), done)
+
+    def select(self, city):
+        self.search_generation += 1
+        self.city = city
+        favorites = [c for c in self.config.get('favorites', []) if c.get('id') != city.get('id')]
+        self.config = {'selected': city, 'favorites': [city] + favorites[:7]}
+        save('cities.json', self.config)
+        self.set_city_title()
+        self.pages.set_visible_child_name('weather')
+        self.load()
+
+    def cache_name(self):
+        return f"forecast-{self.city['latitude']}-{self.city['longitude']}.json"
+
+    def load(self):
+        if not self.city: return
+        self.generation += 1
+        generation = self.generation
+        self.pending = True
+        self.refresh.set_sensitive(False)
+        cached = read(self.cache_name())
+        if cached: self.render(cached, time.time() - cached['fetched'] > 1800)
+        else:
+            self.temp.set_text('—')
+            self.description.set_text('Загрузка…')
+            self.feels.set_text('')
+            self.details.set_text('')
+            self.clear(self.hours)
+            self.clear(self.days)
+        self.status.set_text('Обновление…')
+        cache_name = self.cache_name()
+        params = {'latitude': self.city['latitude'], 'longitude': self.city['longitude'], 'timezone': 'auto', 'forecast_days': 3, 'wind_speed_unit': 'ms',
+                  'current': 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation',
+                  'hourly': 'temperature_2m,weather_code,precipitation_probability',
+                  'daily': 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'}
+        def done(data, error):
+            if generation != self.generation: return
+            self.pending = False
+            self.refresh.set_sensitive(True)
+            if error:
+                if cached: self.render(cached, True)
+                else: self.description.set_text('Прогноз недоступен')
+                self.status.set_text(self.status.get_text() + '\nНет соединения — показан сохранённый прогноз.' if cached else 'Нет соединения. Нажми ↻, чтобы повторить.')
+                return
+            payload = {'fetched': time.time(), 'data': data}
+            try:
+                self.render(payload, False)
+                save(cache_name, payload)
+            except (KeyError, TypeError, ValueError, OSError):
+                self.status.set_text('Ошибка данных или сохранения. Повтори обновление.')
+        self.background(lambda: fetch('https://api.open-meteo.com/v1/forecast', params), done)
+
+    def render(self, payload, stale):
+        data = payload['data']
+        current = data['current']
+        icon, description = condition(current['weather_code'])
+        self.temp.set_text(number(current['temperature_2m'], '°'))
+        self.description.set_text(icon + '  ' + description)
+        self.feels.set_text('Ощущается как ' + number(current['apparent_temperature'], '°'))
+        self.details.set_text(f"Ветер {current['wind_speed_10m']:g} м/с    ·    Осадки {current['precipitation']:g} мм")
+        self.clear(self.hours)
+        hourly = data['hourly']
+        indices = [i for i, t in enumerate(hourly['time']) if t >= current['time']][:6]
+        for i in indices:
+            tile = box(spacing=6)
+            tile.get_style_context().add_class('tile')
+            for text, style in [(hourly['time'][i][11:16], 'muted'), (condition(hourly['weather_code'][i])[0], ''), (number(hourly['temperature_2m'][i], '°'), ''), (number(hourly['precipitation_probability'][i], '%'), 'muted')]:
+                tile.pack_start(label(text, style, .5), False, False, 0)
+            self.hours.pack_start(tile, True, True, 0)
+        self.clear(self.days)
+        daily = data['daily']
+        for i, day in enumerate(daily['time']):
+            row = box(False, 10)
+            when = ('Сегодня', 'Завтра', 'Послезавтра')[i]
+            left = label(when + '  ' + datetime.fromisoformat(day).strftime('%d.%m'), 'muted')
+            row.pack_start(left, True, True, 0)
+            row.pack_start(label(condition(daily['weather_code'][i])[0]), False, False, 0)
+            right = label(f"{number(daily['temperature_2m_min'][i], '°')} / {number(daily['temperature_2m_max'][i], '°')}    ·    {number(daily['precipitation_probability_max'][i], '%')}")
+            right.set_width_chars(22)
+            right.set_xalign(1)
+            row.pack_start(right, False, False, 0)
+            self.days.pack_start(row, False, False, 0)
+        updated = datetime.fromtimestamp(payload['fetched']).strftime('%d.%m %H:%M')
+        self.status.set_text(('Сохранённый прогноз · ' if stale else '') + f'Получено {updated} · Open-Meteo\nЧасы прогноза — по времени города. % — вероятность осадков.')
+        self.main.show_all()
+
+    def auto_refresh(self):
+        if self.city and not self.pending: self.load()
+        return GLib.SOURCE_CONTINUE
+
+
+if __name__ == '__main__':
+    Weather().run()

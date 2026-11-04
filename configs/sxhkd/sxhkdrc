@@ -154,3 +154,7 @@ super + shift + g
     "$HOME/.local/bin/panel-action" ghidra
 
 # Wispr owns super+alt+s (toggle) and super+ctrl (hold).
+
+# Compact Tiffany weather card
+super + shift + w
+    ~/.local/bin/tiffany-weather
