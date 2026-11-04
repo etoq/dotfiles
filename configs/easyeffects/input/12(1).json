@@ -57,7 +57,7 @@
                 },
                 "band1": {
                     "frequency": 120.0,
-                    "gain": 2.0,
+                    "gain": 1.0,
                     "mode": "RLC (BT)",
                     "mute": false,
                     "q": 0.9,
@@ -416,7 +416,7 @@
                 },
                 "band1": {
                     "frequency": 120.0,
-                    "gain": 2.0,
+                    "gain": 1.0,
                     "mode": "RLC (BT)",
                     "mute": false,
                     "q": 0.9,
