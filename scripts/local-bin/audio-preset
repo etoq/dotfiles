@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Switch the two reviewed headphone presets without changing microphone effects."""
+import argparse
+import json
+import subprocess
+import sys
+
+PRESETS = {'music': ('12-output', 'Музыка'),
+           'film': ('G435 - Films and Courses', 'Фильмы/курсы')}
+
+
+def run(args):
+    return subprocess.run(args, capture_output=True, text=True, timeout=5, check=True)
+
+
+def status():
+    preset = run(['easyeffects', '-a', 'output']).stdout.strip()
+    mode = next((mode for mode, (name, _) in PRESETS.items() if name == preset), 'other')
+    return {'mode': mode, 'label': PRESETS[mode][1] if mode in PRESETS else 'Другой пресет',
+            'preset': preset}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=['status', 'toggle', 'music', 'film'])
+    action = parser.parse_args().action
+    # A CLI query must never accidentally create a standalone GUI instance.
+    run(['systemctl', '--user', 'is-active', '--quiet', 'easyeffects.service'])
+    if action == 'toggle':
+        action = 'film' if status()['mode'] == 'music' else 'music'
+    if action in PRESETS:
+        run(['easyeffects', '-l', PRESETS[action][0]])
+    result = status()
+    if action in PRESETS and result['mode'] != action:
+        raise RuntimeError('EasyEffects не подтвердил переключение пресета.')
+    print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        print('Не удалось переключить звук: ' + str(error), file=sys.stderr)
+        sys.exit(1)

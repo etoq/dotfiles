@@ -21,3 +21,5 @@ window.deck { background: #080D10; color: #C5D6D8; border: 1px solid #0ABAB5; bo
 .deck combobox button { padding: 6px 10px; }
 .deck scrollbar trough { background: #080D10; }
 .deck scrollbar slider { background: #183039; border-radius: 5px; min-width: 5px; }
+
+.deck button.audio-mode { padding: 5px 10px; font-size: 10pt; color: #4DDDD5; }

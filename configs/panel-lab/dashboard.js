@@ -78,6 +78,20 @@ app.connect('activate',()=>{
  const refreshVolume=slider('󰕾 Звук','volume-set',0,['pamixer','--get-volume'],Number);
  const refreshBrightness=slider('󰃠 Яркость','brightness-set',1,['brightnessctl','-m'],s=>Number(s.split(',')[3]?.replace('%','')));
  const devices=box(false,8);const mute=new Gtk.Button({label:'󰖁 Звук вкл/выкл'});mute.connect('clicked',()=>request([`${H}/.local/bin/panel-action`,'mute']));devices.pack_start(mute,false,false,0);
+ const audioMode=new Gtk.Button({label:'♫  Звук…'});audioMode.get_style_context().add_class('audio-mode');devices.pack_end(audioMode,false,false,0);
+ let audioPending=false;
+ function refreshAudioMode(toggle=false){
+  if(audioPending)return;audioPending=true;
+  if(toggle){audioMode.set_sensitive(false);audioMode.set_label('Переключение…');}
+  request([`${H}/.local/bin/audio-preset`,toggle?'toggle':'status'],out=>{
+   try{const data=JSON.parse(out);audioMode.set_label(`${data.mode==='film'?'▶':'♫'}  ${data.label}`);}
+   catch(e){console.error(String(e));audioMode.set_label('Звук: ошибка');}
+   audioPending=false;audioMode.set_sensitive(true);
+  },err=>{console.error(err);audioMode.set_label('Звук: недоступно');audioPending=false;audioMode.set_sensitive(true);});
+ }
+ audioMode.connect('clicked',()=>refreshAudioMode(true));refreshAudioMode();
+ const audioRefreshId=GLib.timeout_add(GLib.PRIORITY_DEFAULT,3000,()=>{refreshAudioMode();return GLib.SOURCE_CONTINUE;});
+ app.connect('shutdown',()=>GLib.source_remove(audioRefreshId));
  controls.pack_start(devices,false,false,0);
  const selectors=box(true,6);controls.pack_start(selectors,false,false,0);
  let deviceSync=false,deviceEdited=0,deviceOptions={};
