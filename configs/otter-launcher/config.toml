@@ -53,7 +53,7 @@ move_interface_down  = 10 # ═════════════════�
 
 
 [[modules]]
-description = "Проверка после обновления"
+description = "Проверка обновления"
 prefix = "checkupd"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module checkupd"
 unbind_proc = false
@@ -65,78 +65,78 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module errors"
 unbind_proc = false
 
 [[modules]]
-description = "Файлы · дубликаты"
+description = "Дубликаты"
 prefix = "dupes"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module dupes"
 unbind_proc = false
 
 [[modules]]
-description = "Диски · что выросло"
+description = "Размер папок"
 prefix = "growth"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module growth"
 unbind_proc = false
 
 [[modules]]
-description = "Файл · реальный формат"
+description = "Формат файла"
 prefix = "kind"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module kind"
 unbind_proc = false
 
 [[modules]]
-description = "Бинарники · сравнить версии"
+description = "Сравнить бинарники"
 prefix = "bdiff"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module bdiff"
 unbind_proc = false
 
 [[modules]]
-description = "Бинарник · встроенные объекты"
+description = "Извлечь объект"
 prefix = "carve"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module carve"
 unbind_proc = false
 
 [[modules]]
-description = "Вентилятор · тихий / обычный"
+description = "Режим вентилятора"
 prefix = "fan"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module fan"
 unbind_proc = false
 
 [[modules]]
-description = "Приложения · выбрать"
+description = "Приложения"
 prefix = "app"
 cmd = 'exec "$HOME/.local/bin/otter-apps"'
 
 [[modules]]
-description = "Файлы · найти и открыть"
+description = "Найти файл"
 prefix = "fo"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module fo"
 unbind_proc = false
 
 [[modules]]
-description = "Папки · открыть в Yazi"
+description = "Открыть папку"
 prefix = "yz"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module yz"
 unbind_proc = false
 
 [[modules]]
-description = "Новая заметка · nvim"
+description = "Новая заметка"
 prefix = "note"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module note"
 unbind_proc = false
 
 [[modules]]
-description = "Заметки · последние"
+description = "Последние заметки"
 prefix = "recent"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module recent"
 unbind_proc = false
 
 [[modules]]
-description = "Календарь · calcurse"
+description = "Календарь"
 prefix = "cal"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module cal"
 unbind_proc = false
 
 [[modules]]
-description = "Калькулятор · выражения и hex/dec"
+description = "Калькулятор"
 prefix = "calc"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module calc --argument '{}'"
 unbind_proc = false
@@ -144,7 +144,7 @@ with_argument = true
 url_encode = true
 
 [[modules]]
-description = "Пароли · KeePassXC"
+description = "Пароли"
 prefix = "kp"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module kp"
 unbind_proc = false
@@ -162,19 +162,19 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module lof"
 unbind_proc = false
 
 [[modules]]
-description = "Музыка · Яндекс"
+description = "Яндекс Музыка"
 prefix = "music"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module music"
 unbind_proc = false
 
 [[modules]]
-description = "Discord · приложение"
+description = "Discord"
 prefix = "ds"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ds"
 unbind_proc = false
 
 [[modules]]
-description = "Wispr Flow · голосовой ввод"
+description = "Диктовка"
 prefix = "wf"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module wf"
 unbind_proc = false
@@ -182,19 +182,19 @@ unbind_proc = false
 # ── Веб и помощники ──────────────────────────────────────────────
 
 [[modules]]
-description = "ChatGPT · сайт"
+description = "ChatGPT"
 prefix = "pai"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module pai"
 unbind_proc = false
 
 [[modules]]
-description = "Codex · терминал"
+description = "Codex"
 prefix = "cx"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module cx"
 unbind_proc = false
 
 [[modules]]
-description = "Google AI"
+description = "Gemini"
 prefix = "gai"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module gai"
 unbind_proc = false
@@ -260,14 +260,14 @@ url_encode = true
 unbind_proc = false
 
 [[modules]]
-description = "Перевод · API · EN ↔ RU"
+description = "Переводчик"
 prefix = "tr"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module tr --argument '{}'"
 with_argument = true
 url_encode = true
 unbind_proc = false
 [[modules]]
-description = "Claude Desktop"
+description = "Claude"
 prefix = "acl"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module acl"
 unbind_proc = false
@@ -275,7 +275,7 @@ unbind_proc = false
 # ── Разработка и файлы ──────────────────────────────────────────────
 
 [[modules]]
-description = "Git · lazygit"
+description = "Git"
 prefix = "lg"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module lg"
 unbind_proc = false
@@ -293,7 +293,7 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module jq"
 unbind_proc = false
 
 [[modules]]
-description = "Hex · файл в nvim"
+description = "Hex-редактор"
 prefix = "hex"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module hex --argument '{}'"
 unbind_proc = false
@@ -301,7 +301,7 @@ with_argument = true
 url_encode = true
 
 [[modules]]
-description = "Файл · формат / SHA-256 / строки"
+description = "Сведения о файле"
 prefix = "info"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module info --argument '{}'"
 unbind_proc = false
@@ -309,7 +309,7 @@ with_argument = true
 url_encode = true
 
 [[modules]]
-description = "OCR · область → текст rus/eng"
+description = "Распознать текст"
 prefix = "ocr"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ocr"
 unbind_proc = false
@@ -321,7 +321,7 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module cc"
 unbind_proc = false
 
 [[modules]]
-description = "Картинки · очистить метаданные"
+description = "Очистить метаданные"
 prefix = "meta"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module meta --argument '{}'"
 with_argument = true
@@ -336,19 +336,19 @@ unbind_proc = false
 # ── Реверс и CTF ──────────────────────────────────────────────
 
 [[modules]]
-description = "Реверс · Ghidra"
+description = "Ghidra"
 prefix = "ghi"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ghi"
 unbind_proc = false
 
 [[modules]]
-description = "Реверс · Cutter"
+description = "Cutter"
 prefix = "cut"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module cut"
 unbind_proc = false
 
 [[modules]]
-description = "Формат файла · Detect It Easy"
+description = "Detect It Easy"
 prefix = "die"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module die"
 unbind_proc = false
@@ -417,7 +417,7 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module vm"
 unbind_proc = false
 
 [[modules]]
-description = "VM · управление"
+description = "Виртуальные машины"
 prefix = "vms"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module vms"
 
@@ -425,7 +425,7 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module vms"
 # ── Мониторинг и обслуживание ──────────────────────────────────────────────
 
 [[modules]]
-description = "Мониторинг · btop"
+description = "Нагрузка"
 prefix = "top"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module top"
 unbind_proc = false
@@ -449,49 +449,49 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module dsk"
 unbind_proc = false
 
 [[modules]]
-description = "Система · состояние"
+description = "Система"
 prefix = "sys"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module sys"
 unbind_proc = false
 
 [[modules]]
-description = "Журнал · ошибки"
+description = "Журнал"
 prefix = "log"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module log"
 unbind_proc = false
 
 [[modules]]
-description = "Обновить · pacman"
+description = "Обновить систему"
 prefix = "upd"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module upd"
 unbind_proc = false
 
 [[modules]]
-description = "Обновить · yay + AUR"
+description = "Обновить всё"
 prefix = "yupd"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module yupd"
 unbind_proc = false
 
 [[modules]]
-description = "Snapper · снимки"
+description = "Снимки системы"
 prefix = "snap"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module snap"
 unbind_proc = false
 
 [[modules]]
-description = "Пакеты · план удаления"
+description = "Удаление пакетов"
 prefix = "rm"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module rm"
 unbind_proc = false
 
 [[modules]]
-description = "Процессы · TERM / KILL"
+description = "Процессы"
 prefix = "kill"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module kill"
 unbind_proc = false
 
 [[modules]]
-description = "Wi-Fi · подключение"
+description = "Wi-Fi"
 prefix = "wifi"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module wifi"
 unbind_proc = false
@@ -503,13 +503,13 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module wvm"
 unbind_proc = false
 
 [[modules]]
-description = "Bluetooth · устройства"
+description = "Bluetooth"
 prefix = "bt"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module bt"
 unbind_proc = false
 
 [[modules]]
-description = "Звук · pulsemixer"
+description = "Громкость"
 prefix = "vol"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module vol"
 unbind_proc = false
@@ -518,12 +518,6 @@ unbind_proc = false
 description = "Сеть · IP-адреса"
 prefix = "ip"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ip"
-unbind_proc = false
-
-[[modules]]
-description = "Порты · процессы и действия"
-prefix = "ports"
-cmd = "exec \"$HOME/.local/bin/otter-run\" --module ports"
 unbind_proc = false
 
 [[modules]]
@@ -538,7 +532,7 @@ prefix = "sl"
 cmd = "systemctl suspend"
 
 [[modules]]
-description = "Таймер · длительность / отмена"
+description = "Таймер"
 prefix = "timer"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module timer --argument '{}'"
 unbind_proc = false
@@ -546,18 +540,24 @@ with_argument = true
 url_encode = true
 
 [[modules]]
-description = "Время · работа / отдых / аналитика"
+description = "Работа и отдых"
 prefix = "study"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module study"
 unbind_proc = false
 
 [[modules]]
-description = "Питание · меню"
+description = "Питание"
 prefix = "po"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module po"
 
 
 # Служебный поиск: без префикса, скрыт из подсказок и списка ?.
+[[modules]]
+description = "Порты"
+prefix = "ports"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module ports"
+unbind_proc = false
+
 [[modules]]
 description = "google search"
 prefix = "__search"
@@ -569,19 +569,19 @@ hidden = true
 
 [[modules]]
 prefix = "ssh"
-description = "SSH · lazyssh"
+description = "SSH"
 with_argument = false
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ssh"
 unbind_proc = false
 
 [[modules]]
 prefix = "health"
-description = "Состояние · backup, диски и обслуживание"
+description = "Состояние"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module health"
 unbind_proc = false
 
 [[modules]]
 prefix = "learn"
-description = "Учёба · Linux RE"
+description = "Учёба"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module learn"
 unbind_proc = false

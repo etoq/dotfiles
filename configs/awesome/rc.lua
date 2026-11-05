@@ -96,7 +96,7 @@ key({mod},'F7',function()require('cheatsheets').show('recli')end,'RE CLI · ан
 key({mod},'F8',function()require('cheatsheets').show('ghidra')end,'Ghidra · IDA-подобные сочетания','Справочники')
 key({mod},'F9',function()require('cheatsheets').show('scripts')end,'Свои скрипты · команды терминала','Справочники')
 if preview then key({mod,'Control','Shift'},'Escape',awesome.quit,'Закрыть предпросмотр','Сеанс')end
-key({mod},'q',function()spawn({home..'/.config/sxhkd/clip.sh'})end,'История буфера','Инструменты')
+key({mod},'q',function()spawn({home..'/.local/bin/tiffany-picker','clipboard'})end,'История буфера','Инструменты')
 key({mod,'Shift'},'q',function()spawn({'sh','-c','greenclip clear; printf "" | xclip -selection clipboard; notify-send "Clipboard" "История очищена"'})end,'Очистить буфер','Инструменты')
 key({},'Print',function()action('shot')end,'Скриншот','Инструменты')
 key({},'XF86AudioRaiseVolume',function()action('volume-up')end,'Громче','Мультимедиа')
@@ -118,6 +118,8 @@ key({mod,'Control','Shift'},'space',function()awful.layout.inc(-1)end,'Пред�
 key({'Mod1'},'Tab',function()navigation.cycle(1) end,'Следующее окно','Окна')
 key({'Mod1','Shift'},'Tab',function()navigation.cycle(-1) end,'Предыдущее окно','Окна')
 key({mod},'grave',function()navigation.previous() end,'Предыдущее активное окно','Окна')
+key({mod,'Control'},'Tab',function()spawn({home..'/.local/bin/tiffany-picker','windows'})end,'Открытые окна','Окна')
+key({mod,'Control'},'n',function()spawn({home..'/.local/bin/tiffany-picker','notifications'})end,'История уведомлений','Инструменты')
 key({mod},'Tab',awful.tag.history.restore,'Предыдущий рабочий стол','Столы')
 key({mod,'Control'},'Left',function()awful.screen.focus_relative(-1)end,'Предыдущий монитор','Мониторы')
 key({mod,'Control'},'Right',function()awful.screen.focus_relative(1)end,'Следующий монитор','Мониторы')
@@ -173,6 +175,7 @@ awful.rules.rules={
  {rule_any={class={'otter','clipboard-manager','pkg-manager','sysmenu','panel-tool','panel-dashboard'},instance={'calendar','otter-tools'}},properties={floating=true,placement=awful.placement.centered}},
  {rule={type='utility'},rule_any={class={'flameshot','Flameshot'}},properties={floating=true,fullscreen=true,ontop=true,border_width=0,skip_taskbar=true,placement=function(c)c:geometry(c.screen.geometry)end},callback=place_capture},
  {rule_any={type={'dock'}},properties={border_width=0,focus=false,focusable=false,skip_taskbar=true,buttons={}}},
+ {rule={class='tiffany-picker'},properties={floating=true,border_width=0,placement=awful.placement.centered}},
  {rule={class='tiffany-calendar'},properties={floating=true,ontop=false,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='tiffany-weather'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},

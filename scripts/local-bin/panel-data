@@ -71,7 +71,8 @@ def snapshot(previous=None):
         timer=timer,media=media,host=socket.gethostname(),desktops=desktops[:14])
     data['summary']=f"CPU {cpu}%  ·  RAM {used:.1f} GiB  ·  {temp}°C"
     color='#DE7C86' if temp>=85 else '#D8B77B' if temp>=70 else '#0ABAB5'
-    data['polybar_stats']=f'%{{F#C99070}} {cpu}%%{{F-}}  %{{F#A3F0E7}}󰘚 {used:.1f} GiB%{{F-}}  %{{F{color}}}󰔏 {temp}°C%{{F-}}'
+    cpu_color='#DE7C86' if cpu>=90 else '#D8B77B' if cpu>=75 else '#C5D6D8'
+    data['polybar_stats']=f'%{{F{cpu_color}}} {cpu}%%{{F-}}  %{{F#A3F0E7}}󰘚 {used:.1f} GiB%{{F-}}  %{{F{color}}}󰔏 {temp}°C%{{F-}}'
     data['polybar_media']=('󰎆 '+media.replace('%','％').replace('\n',' ').replace('\r',' ')) if media else ''
     data['net_label']=kind+(' · VPN' if vpn else '')
     data['battery_label']=f"{'󰂄' if charging=='Charging' else '󰁹'} {capacity}%"

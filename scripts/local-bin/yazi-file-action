@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Actions on Yazi-selected paths; no shell interpolation of filenames."""
+import hashlib,subprocess as sp,sys
+from pathlib import Path
+if len(sys.argv)!=3:raise SystemExit('action path')
+a,path=sys.argv[1],str(Path(sys.argv[2]).absolute())
+if a in ('path','sha'):
+ if a=='sha':
+  with open(path,'rb') as f:value=hashlib.file_digest(f,'sha256').hexdigest()
+ else:value=path
+ sp.run(['xclip','-selection','clipboard','-in'],input=value.encode(),check=True)
+ sp.run(['notify-send','Yazi','Путь скопирован' if a=='path' else 'SHA-256 скопирован'])
+else:
+ commands={'hex':[str(Path.home()/'.local/bin/imhex'),path],'ghidra':[str(Path.home()/'.local/bin/reverse-ghidra')],'die':['die',path]}
+ sp.Popen(commands[a],stdin=sp.DEVNULL,stdout=sp.DEVNULL,stderr=sp.DEVNULL,start_new_session=True)
+ if a=='ghidra':sp.run(['xclip','-selection','clipboard','-in'],input=path.encode());sp.run(['notify-send','Ghidra','Путь файла скопирован — импортируй через I'])

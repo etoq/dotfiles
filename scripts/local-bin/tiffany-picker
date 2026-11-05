@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""Small searchable clipboard and Awesome window cards; no background process."""
+import re,html,json,os,subprocess as sp,sys,tempfile
+from pathlib import Path
+import gi
+gi.require_version('Gtk','3.0');gi.require_version('Gdk','3.0')
+from gi.repository import Gtk,Gdk,Pango
+MODE=sys.argv[1] if len(sys.argv)>1 else 'clipboard'
+if MODE not in ('clipboard','windows','notifications'):raise SystemExit('clipboard or windows')
+STATE=Path.home()/'.local/share/tiffany-picker';os.umask(0o077)
+def call(args):return sp.check_output(args,text=True,timeout=5)
+def pins():
+ try:return json.loads((STATE/'pins.json').read_text())
+ except (OSError,ValueError):return []
+CSS=b'''window { background:#080D10; color:#C5D6D8; border:1px solid #183039; border-radius:10px; } * { font-family:"Noto Sans"; font-size:11pt; } label {color:#C5D6D8;} .title {color:#A3F0E7;font-size:16pt;font-weight:bold;} .muted {color:#89A6AB;font-size:10pt;} entry,button,textview,textview text {background:#101B20;color:#C5D6D8;border-radius:8px;box-shadow:none;} entry,button {border:1px solid #183039;padding:8px;} entry:focus,button:hover {border-color:#0ABAB5;} list,row {background:transparent;} row {padding:10px;border-bottom:1px solid #183039;} row:selected {background:#183039;} scrolledwindow {border:none;}'''
+class App(Gtk.Application):
+ def __init__(self):
+  display=''.join(c if c.isalnum() else '_' for c in os.getenv('DISPLAY','default'))
+  super().__init__(application_id='local.tiffany.Picker.'+MODE+'.d'+display);self.win=None
+ def do_activate(self):
+  if self.win:self.quit();return
+  css=Gtk.CssProvider();css.load_from_data(CSS);Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),css,Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+  self.win=Gtk.ApplicationWindow(application=self,title='Окна' if MODE=='windows' else 'Уведомления' if MODE=='notifications' else 'Буфер',decorated=False,resizable=False)
+  self.win.set_wmclass('tiffany-picker','tiffany-picker');self.win.set_type_hint(Gdk.WindowTypeHint.DIALOG);self.win.set_skip_taskbar_hint(True);self.win.set_default_size(620,500);self.win.set_position(Gtk.WindowPosition.CENTER)
+  root=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=12);root.set_border_width(20);self.win.add(root)
+  header=Gtk.Box(spacing=8);title=Gtk.Label(label=self.win.get_title(),xalign=0);title.get_style_context().add_class('title');header.pack_start(title,True,True,0)
+  close=Gtk.Button(label='×');close.connect('clicked',lambda *_:self.quit());header.pack_end(close,False,False,0);root.pack_start(header,False,False,0)
+  self.entry=Gtk.SearchEntry(placeholder_text='Поиск');self.entry.connect('search-changed',lambda *_:self.render());self.entry.connect('activate',lambda *_:self.choose());root.pack_start(self.entry,False,False,0)
+  self.list=Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE);self.list.connect('row-activated',lambda *_:self.choose());self.list.connect('row-selected',lambda *_:self.preview())
+  scroll=Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER);scroll.set_min_content_height(235);scroll.add(self.list);root.pack_start(scroll,True,True,0)
+  self.detail=Gtk.TextView(editable=False,wrap_mode=Gtk.WrapMode.WORD_CHAR,left_margin=10,right_margin=10,top_margin=8,bottom_margin=8)
+  preview=Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER);preview.set_min_content_height(100);preview.set_max_content_height(100);preview.add(self.detail)
+  if MODE=='clipboard':
+   root.pack_start(preview,False,False,0);pin=Gtk.Button(label='☆ Закрепить / убрать');pin.connect('clicked',self.pin);root.pack_start(pin,False,False,0)
+  if MODE=='notifications':root.pack_start(preview,False,False,0)
+  self.info=Gtk.Label(xalign=0);self.info.get_style_context().add_class('muted');root.pack_start(self.info,False,False,0)
+  self.win.connect('key-press-event',self.key)
+  try:
+   if MODE=='clipboard':self.data=list(dict.fromkeys(pins()+call(['greenclip','print']).splitlines()))
+   elif MODE=='notifications':
+    history=json.loads(call(['dunstctl','history']));self.data=[]
+    for group in history.get('data',[]):
+     for item in group:
+      value='\n'.join(str(item.get(k,{}).get('data','')) for k in ['appname','summary','body'])
+      self.data.append(html.unescape(re.sub('<[^>]+>','',value)))
+   else:
+    code='local a={}; for _,c in ipairs(client.get()) do if c.valid and not c.skip_taskbar and (c.type=="normal" or c.type=="dialog") then local t=c.first_tag; a[#a+1]={id=c.window,name=c.name or c.class or "Окно",class=c.class or "",desktop=t and t.index or 0,minimized=c.minimized} end end; return (require("dkjson").encode(a):gsub(".",function(c) return string.format("%02x",string.byte(c)) end))'
+    raw=call(['awesome-client',code]);match=re.search(r'"([0-9a-f]+)"',raw);self.data=json.loads(bytes.fromhex(match[1]).decode())
+  except Exception as e:self.data=[];self.info.set_text('Не удалось загрузить список: '+str(e)[:90])
+  self.render();self.win.show_all();self.entry.grab_focus()
+ def render(self):
+  for child in self.list.get_children():child.destroy()
+  query=self.entry.get_text().casefold();saved=pins() if MODE=='clipboard' else []
+  for item in self.data:
+   title=item if MODE!='windows' else f"{item['desktop']} · {item['class']} · {item['name']}"+(' · свёрнуто' if item['minimized'] else '')
+   if query not in title.casefold():continue
+   row=Gtk.ListBoxRow();row.value=item;label=Gtk.Label(label=('★ ' if item in saved else '')+' '.join(title.split()),xalign=0);label.set_ellipsize(Pango.EllipsizeMode.END);label.set_max_width_chars(65);line=Gtk.Box(spacing=10)
+   if MODE=='windows':
+    theme=Gtk.IconTheme.get_default();name=item['class'].lower();icon=name if theme.has_icon(name) else 'application-x-executable-symbolic';line.pack_start(Gtk.Image.new_from_icon_name(icon,Gtk.IconSize.LARGE_TOOLBAR),False,False,0)
+   line.pack_start(label,True,True,0);row.add(line);self.list.add(row)
+  self.list.show_all();rows=self.list.get_children()
+  if rows:self.list.select_row(rows[0])
+ def preview(self):
+  row=self.list.get_selected_row();self.detail.get_buffer().set_text(row.value if row and MODE!='windows' else '')
+ def pin(self,*_):
+  row=self.list.get_selected_row()
+  if not row:return
+  value=row.value;saved=pins();saved.remove(value) if value in saved else saved.append(value)
+  STATE.mkdir(parents=True,exist_ok=True,mode=0o700);fd,tmp=tempfile.mkstemp(dir=STATE)
+  with os.fdopen(fd,'w') as f:json.dump(saved,f,ensure_ascii=False)
+  os.replace(tmp,STATE/'pins.json');self.render()
+ def choose(self):
+  row=self.list.get_selected_row()
+  if not row:return
+  try:
+   if MODE!='windows':sp.run(['xclip','-selection','clipboard','-in'],input=row.value.encode(),check=True,timeout=4)
+   else:
+    ident=int(row.value['id']);call(['awesome-client',f'for _,c in ipairs(client.get()) do if c.window=={ident} then c.minimized=false; c.hidden=false; local t=c.first_tag; if t then t:view_only() end; require("awful").screen.focus(c.screen); c:emit_signal("request::activate","picker",{{raise=true}}); break end end'])
+   self.quit()
+  except Exception:self.info.set_text('Действие не выполнено. Повтори выбор.')
+ def key(self,_,event):
+  if event.keyval==Gdk.KEY_Escape:self.quit();return True
+  if event.keyval in (Gdk.KEY_Down,Gdk.KEY_Up):
+   rows=self.list.get_children();selected=self.list.get_selected_row();index=selected.get_index() if selected else 0
+   if rows:self.list.select_row(rows[(index+(1 if event.keyval==Gdk.KEY_Down else -1))%len(rows)])
+   return True
+  return False
+if __name__=='__main__':App().run([])

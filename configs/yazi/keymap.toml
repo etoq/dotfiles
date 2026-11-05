@@ -5,6 +5,11 @@
 [mgr]
 
 keymap = [
+    { on = [ ",", "p" ], run = "shell '\"$HOME/.local/bin/yazi-file-action\" path %s1'", desc = "Копировать путь" },
+    { on = [ ",", "s" ], run = "shell '\"$HOME/.local/bin/yazi-file-action\" sha %s1'", desc = "Копировать SHA-256" },
+    { on = [ ",", "h" ], run = "shell '\"$HOME/.local/bin/yazi-file-action\" hex %s1'", desc = "ImHex" },
+    { on = [ ",", "g" ], run = "shell '\"$HOME/.local/bin/yazi-file-action\" ghidra %s1'", desc = "Ghidra · импорт" },
+    { on = [ ",", "d" ], run = "shell '\"$HOME/.local/bin/yazi-file-action\" die %s1'", desc = "Detect It Easy" },
 	{ on = "<Esc>", run = "escape",             desc = "Exit visual mode, clear selection, or cancel search" },
 	{ on = "<C-[>", run = "escape",             desc = "Exit visual mode, clear selection, or cancel search" },
 	{ on = "q",     run = "quit",               desc = "Quit the process" },
