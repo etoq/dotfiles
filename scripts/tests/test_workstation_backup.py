@@ -157,6 +157,15 @@ class BackupTests(unittest.TestCase):
             self.backup.main()
         return json.loads((self.backup.STATE / 'status.json').read_text())
 
+    def test_retention_recognizes_proven_renamed_source_only(self):
+        target = self.backup.H/'Documents/Notes/quick-notes'
+        target.mkdir(parents=True)
+        (self.backup.H/'notes').symlink_to(target)
+        records = [dict(id='old', scope='full', manifest={'sources':['notes']}), dict(id='new', scope='full', manifest={'sources':['Documents/Notes']})]
+        self.assertEqual(len(self.backup.retention_targets(records, {})), 1)
+        (self.backup.H/'notes').unlink()
+        self.assertEqual(self.backup.retention_targets(records, {}), [])
+
     def test_live_sqlite_wal_is_in_consistent_backup(self):
         import sqlite3
         name = '.local/state/study/activity.sqlite3'

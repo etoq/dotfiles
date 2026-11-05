@@ -80,6 +80,15 @@ def verified_records(plan):
         records.append(dict(folder=folder,id=folder.name,result=result,manifest=manifest,retirement=retirement,scope=scope))
     return records
 
+def source_covered(old, current_sources):
+    if old in current_sources:return True
+    # Only existing compatibility symlinks prove that an old source was moved.
+    old_path=H/old
+    if not old_path.is_symlink():return False
+    target=old_path.resolve()
+    if not target.is_relative_to(H.resolve()):return False
+    return any(target.is_relative_to((H/name).resolve()) for name in current_sources)
+
 def retention_targets(records,plan):
     policy=plan.get('retention',{})
     full_keep=policy.get('full_versions',1);daily_keep=policy.get('keepass_daily_versions',14)
@@ -90,7 +99,7 @@ def retention_targets(records,plan):
         latest=full[-1]
         for old in full[:-full_keep]:
             # Do not erase the only backup of a source removed from the plan.
-            if set(old['manifest']['sources'])<=set(latest['manifest']['sources']):targets.append((old,latest))
+            if all(source_covered(name, latest['manifest']['sources']) for name in old['manifest']['sources']):targets.append((old,latest))
     sources=set(plan.get('keepass_sources',[]))
     if sources:
         daily=[r for r in records if r['scope']=='partial' and set(r['manifest']['sources'])==sources]
