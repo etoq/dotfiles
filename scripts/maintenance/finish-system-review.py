@@ -32,7 +32,7 @@ if after!=before:
 f=Path('/etc/modprobe.d/audio-fix.conf')
 if f.exists():write(f,'\n'.join(x for x in f.read_text().splitlines() if 'driver_selection=' not in x)+'\n')
 # Limit a future stalled key refresh; retain signature verification.
-write('/etc/systemd/system/dirmngr@etc-pacman.d-gnupg.service.d/90-resource-guard.conf','[Service]\nCPUQuota=25%\nRuntimeMaxSec=20min\n')
+write('/etc/systemd/system/dirmngr@etc-pacman.d-gnupg.service.d/90-resource-guard.conf','[Service]\nCPUQuota=25%\n')
 run(['systemctl','daemon-reload'])
 run(['systemctl','stop','dirmngr@etc-pacman.d-gnupg.service'])
 run(['systemctl','reset-failed','archlinux-keyring-wkd-sync.service'],False)
