@@ -2,6 +2,7 @@
 """Versioned Proton backup with complete restore verification and scoped retention.
 Default is local plan inspection. Timers use --scheduled with an enabled plan.
 """
+import sqlite3
 import argparse,contextlib,datetime,fcntl,hashlib,json,os,re,shutil,stat,subprocess as sp,sys,tarfile,tempfile,time
 from pathlib import Path,PurePosixPath
 H=Path.home();STATE=H/'.local/state/workstation-backup';PLAN=H/'.config/workstation-backup/plan.json'
@@ -261,10 +262,17 @@ def run_backup(resources):
                         return
         phase('archive','Создание локального архива выбранных папок')
         archive=stage/('zer0-'+run_id+'.tar.zst')
+        db_name='.local/state/study/activity.sqlite3'
+        db_root=stage/'consistent'
+        if db_name in sources:
+            db_copy=db_root/db_name;db_copy.parent.mkdir(parents=True)
+            with contextlib.closing(sqlite3.connect((H/db_name).as_uri()+'?mode=ro',uri=True)) as source_db, contextlib.closing(sqlite3.connect(db_copy)) as dest_db:
+                source_db.backup(dest_db)
         for attempt in range(3):
             cmd=['tar','--create','--file',str(archive),'--directory',str(H),'--acls','--xattrs','--sparse','--use-compress-program=zstd -T2 -3']
             cmd += ['--exclude='+pattern for pattern in plan.get('exclude',[])]
-            cmd += ['--',*sources]
+            cmd += ['./'+name for name in sources if name!=db_name]
+            if db_name in sources: cmd += ['--directory',str(db_root),'./'+db_name]
             p=sp.run(cmd,stdout=sp.DEVNULL,stderr=sp.PIPE,text=True)
             (record/'archive.log').write_text(p.stderr)
             if p.returncode==0:break
@@ -272,7 +280,7 @@ def run_backup(resources):
             time.sleep(2)
         archive.chmod(0o600)
         policy=plan.get('storage',{})
-        if policy.get('max_archive_bytes') and archive.stat().st_size>policy['max_archive_bytes']:raise RuntimeError('Archive exceeds the configured size limit; previous cloud backup preserved')
+        if policy.get('max_archive_bytes') and archive.stat().st_size>policy['max_archive_bytes']:raise RuntimeError(f'Archive exceeds the configured size limit: {archive.stat().st_size} bytes; previous cloud backup preserved')
         phase('manifest','Хеширование файлов из готового архива')
         entries=inspect_archive(archive);digest=sha(archive)
         manifest=stage/'manifest.json'
@@ -318,4 +326,4 @@ def run_backup(resources):
         log.close();shutil.rmtree(stage)
 if __name__=='__main__':
     try:main()
-    except (Exception,KeyboardInterrupt) as e:print('Backup failed:',e,file=sys.stderr);sys.exit(1)
+    except (Exception,KeyboardInterrupt) as e:print('Backup failed:',e,file=sys.stderr);sys.exit(78 if 'configured size limit' in str(e) else 1)

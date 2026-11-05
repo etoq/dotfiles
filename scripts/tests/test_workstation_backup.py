@@ -157,6 +157,29 @@ class BackupTests(unittest.TestCase):
             self.backup.main()
         return json.loads((self.backup.STATE / 'status.json').read_text())
 
+    def test_live_sqlite_wal_is_in_consistent_backup(self):
+        import sqlite3
+        name = '.local/state/study/activity.sqlite3'
+        source = self.backup.H / name
+        source.parent.mkdir(parents=True)
+        connection = sqlite3.connect(source)
+        self.addCleanup(connection.close)
+        connection.execute('PRAGMA journal_mode=WAL')
+        connection.execute('CREATE TABLE activity (value TEXT)')
+        connection.execute("INSERT INTO activity VALUES ('committed in WAL')")
+        connection.commit()
+        plan = json.loads(self.backup.PLAN.read_text())
+        plan['sources'].append(name)
+        self.backup.PLAN.write_text(json.dumps(plan))
+        result = self.run_backup(1)
+        archive = next(self.cloud.root.rglob('*.tar.zst'))
+        payload = REAL_RUN(['tar', '--zstd', '-xOf', str(archive), './'+name], capture_output=True, check=True).stdout
+        restored = self.backup.H / 'restored.sqlite3'
+        restored.write_bytes(payload)
+        with contextlib.closing(sqlite3.connect(restored)) as database:
+            self.assertEqual(database.execute('SELECT value FROM activity').fetchone()[0], 'committed in WAL')
+        self.assertTrue(result['restore_verified'])
+
     def test_verified_replacement_only_retires_own_old_folder(self):
         first = self.run_backup(1)
         latest = self.run_backup(2)

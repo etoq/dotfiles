@@ -19,7 +19,8 @@ os.umask(0o077)
 STATE = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'otter-tools'
 HISTORY = STATE / 'calc-history.json'
 CSS = b'''
-window.calculator { background: #080D10; color: #C5D6D8; border: 1px solid #183039; }
+.calculator * { font-family: "Noto Sans"; }
+window.calculator { border-radius: 10px; background: #080D10; color: #C5D6D8; border: 1px solid #183039; }
 .calculator label { color: #C5D6D8; }
 .calculator .heading { color: #A3F0E7; font-size: 24px; font-weight: bold; }
 .calculator .muted { color: #7E999F; font-size: 12px; }

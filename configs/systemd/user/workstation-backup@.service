@@ -8,6 +8,7 @@ StartLimitBurst=3
 Type=oneshot
 ExecStart=%h/.local/bin/workstation-backup --scheduled %i
 Restart=on-failure
+RestartPreventExitStatus=78
 RestartSec=30min
 TimeoutStartSec=6h
 TimeoutStopSec=30

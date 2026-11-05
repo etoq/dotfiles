@@ -26,7 +26,7 @@ def main():
     parameters = dict(line.split(':', 1) for line in Path('/proc/driver/nvidia/params').read_text().splitlines() if ':' in line)
     version = Path('/sys/module/nvidia/version').read_text().strip()
     kernel = os.uname().release
-    check('NVIDIA 580 is loaded', version == '580.178.04')
+    check('NVIDIA 580 is loaded', version.startswith('580.'))
     check('Full VRAM preservation is loaded', parameters.get('PreserveVideoMemoryAllocations', '').strip() == '1')
     check('VRAM backing path is /var/tmp', parameters.get('TemporaryFilePath', '').strip().strip('"') == '/var/tmp')
     check('Installed NVIDIA matches loaded driver', output(['modinfo', '-F', 'version', 'nvidia']) == version)

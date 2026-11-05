@@ -13,6 +13,7 @@ def replace(match):
  text=match.group();raw=text.lstrip('#');alpha=raw[:2] if len(raw)==8 else '';rgb=raw[-6:].lower()
  return ('#' if text.startswith('#') else '')+alpha+mapping[rgb] if rgb in mapping else text
 files=[R/'configs'/p for p in ['awesome/theme.lua','awesome/rc.lua','polybar/config.ini','panel-lab/dashboard.css','bspwm/bspwmrc','picom/picom.conf','dunst/dunstrc','kitty/kitty.conf','kitty/otter.conf','fish/config.fish','fish/tiffany.fish','Xresources','gtk-3.0/gtk.css','gtk-4.0/gtk.css','nvim/lua/core/colors.lua','otter-launcher/config.toml','rofi/config.rasi','rofi/dracula.rasi','rofi/catppuccin.rasi']]
+files += [R/'scripts/local-bin/tiffany-calculator', R/'scripts/local-bin/tiffany-calendar', R/'scripts/local-bin/tiffany-weather']
 files += [R/'scripts/local-bin/panel-data',R/'scripts/local-bin/polybar-workspaces',R/'themes/Ghidra/BlackTiffany.theme']
 files += list((R/'themes/Black-Tiffany').rglob('*.css'))
 changed=0

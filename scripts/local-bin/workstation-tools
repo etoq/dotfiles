@@ -250,6 +250,18 @@ def vm_menu(ui):
         if action == 'open':
             sp.Popen(['virt-manager', '--connect', URI, '--show-domain-console', domain], start_new_session=True)
         elif action == 'start':
+            if vm['name'] == 'debian_RE':
+                tree = ET.fromstring(virsh('dumpxml', domain))
+                devices = tree.find('devices')
+                interfaces = devices.findall('interface')
+                safe = bool(interfaces) and all(i.get('type') == 'network' and i.find('source') is not None and i.find('source').get('network') == 'isolated' for i in interfaces)
+                net = ET.fromstring(virsh('net-dumpxml', 'isolated'))
+                if not safe or net.find('forward') is not None or devices.findall('filesystem') or devices.findall('hostdev'):
+                    ui.notify('ВМ · проверка', 'Запуск отменён: проверь offline-сеть и общие устройства debian_RE.')
+                    continue
+                if not virsh('snapshot-list', domain, '--name').strip():
+                    ui.notify('ВМ · проверка', 'Сначала создай базовый снимок выключенной debian_RE через это меню.')
+                    continue
             virsh('start', domain)
             ui.notify('ВМ', 'Запущена: ' + vm['name'])
         elif action == 'shutdown':

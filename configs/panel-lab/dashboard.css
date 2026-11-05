@@ -1,4 +1,4 @@
-window.deck { background: #080D10; color: #C5D6D8; border: 1px solid #0ABAB5; border-radius: 8px; font-family: 'JetBrainsMono Nerd Font'; font-size: 11pt; }
+window.deck { background: #080D10; color: #C5D6D8; border: 1px solid #0ABAB5; border-radius: 10px; font-family: 'Noto Sans'; font-size: 11pt; }
 .deck button { background: #101B20; color: #C5D6D8; border: 1px solid #183039; border-radius: 8px; padding: 8px; box-shadow: none; text-shadow: none; }
 .deck button:hover, .deck button:focus { background: #183039; border-color: #0ABAB5; color: #A3F0E7; }
 .deck .hero { color: #4DDDD5; font-weight: bold; font-size: 18px; }

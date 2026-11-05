@@ -43,6 +43,9 @@ x-scheme-handler/incy=incy.desktop
 x-scheme-handler/awg=incy.desktop
 x-scheme-handler/amneziawg=incy.desktop
 x-scheme-handler/dsh=deepseek-ai-dsh-desktop.desktop
+x-scheme-handler/codex=chatgpt.desktop
+x-scheme-handler/zcode=zcode.desktop
+x-scheme-handler/qwenwork-cn=qwen-work-cn.desktop
 
 [Added Associations]
 application/pdf=rocks.koreader.koreader.desktop;
@@ -58,4 +61,3 @@ application/x-extension-shtml=zen.desktop;
 application/xhtml+xml=zen.desktop;
 application/x-extension-xhtml=zen.desktop;
 application/x-extension-xht=zen.desktop;
-x-scheme-handler/dsh=deepseek-ai-dsh-desktop.desktop;

@@ -156,6 +156,12 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module obs"
 unbind_proc = false
 
 [[modules]]
+description = "Документы · LibreOffice"
+prefix = "lof"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module lof"
+unbind_proc = false
+
+[[modules]]
 description = "Музыка · Яндекс"
 prefix = "music"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module music"
@@ -521,7 +527,7 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module ports"
 unbind_proc = false
 
 [[modules]]
-description = "Ухожу · закрыть приложения и выключить ВМ"
+description = "Закрыть все"
 prefix = "ol"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ol"
 unbind_proc = false
@@ -566,4 +572,16 @@ prefix = "ssh"
 description = "SSH · lazyssh"
 with_argument = false
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module ssh"
+unbind_proc = false
+
+[[modules]]
+prefix = "health"
+description = "Состояние · backup, диски и обслуживание"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module health"
+unbind_proc = false
+
+[[modules]]
+prefix = "learn"
+description = "Учёба · Linux RE"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module learn"
 unbind_proc = false

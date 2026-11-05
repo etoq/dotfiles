@@ -111,8 +111,12 @@ if status is-interactive
     # Starship prompt
     # starship init fish | source
 
-    # Zoxide (умный cd) вместо обычного cd
-    zoxide init fish | source
+    # cd — умная навигация zoxide; cdz — обычный cd с историей Fish.
+    zoxide init fish --cmd cd | source
+    alias cdz='__zoxide_cd_internal'
+    # Сохранить привычные короткие команды z и zi.
+    alias z='__zoxide_z'
+    alias zi='__zoxide_zi'
 
     # fzf keybindings (Ctrl+R история, Ctrl+T файлы)
     fzf --fish | source

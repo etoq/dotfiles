@@ -26,8 +26,8 @@ def when(value):
         return 'нет данных'
 
 
-def unit(name, *properties):
-    result = sp.run(['systemctl', 'show', name, *['--property=' + x for x in properties]],
+def unit(name, *properties, user=False):
+    result = sp.run(['systemctl', *(['--user'] if user else []), 'show', name, *['--property=' + x for x in properties]],
                     capture_output=True, text=True, timeout=4)
     return dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
 
@@ -66,9 +66,12 @@ def main():
     disk = read(Path('/var/lib/workstation-health/status.json'))
     trim = unit('fstrim.service', 'Result', 'ExecMainExitTimestamp')
     timer = unit('fstrim.timer', 'ActiveState', 'NextElapseUSecRealtime')
-    rows = [['Полная копия', when(backup.get('last_full_success'))],
+    full_unit = unit('workstation-backup@full.service', 'Result', 'ActiveState', user=True)
+    full_problem = full_unit.get('Result') not in (None, '', 'success')
+    full_label = 'выполняется' if full_unit.get('ActiveState') == 'activating' else ('ошибка последнего запуска' if full_problem else 'проверено восстановлением' if backup.get('last_full_success') else 'нет успешной копии')
+    rows = [['Статус полной копии', full_label], ['Полная копия', when(backup.get('last_full_success'))],
             ['Последняя копия', when(backup.get('last_success'))],
-            ['Резервирование', {'success': 'проверено восстановлением', 'running': 'выполняется', 'error': 'ошибка'}.get(backup.get('state'), 'нет данных')]]
+            ['Последняя копия (' + backup.get('scope', 'unknown') + ')', {'success': 'проверено восстановлением', 'running': 'выполняется', 'error': 'ошибка'}.get(backup.get('state'), 'нет данных')]]
     if all(key in quota for key in ('percent', 'used_bytes', 'budget_bytes')):
         rows += [['Proton Drive', f"{quota['percent']:.1f}% · {quota['used_bytes']/1024**2:.0f} / {quota['budget_bytes']/1024**2:.0f} МиБ"],
                  ['Проверка облака', when(quota.get('checked_at'))]]
@@ -76,6 +79,11 @@ def main():
         rows.append(['Proton Drive', 'размер ещё не проверен'])
     if quota.get('check_state') in ('keyring_or_login', 'error'):
         rows.append(['Доступ к облаку', 'нужна разблокировка ключей или повторный вход' if quota['check_state'] == 'keyring_or_login' else 'последняя проверка не удалась'])
+    daily = []
+    for result_path in (HOME/'.local/state/workstation-backup/runs').glob('*/result.json'):
+        item = read(result_path)
+        if item.get('state') == 'success' and item.get('scope') == 'partial': daily.append(item.get('last_success', ''))
+    rows.append(['Последняя копия KeePass', when(max(daily)) if daily else 'нет данных'])
     smart = disk.get('smart', {})
     smart_text = {True: 'PASSED', False: 'требует внимания', None: 'нет данных SMART' if disk else 'ожидает системной настройки'}.get(smart.get('passed'))
     rows.append(['SMART NVMe', smart_text])

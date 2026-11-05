@@ -16,7 +16,7 @@ NOTES = Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share')))
 MONTHS = ('Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь')
 WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс')
 CSS = b'''
-window.calendar { background: #080D10; color: #C5D6D8; border: 1px solid #244145; border-radius: 16px; }
+window.calendar { background: #080D10; color: #C5D6D8; border: 1px solid #183039; border-radius: 10px; }
 .calendar * { font-family: "Noto Sans"; font-size: 11pt; }
 .calendar label { color: #C5D6D8; }
 .calendar .heading { color: #A3F0E7; font-size: 16pt; font-weight: 600; }

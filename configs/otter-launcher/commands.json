@@ -1,4 +1,9 @@
 {
+  "lof": {
+    "command": "exec /usr/bin/libreoffice",
+    "url_encoded": false,
+    "raw_argument": false
+  },
   "fo": {
     "command": "exec kitty --class otter-tools -e bash -c 'f=\"$(fd --type f --hidden --exclude .git --exclude .cache . \"$HOME\" 2>/dev/null | fzf --cycle --gutter '\"'\"' '\"'\"' --pointer '\"'\"'▌'\"'\"' --color '\"'\"'bg:#183039,bg+:#183039,fg:#C5D6D8,hl:#0ABAB5,pointer:#0ABAB5'\"'\"' --prompt '\"'\"'  File > '\"'\"' --preview '\"'\"'bat --color=always --style=numbers {+} 2>/dev/null || cat {+}'\"'\"' --preview-window=right:50%:wrap)\"\nif [ -n \"$f\" ]; then\n    setsid -f xdg-open \"$f\" </dev/null >/dev/null 2>&1\nfi\nexit 0\n'",
     "url_encoded": false,
@@ -40,7 +45,7 @@
     "raw_argument": false
   },
   "music": {
-    "command": "yandex-music",
+    "command": "exec \"$HOME/.local/bin/desktop-app\" open yandex-music",
     "url_encoded": false,
     "raw_argument": false
   },
@@ -386,6 +391,16 @@
   },
   "ssh": {
     "command": "exec kitty --override font_size=14.7 --class lazyssh-terminal -e \"$HOME/.local/bin/lazyssh\"",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "health": {
+    "command": "exec kitty --class otter-tools -e python -c 'import json,subprocess; from pathlib import Path; r=subprocess.check_output([str(Path.home()/'\"'\"'.local/bin/workstation-status'\"'\"')],text=True); [print(k+'\"'\"': '\"'\"'+v) for k,v in json.loads(r)['\"'\"'rows'\"'\"']]; input('\"'\"'\\nEnter — закрыть…'\"'\"')'",
+    "url_encoded": false,
+    "raw_argument": false
+  },
+  "learn": {
+    "command": "exec kitty --class otter-tools -e yazi \"$HOME/learning/linux-re\"",
     "url_encoded": false,
     "raw_argument": false
   }

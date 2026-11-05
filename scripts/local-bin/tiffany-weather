@@ -56,9 +56,9 @@ def city_label(city):
 
 
 CSS = b'''
-window.weather { background: #080D10; color: #C5D6D8; border: 1px solid #244145; border-radius: 16px; }
+window.weather { background: #080D10; color: #C5D6D8; border: 1px solid #183039; border-radius: 10px; }
 .weather * { font-family: "Noto Sans"; font-size: 11pt; }
-.weather button, .weather entry { background: #101B20; color: #C5D6D8; border: 1px solid #244145; border-radius: 8px; padding: 7px 10px; box-shadow: none; }
+.weather button, .weather entry { background: #101B20; color: #C5D6D8; border: 1px solid #183039; border-radius: 8px; padding: 7px 10px; box-shadow: none; }
 .weather button:hover { background: #183034; border-color: #0ABAB5; }
 .weather button:focus, .weather entry:focus { border-color: #4DDDD5; }
 .weather .temperature { font-size: 46pt; font-weight: 600; color: #4DDDD5; }

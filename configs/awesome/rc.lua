@@ -62,6 +62,7 @@ key({mod},'x',function()spawn({'kitty','--class','codex-terminal','--override','
 key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · повтор — отмена','Инструменты')
 key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/desktop-app','open','discord'})end,'Discord','Приложения')
 key({mod,'Shift'},'a',function()spawn({home..'/.local/bin/desktop-app','open','chatgpt'})end,'ChatGPT Desktop','Приложения')
+key({mod,'Shift'},'y',function()spawn({home..'/.local/bin/desktop-app','open','yandex-music'})end,'Яндекс Музыка · показать окно','Приложения')
 key({mod,'Shift'},'c',function()spawn({home..'/bin/calculator'})end,'Калькулятор','Инструменты')
 key({mod,'Shift'},'k',function()action('calendar')end,'Календарь · заметки по датам','Инструменты')
 key({mod,'Shift'},'v',function()action('vm-menu')end,'ВМ · меню управления','Лаборатория')
