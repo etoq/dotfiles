@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Interactive update with a before/after package summary."""
 import argparse
+import json
 import fcntl
 import os
 from pathlib import Path
@@ -31,6 +32,8 @@ def remaining(command, label):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=('pacman', 'yay'))
+    parser.add_argument('--with-regdb', action='store_true', help='Include missing Wi-Fi regulatory data in the full update')
+    parser.add_argument('--verify', action='store_true', help='Check kernels, NVIDIA, EFI and services after the transaction')
     args = parser.parse_args()
     state = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'workstation-update'
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -44,7 +47,10 @@ def main():
         before = snapshot()
         code = 130
         try:
-            code = sp.call(['yay', '-Syu'] if args.mode == 'yay' else ['sudo', 'pacman', '-Syu'])
+            command = ['yay', '-Syu'] if args.mode == 'yay' else ['sudo', 'pacman', '-Syu']
+            if args.with_regdb: command += ['--needed', 'wireless-regdb']
+            print('Исключения пакетов: Enter — обновить все. Итог и проверки будут сохранены.', flush=True)
+            code = sp.call(command)
         except KeyboardInterrupt:
             print('\nОбновление прервано.')
         after = snapshot()
@@ -66,6 +72,20 @@ def main():
         print('\nОставшиеся пакеты могли быть исключены или не установиться; точная причина указана выше в журнале.')
         print('\nПереносимые приложения (обновляются отдельно):')
         sp.run([str(Path.home()/'.local/bin/portable-status')])
+        if args.verify:
+            print('\nПроверка после транзакции (может потребоваться пароль sudo):', flush=True)
+            checker = Path.home()/'.local/bin/workstation-tools'
+            check = sp.run([str(checker), 'post-update', '--admin'], stdout=sp.PIPE, text=True)
+            try:
+                checks = json.loads(check.stdout)
+                for item in checks:
+                    print(f"{item.get('status', '?').upper()}: {item.get('name', '?')}")
+                    if item.get('status') != 'ok': print(item.get('output') or item.get('error') or '')
+            except ValueError:
+                print(check.stdout, flush=True)
+            (state/'post-update.json').write_text(check.stdout)
+            print('Результаты проверок: '+str(state/'post-update.json'))
+            print('Перезагрузка автоматически не выполняется. После обновления ядра загружай Linux LTS.')
         input('Enter — закрыть…')
         return code
 

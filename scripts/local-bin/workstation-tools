@@ -54,7 +54,7 @@ def native(command, *args, timeout=1800):
 def authorize_admin():
     """Authenticate on this terminal; only protected read commands use sudo."""
     if os.geteuid() != 0:
-        print('Для полной проверки initramfs нужны права администратора.', flush=True)
+        print('Для полной проверки initramfs нужны права администратора.', file=sys.stderr, flush=True)
         if sp.run(['/usr/bin/sudo', '-v']).returncode != 0:
             raise RuntimeError('Проверка отменена: права администратора не получены.')
 
