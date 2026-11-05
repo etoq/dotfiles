@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Small searchable clipboard and Awesome window cards; no background process."""
-import re,html,json,os,subprocess as sp,sys,tempfile
+import re,html,json,os,struct,time,tomllib,subprocess as sp,sys,tempfile
 from pathlib import Path
 import gi
 gi.require_version('Gtk','3.0');gi.require_version('Gdk','3.0')
@@ -12,7 +12,50 @@ def call(args):return sp.check_output(args,text=True,timeout=5)
 def pins():
  try:return json.loads((STATE/'pins.json').read_text())
  except (OSError,ValueError):return []
-CSS=b'''window { background:#080D10; color:#C5D6D8; border:1px solid #183039; border-radius:10px; } * { font-family:"Noto Sans"; font-size:11pt; } label {color:#C5D6D8;} .title {color:#A3F0E7;font-size:16pt;font-weight:bold;} .muted {color:#89A6AB;font-size:10pt;} entry,button,textview,textview text {background:#101B20;color:#C5D6D8;border-radius:8px;box-shadow:none;} entry,button {border:1px solid #183039;padding:8px;} entry:focus,button:hover {border-color:#0ABAB5;} list,row {background:transparent;} row {padding:10px;border-bottom:1px solid #183039;} row:selected {background:#183039;} scrolledwindow {border:none;}'''
+
+def decode_greenclip(data):
+ """Read Greenclip 4.2 Data.Binary [Selection], preserving raw UTF-8 text."""
+ offset=0
+ def field_length():
+  nonlocal offset
+  if offset+8>len(data):raise ValueError('Неполная история буфера')
+  value=struct.unpack_from('>q',data,offset)[0];offset+=8
+  if value<0 or value>len(data):raise ValueError('Неизвестный формат истории буфера')
+  return value
+ def field():
+  nonlocal offset
+  size=field_length()
+  if offset+size>len(data):raise ValueError('Неполная запись буфера')
+  value=data[offset:offset+size];offset+=size;return value
+ count=field_length()
+ if count>10000:raise ValueError('Неизвестный формат истории буфера')
+ entries=[];images=set()
+ for _ in range(count):
+  app=field().decode('utf-8')
+  if offset>=len(data):raise ValueError('Неполная запись буфера')
+  kind=data[offset];offset+=1;value=field()
+  if kind==0:entries.append(value.decode('utf-8'))
+  elif kind in (1,2,3):
+   mime={1:'image/png',2:'image/jpeg',3:'image/bmp'}[kind]
+   entry=f'{mime} {app} {value.decode("utf-8")}'
+   entries.append(entry);images.add(entry)
+  else:raise ValueError('Неизвестный тип записи буфера')
+ if offset!=len(data):raise ValueError('Неизвестный формат истории буфера')
+ return entries,images
+
+def clipboard_history():
+ config_path=Path.home()/'.config/greenclip.toml'
+ config=tomllib.loads(config_path.read_text()).get('greenclip',{})
+ path=Path(os.path.expandvars(config.get('history_file',str(Path.home()/'.cache/greenclip.history')))).expanduser()
+ for attempt in range(3):
+  try:
+   entries,images=decode_greenclip(path.read_bytes())
+   return entries+config.get('static_history',[]),images
+  except ValueError:
+   if attempt==2:raise
+   time.sleep(.02)
+
+CSS=b'''window { background:#080D10; color:#C5D6D8; border:1px solid #183039; border-radius:10px; } * { font-family:"Noto Sans"; font-size:11pt; } label {color:#C5D6D8;} .title {color:#A3F0E7;font-size:16pt;font-weight:bold;} .muted {color:#89A6AB;font-size:10pt;} entry,button,textview,textview text {background:#101B20;color:#C5D6D8;border-radius:8px;box-shadow:none;} entry,button {border:1px solid #183039;padding:8px;} entry:focus,button:hover {border-color:#0ABAB5;} list,row {background:transparent;} row {padding:10px;border-bottom:1px solid #183039;} row:selected {background:#183039;} scrolledwindow {border:none;} textview,textview text {font-family:monospace;}'''
 class App(Gtk.Application):
  def __init__(self):
   display=''.join(c if c.isalnum() else '_' for c in os.getenv('DISPLAY','default'))
@@ -36,7 +79,9 @@ class App(Gtk.Application):
   self.info=Gtk.Label(xalign=0);self.info.get_style_context().add_class('muted');root.pack_start(self.info,False,False,0)
   self.win.connect('key-press-event',self.key)
   try:
-   if MODE=='clipboard':self.data=list(dict.fromkeys(pins()+call(['greenclip','print']).splitlines()))
+   if MODE=='clipboard':
+    entries,self.images=clipboard_history()
+    self.data=list(dict.fromkeys(pins()+entries))
    elif MODE=='notifications':
     history=json.loads(call(['dunstctl','history']));self.data=[]
     for group in history.get('data',[]):
@@ -73,7 +118,9 @@ class App(Gtk.Application):
   row=self.list.get_selected_row()
   if not row:return
   try:
-   if MODE!='windows':sp.run(['xclip','-selection','clipboard','-in'],input=row.value.encode(),check=True,timeout=4)
+   if MODE=='clipboard' and row.value in self.images:
+    sp.run(['greenclip','print',row.value],check=True,stdout=sp.DEVNULL,timeout=5)
+   elif MODE!='windows':sp.run(['xclip','-selection','clipboard','-in'],input=row.value.encode('utf-8'),check=True,timeout=4)
    else:
     ident=int(row.value['id']);call(['awesome-client',f'for _,c in ipairs(client.get()) do if c.window=={ident} then c.minimized=false; c.hidden=false; local t=c.first_tag; if t then t:view_only() end; require("awful").screen.focus(c.screen); c:emit_signal("request::activate","picker",{{raise=true}}); break end end'])
    self.quit()
