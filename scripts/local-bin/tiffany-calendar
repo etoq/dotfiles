@@ -1,15 +1,239 @@
-#!/bin/sh
-exec kitty --class calendar \
- --override font_size=18 \
- --override 'font_family=JetBrainsMono Nerd Font' \
- --override window_padding_width=12 \
- --override remember_window_size=no \
- --override initial_window_width=1400 \
- --override initial_window_height=900 \
- --override background=#080D10 \
- --override background_opacity=0.96 \
- --override color1=#A3F0E7 \
- --override color9=#4DDDD5 \
- --override color6=#0ABAB5 \
- --override color14=#4DDDD5 \
- -e calcurse "$@"
+#!/usr/bin/env python3
+"""Minimal Tiffany month calendar with private, automatically saved daily notes."""
+import calendar
+from datetime import date
+import os
+from pathlib import Path
+import tempfile
+
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gtk, Gdk, GLib
+
+os.umask(0o077)
+NOTES = Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))) / 'tiffany-calendar' / 'notes'
+MONTHS = ('Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь')
+WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс')
+CSS = b'''
+window.calendar { background: #080D10; color: #C5D6D8; border: 1px solid #244145; border-radius: 16px; }
+.calendar * { font-family: "Noto Sans"; font-size: 11pt; }
+.calendar label { color: #C5D6D8; }
+.calendar .heading { color: #A3F0E7; font-size: 16pt; font-weight: 600; }
+.calendar .muted { color: #89A6AB; font-size: 10pt; }
+.calendar button { background: #101B20; color: #C5D6D8; border: 1px solid #183039; border-radius: 8px; padding: 6px 10px; box-shadow: none; text-shadow: none; }
+.calendar button:hover { background: #183039; border-color: #0ABAB5; }
+.calendar button:focus { border-color: #4DDDD5; }
+.calendar button.day { padding: 0; min-height: 42px; min-width: 48px; }
+.calendar button.adjacent label { color: #546D72; }
+.calendar button.today { border-color: #0ABAB5; }
+.calendar button.selected { background: #0ABAB5; border-color: #4DDDD5; }
+.calendar button.selected label { color: #080D10; }
+.calendar button.noted label { font-weight: bold; }
+.calendar textview, .calendar textview text { background: #101B20; color: #C5D6D8; caret-color: #4DDDD5; }
+.calendar scrolledwindow { background: #101B20; border: 1px solid #183039; border-radius: 8px; }
+.calendar .error { color: #E4B478; }
+'''
+
+
+def row(vertical=False, spacing=8):
+    return Gtk.Box(orientation=Gtk.Orientation.VERTICAL if vertical else Gtk.Orientation.HORIZONTAL, spacing=spacing)
+
+
+def text(value, style='', align=0):
+    widget = Gtk.Label(label=value, xalign=align)
+    if style: widget.get_style_context().add_class(style)
+    return widget
+
+
+class Calendar(Gtk.Application):
+    def __init__(self):
+        display = ''.join(c if c.isalnum() else '_' for c in os.environ.get('DISPLAY', 'default'))
+        super().__init__(application_id='local.tiffany.Calendar.d' + display)
+        self.win = None
+        self.selected = date.today()
+        self.month = self.selected.replace(day=1)
+        self.pending = 0
+        self.loading = False
+        self.dirty = False
+        self.buttons = {}
+
+    def note_path(self, day):
+        return NOTES / (day.isoformat() + '.txt')
+
+    def do_activate(self):
+        if self.win:
+            if self.flush(): self.quit()
+            else: self.win.present()
+            return
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.win = Gtk.ApplicationWindow(application=self, title='Календарь', decorated=False, resizable=False)
+        self.win.set_wmclass('tiffany-calendar', 'tiffany-calendar')
+        self.win.get_style_context().add_class('calendar')
+        self.win.set_default_size(520, -1)
+        self.win.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+        self.win.set_skip_taskbar_hint(True)
+        self.win.connect('delete-event', self.close)
+        self.win.connect('key-press-event', self.keypress)
+        display = Gdk.Display.get_default()
+        _, x, y = display.get_default_seat().get_pointer().get_position()
+        monitor = display.get_monitor_at_point(x, y)
+        last_size = [None]
+        def center(_win, size):
+            dimensions = size.width, size.height
+            if last_size[0] == dimensions: return
+            last_size[0] = dimensions
+            area = monitor.get_workarea()
+            self.win.move(area.x + max(0, (area.width-size.width)//2), area.y + max(0, (area.height-size.height)//2))
+        self.win.connect('size-allocate', center)
+        root = row(True, 14)
+        root.set_border_width(20)
+        self.win.add(root)
+        header = row()
+        self.heading = text('', 'heading')
+        header.pack_start(self.heading, True, True, 0)
+        for title, callback in [('‹', lambda *_: self.move_month(-1)), ('Сегодня', lambda *_: self.select(date.today())), ('›', lambda *_: self.move_month(1)), ('×', self.close)]:
+            button = Gtk.Button(label=title)
+            button.connect('clicked', callback)
+            header.pack_start(button, False, False, 0)
+        root.pack_start(header, False, False, 0)
+        self.grid = Gtk.Grid(column_homogeneous=True, row_spacing=5, column_spacing=5)
+        root.pack_start(self.grid, False, False, 0)
+        caption = row()
+        self.note_title = text('', 'muted')
+        caption.pack_start(self.note_title, True, True, 0)
+        self.status = text('', 'muted')
+        caption.pack_end(self.status, False, False, 0)
+        root.pack_start(caption, False, False, 0)
+        scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vscrollbar_policy=Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(112)
+        scroll.set_max_content_height(112)
+        self.editor = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=12, right_margin=12, top_margin=10, bottom_margin=10, accepts_tab=False)
+        self.buffer = self.editor.get_buffer()
+        self.buffer.connect('changed', self.changed)
+        scroll.add(self.editor)
+        root.pack_start(scroll, False, False, 0)
+        self.draw_month()
+        self.load_note()
+        self.win.show_all()
+
+    def draw_month(self):
+        self.heading.set_text(f'{MONTHS[self.month.month-1]} {self.month.year}')
+        for child in self.grid.get_children(): child.destroy()
+        self.buttons = {}
+        for column, title in enumerate(WEEKDAYS):
+            self.grid.attach(text(title, 'muted', .5), column, 0, 1, 1)
+        days = list(calendar.Calendar(firstweekday=0).itermonthdates(self.month.year, self.month.month))
+        # Always six rows so the note field stays still when switching months.
+        from datetime import timedelta
+        while len(days) < 42: days.append(days[-1] + timedelta(days=1))
+        for index, day in enumerate(days):
+            button = Gtk.Button()
+            context = button.get_style_context()
+            context.add_class('day')
+            if day.month != self.month.month: context.add_class('adjacent')
+            if day == date.today(): context.add_class('today')
+            if day == self.selected: context.add_class('selected')
+            self.buttons[day] = button
+            self.mark_note(day)
+            button.connect('clicked', lambda _button, value=day: self.select(value))
+            self.grid.attach(button, index % 7, index // 7 + 1, 1, 1)
+        self.grid.show_all()
+
+    def mark_note(self, day):
+        button = self.buttons.get(day)
+        if not button: return
+        exists = self.note_path(day).is_file()
+        button.set_label(f'{day.day}' + (' ·' if exists else ''))
+        context = button.get_style_context()
+        if exists: context.add_class('noted')
+        else: context.remove_class('noted')
+
+    def load_note(self):
+        try:
+            value = self.note_path(self.selected).read_text()
+        except FileNotFoundError:
+            value = ''
+        except OSError:
+            self.status.set_text('Не удалось прочитать')
+            self.editor.set_editable(False)
+            return
+        self.loading = True
+        self.buffer.set_text(value)
+        self.loading = False
+        self.dirty = False
+        self.editor.set_editable(True)
+        self.note_title.set_text(self.selected.strftime('%d.%m.%Y') + ' · Заметка')
+        self.status.set_text('Сохранено' if value else 'Пиши здесь')
+
+    def changed(self, *_):
+        if self.loading: return
+        self.dirty = True
+        self.status.set_text('Сохраняю…')
+        if self.pending: GLib.source_remove(self.pending)
+        self.pending = GLib.timeout_add(500, self.autosave)
+
+    def autosave(self):
+        self.pending = 0
+        self.flush()
+        return GLib.SOURCE_REMOVE
+
+    def flush(self):
+        if self.pending:
+            GLib.source_remove(self.pending)
+            self.pending = 0
+        if not self.dirty: return True
+        value = self.buffer.get_text(self.buffer.get_start_iter(), self.buffer.get_end_iter(), True)
+        path = self.note_path(self.selected)
+        temporary = None
+        try:
+            if value.strip():
+                NOTES.mkdir(parents=True, exist_ok=True, mode=0o700)
+                fd, temporary = tempfile.mkstemp(prefix='.note-', dir=NOTES)
+                with os.fdopen(fd, 'w') as stream:
+                    stream.write(value)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, path)
+            else:
+                path.unlink(missing_ok=True)
+            self.dirty = False
+            self.status.set_text('Сохранено' if value.strip() else 'Пиши здесь')
+            self.mark_note(self.selected)
+            return True
+        except OSError:
+            self.status.set_text('Ошибка сохранения')
+            return False
+        finally:
+            if temporary: Path(temporary).unlink(missing_ok=True)
+
+    def select(self, day):
+        if not self.flush(): return
+        self.selected = day
+        self.month = day.replace(day=1)
+        self.draw_month()
+        self.load_note()
+        self.editor.grab_focus()
+
+    def move_month(self, offset):
+        if not self.flush(): return
+        index = self.month.year * 12 + self.month.month - 1 + offset
+        year, month = index // 12, index % 12 + 1
+        if not 2 <= year <= 9998: return
+        self.select(date(year, month, min(self.selected.day, calendar.monthrange(year, month)[1])))
+
+    def close(self, *_):
+        if self.flush(): self.quit()
+        return True
+
+    def keypress(self, _win, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
+
+
+if __name__ == '__main__':
+    Calendar().run()

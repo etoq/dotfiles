@@ -63,7 +63,7 @@ key({mod,'Shift'},'x',function()action('color')end,'Пипетка Gpick · по
 key({mod,'Shift'},'d',function()spawn({home..'/.local/bin/desktop-app','open','discord'})end,'Discord','Приложения')
 key({mod,'Shift'},'a',function()spawn({home..'/.local/bin/desktop-app','open','chatgpt'})end,'ChatGPT Desktop','Приложения')
 key({mod,'Shift'},'c',function()spawn({home..'/bin/calculator'})end,'Калькулятор','Инструменты')
-key({mod,'Shift'},'k',function()action('calendar')end,'Календарь calcurse','Инструменты')
+key({mod,'Shift'},'k',function()action('calendar')end,'Календарь · заметки по датам','Инструменты')
 key({mod,'Shift'},'v',function()action('vm-menu')end,'ВМ · меню управления','Лаборатория')
 key({mod,'Shift'},'g',function()action('ghidra')end,'Ghidra','Лаборатория')
 key({mod,'Shift'},'o',function()spawn('obsidian')end,'Obsidian','Приложения')
@@ -172,6 +172,7 @@ awful.rules.rules={
  {rule_any={class={'otter','clipboard-manager','pkg-manager','sysmenu','panel-tool','panel-dashboard'},instance={'calendar','otter-tools'}},properties={floating=true,placement=awful.placement.centered}},
  {rule={type='utility'},rule_any={class={'flameshot','Flameshot'}},properties={floating=true,fullscreen=true,ontop=true,border_width=0,skip_taskbar=true,placement=function(c)c:geometry(c.screen.geometry)end},callback=place_capture},
  {rule_any={type={'dock'}},properties={border_width=0,focus=false,focusable=false,skip_taskbar=true,buttons={}}},
+ {rule={class='tiffany-calendar'},properties={floating=true,ontop=false,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='tiffany-weather'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-dashboard'},properties={floating=true,ontop=true,border_width=0,skip_taskbar=true,placement=awful.placement.centered}},
  {rule={class='panel-monitor'},properties={fullscreen=true}},
