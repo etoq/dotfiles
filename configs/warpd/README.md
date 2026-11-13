@@ -42,7 +42,7 @@ ln -s "$HOME/.local/lib/warpd/warpd" "$HOME/.local/bin/warpd"
 systemd-run --user --unit=warpd-trial "$HOME/.local/bin/warpd" -f
 ```
 
-Win+Z — управление указателем; Esc — выход. Caps+J/K (стрелки вниз/вверх)
+Win+Z — управление указателем; Alt+X — метки; Win+Alt+G — сетка; Esc — выход. Caps+J/K (стрелки вниз/вверх)
 и e/r — прокрутка. Системный Caps настроен в configs/etc/keyd/default.conf.
 Обычная тема указателя не меняется. Для warpd в Picom сохранены исключения
 blur, shadow, rounded corners и fading.

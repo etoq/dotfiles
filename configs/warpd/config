@@ -1,6 +1,6 @@
-# Trial: Win+Z pointer, Win+Alt+X hints, Win+Alt+G grid.
+# Trial: Win+Z pointer, Alt+X hints, Win+Alt+G grid.
 activation_key: M-z
-hint_activation_key: A-M-x
+hint_activation_key: A-x
 grid_activation_key: A-M-g
 hint2_activation_key:
 history_activation_key:
