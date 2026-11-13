@@ -3,6 +3,7 @@ aircrack-ng
 alsa-utils
 amass
 anki
+antigravity-cli
 apparmor
 apparmor.d-git
 autopsy
@@ -35,8 +36,11 @@ capa-bin
 cava
 cdrtools
 chafa
+chatgpt-desktop
+checksec
 chrony
 clang
+claude-desktop
 cloc
 cloudflared
 code
@@ -98,19 +102,23 @@ htop
 hydra
 hyx
 i3lock-color
+icestorm-git
+icestorm-git-debug
 ida-free
 imagemagick
 impacket
 impala
-incy-bin
 intel-ucode
+iverilog
 iwd
+jadx
 jdk21-openjdk
 john
 jq
 keepassxc
 kernel-modules-hook
 keyd
+kimi-desktop-bin
 kitty
 koreader-bin
 lazydocker
@@ -120,6 +128,7 @@ lib32-nvidia-580xx-utils
 lib32-openal
 lib32-opencl-nvidia-580xx
 lib32-pipewire
+lib32-pipewire-jack
 lib32-vulkan-intel
 libnotify
 libreoffice-fresh
@@ -132,6 +141,7 @@ linux-firmware
 linux-headers
 linux-lts
 linux-lts-headers
+localsend-bin
 lsd
 lsp-plugins-lv2
 ltrace
@@ -238,6 +248,7 @@ tailscale
 tcpdump
 termdown
 terminus-font
+tgpt
 thinkfan
 throne
 tldr
@@ -258,6 +269,7 @@ ttf-vista-fonts
 tumbler
 udiskie
 ueberzug
+unrar
 unzip
 uv
 v4l2loopback-dkms
@@ -270,6 +282,7 @@ vulkan-intel
 wavemon
 wget
 wimlib
+wireless-regdb
 wireplumber
 wireshark-qt
 wispr-flow-appimage

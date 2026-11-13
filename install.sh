@@ -258,6 +258,9 @@ fi
 # ══════════════════════════════════════════════════════════════════
 if [ "$DO_CONFIGS" = "1" ]; then
     link "configs/applications/imhex.desktop" "$HOME/.local/share/applications/imhex.desktop"
+    link "configs/applications/nvim.desktop" "$HOME/.local/share/applications/nvim.desktop"
+    link "configs/alsa/asoundrc" "$HOME/.asoundrc"
+    link "configs/warpd" "$HOME/.config/warpd"
     link "configs/udiskie/config.yml" "$HOME/.config/udiskie/config.yml"
     link "configs/systemd/user/idle-screen-lock.service" "$HOME/.config/systemd/user/idle-screen-lock.service"
     link "configs/systemd/user/study.service" "$HOME/.config/systemd/user/study.service"

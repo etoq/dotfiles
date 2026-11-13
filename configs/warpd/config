@@ -1,0 +1,20 @@
+# Trial: Win+Z pointer, Win+Alt+X hints, Win+Alt+G grid.
+activation_key: M-z
+hint_activation_key: A-M-x
+grid_activation_key: A-M-g
+hint2_activation_key:
+history_activation_key:
+screen_activation_key:
+hint_oneshot_key:
+hint2_oneshot_key:
+cursor_color: #0ABAB5
+hint_bgcolor: #080D10
+hint_fgcolor: #A3F0E7
+cursor_size: 12
+indicator: topright
+indicator_color: #4DDDD5
+indicator_size: 10
+scroll_down: e Down
+scroll_up: r Up
+cursor_theme: Bibata-Modern-Classic
+cursor_theme_size: 24

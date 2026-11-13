@@ -21,7 +21,6 @@ files=(
     modprobe.d/90-intel-kvm-only.conf sysctl.d/90-sysrq-recovery.conf
     systemd/network/10-networkmanager-ethernet.network
     systemd/system/nftables.service.d/libvirt-dep.conf
-    systemd/logind.conf.d/99-lid-lock.conf
     workstation/nvidia-sleep-mode
     pacman.d/hooks/66-nvidia470-sleep-policy.hook
     pacman.d/hooks/99-copy-kernel-to-efi.hook

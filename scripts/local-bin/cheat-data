@@ -76,6 +76,18 @@ def scripts():
                 if any(os.access(folder / name, os.X_OK) for folder in (HOME / '.local/bin', HOME / 'bin'))]
         if rows:
             result.append([title, rows])
+    if os.access(HOME / '.local/bin/warpd', os.X_OK):
+        result.append(['WARPD · Мышь с клавиатуры · EN', [
+            ['Win+Z', 'Включить управление указателем'],
+            ['Win+Alt+X / G', 'Метки / сетка выбора области'],
+            ['Esc', 'Выйти из режима управления'],
+            ['h / j / k / l', 'Влево / вниз / вверх / вправо'],
+            ['n', 'Левый клик и выход · для текстового поля'],
+            ['m', 'Левый клик, оставаясь в режиме'],
+            ['.', 'Правый клик'],
+            ['↓ / ↑ · Caps+J / K · e / r', 'Прокрутка вниз / вверх в режиме warpd'],
+            ['v', 'Начать / закончить перетаскивание'],
+        ]])
     return result
 
 

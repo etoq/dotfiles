@@ -1,0 +1,12 @@
+# Codex voice uses the G435 microphone directly through PipeWire (without the PulseAudio ALSA bridge).
+# Keep the desktop default and all other applications unchanged.
+pcm.codex_g435 {
+    type pipewire
+    exclusive false
+    capture_node "alsa_input.usb-046d_G435_Wireless_Gaming_Headset_V001008005.1-01.mono-fallback"
+    hint {
+        show on
+        description "G435 microphone (Codex voice)"
+        ioid "Input"
+    }
+}

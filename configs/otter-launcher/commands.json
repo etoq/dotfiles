@@ -403,5 +403,10 @@
     "command": "exec kitty --class otter-tools -e yazi \"$HOME/learning/linux-re\"",
     "url_encoded": false,
     "raw_argument": false
+  },
+  "clean": {
+    "command": "exec kitty --class otter-tools --start-as maximized -e \"$HOME/.local/bin/weekly-clean\" --apply --pause",
+    "url_encoded": false,
+    "raw_argument": false
   }
 }

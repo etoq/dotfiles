@@ -68,7 +68,7 @@ alias install='sudo pacman -S'
 alias search='pacman -Ss'
 alias remove='sudo pacman -Rns'
 alias orphans='pacman -Qqdt'
-alias clean='sudo paccache -r && sudo pacman -Sc'
+alias clean='$HOME/.local/bin/weekly-clean --apply'
 
 # ── Arch specific ─────────────────────────────────────────────────────────────
 alias mirrors='sudo reflector --latest 20 --sort rate --save /etc/pacman.d/mirrorlist'

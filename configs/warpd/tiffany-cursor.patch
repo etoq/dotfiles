@@ -1,0 +1,170 @@
+diff --git a/mk/linux.mk b/mk/linux.mk
+index bdfc558..4af8ff9 100644
+--- a/mk/linux.mk
++++ b/mk/linux.mk
+@@ -12,6 +12,8 @@ endif
+ 
+ ifndef DISABLE_X
+ 	CFLAGS+=-I/usr/include/freetype2/\
++		-lXcursor\
++		-lXrender\
+ 		-lXfixes\
+ 		-lXext\
+ 		-lXinerama\
+diff --git a/src/config.c b/src/config.c
+index cdbd756..4dec326 100644
+--- a/src/config.c
++++ b/src/config.c
+@@ -57,6 +57,8 @@ static struct {
+ 
+ 	{ "cursor_color", "#FF4500", "The color of the pointer in normal mode (rgba hex value).", OPT_STRING },
+ 
++	{ "cursor_theme", "", "Optional Xcursor theme for the normal-mode pointer (X11).", OPT_STRING },
++	{ "cursor_theme_size", "24", "Theme pointer size in pixels (X11).", OPT_INT },
+ 	{ "cursor_size", "7", "The height of the pointer in normal mode.", OPT_INT },
+ 	{ "repeat_interval", "20", "The number of milliseconds before repeating a movement event.", OPT_INT },
+ 	{ "speed", "220", "Pointer speed in pixels/second.", OPT_INT },
+diff --git a/src/normal.c b/src/normal.c
+index 9e7837e..854b924 100644
+--- a/src/normal.c
++++ b/src/normal.c
+@@ -20,6 +20,11 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor)
+ 
+ 	platform.screen_clear(scr);
+ 
++#ifdef WARPD_X
++	if (!hide_cursor && config_get("cursor_theme")[0])
++		x_screen_draw_theme_cursor(scr, x, y);
++	else
++#endif
+ 	if (!hide_cursor)
+ 		platform.screen_draw_box(scr, x+1, y-cursz/2,
+ 				cursz, cursz,
+diff --git a/src/platform.h b/src/platform.h
+index e7c9a87..19da0c8 100644
+--- a/src/platform.h
++++ b/src/platform.h
+@@ -42,6 +42,11 @@ struct hint {
+ struct screen;
+ typedef struct screen *screen_t;
+ 
++#ifdef WARPD_X
++void x_screen_draw_theme_cursor(screen_t scr, int x, int y);
++void x_theme_cursor_hide(void);
++#endif
++
+ extern struct platform {
+ 	/* Main entry point for each platform. Must be called befor other functions are
+ 	 * usable. */
+diff --git a/src/platform/linux/X/screen.c b/src/platform/linux/X/screen.c
+index 4408acb..fee08d9 100644
+--- a/src/platform/linux/X/screen.c
++++ b/src/platform/linux/X/screen.c
+@@ -62,6 +62,7 @@ void x_screen_get_dimensions(struct screen *scr, int *w, int *h)
+ 
+ void x_screen_clear(struct screen *scr)
+ {
++	x_theme_cursor_hide();
+ 	size_t i;
+ 
+ 	for (i = 0; i < scr->nr_boxes; i++)
+--- /dev/null
++++ b/src/platform/linux/X/theme_cursor.c
+@@ -0,0 +1,97 @@
++/* Keep the configured theme's arrow silhouette/hotspot; tint its dark fill. */
++#include "X.h"
++#include <X11/Xcursor/Xcursor.h>
++#include <X11/extensions/Xrender.h>
++
++static Window cursor_win;
++static unsigned int hot_x, hot_y;
++static char loaded_theme[256], loaded_color[32];
++static int loaded_size;
++
++void x_theme_cursor_hide(void)
++{
++    if (cursor_win)
++        XUnmapWindow(dpy, cursor_win);
++}
++
++static void create_theme_cursor(void)
++{
++    const char *theme = config_get("cursor_theme");
++    const char *color = config_get("cursor_color");
++    int size = config_get_int("cursor_theme_size");
++    if (cursor_win && loaded_size == size && !strcmp(theme, loaded_theme)
++        && !strcmp(color, loaded_color))
++        return;
++
++    XcursorImage *img = XcursorLibraryLoadImage("left_ptr", theme, size);
++    XVisualInfo visual;
++    if (!img || !XMatchVisualInfo(dpy, DefaultScreen(dpy), 32, TrueColor, &visual)) {
++        fprintf(stderr, "Unable to load theme pointer or 32-bit visual\n");
++        exit(1);
++    }
++    XRenderPictFormat *fmt = XRenderFindVisualFormat(dpy, visual.visual);
++    if (!fmt || fmt->type != PictTypeDirect || !fmt->direct.alphaMask) {
++        fprintf(stderr, "Theme pointer needs an ARGB visual\n");
++        exit(1);
++    }
++    uint32_t tint = parse_xcolor(color, NULL);
++    XImage *pixels = XCreateImage(dpy, visual.visual, 32, ZPixmap, 0, NULL,
++                                  img->width, img->height, 32, 0);
++    if (!pixels || !(pixels->data = calloc(img->height, pixels->bytes_per_line)))
++        exit(1);
++    for (unsigned int y = 0; y < img->height; ++y) {
++        for (unsigned int x = 0; x < img->width; ++x) {
++            uint32_t src = img->pixels[y * img->width + x];
++            unsigned int a = src >> 24;
++            /* Xcursor pixels are premultiplied: retain alpha and white outline. */
++            unsigned int lum = (((src >> 16) & 255) + ((src >> 8) & 255) + (src & 255)) / 3;
++            unsigned int out = a << 24;
++            for (int shift = 0; shift <= 16; shift += 8) {
++                unsigned int t = (tint >> shift) & 255;
++                unsigned int v = lum + ((a > lum ? a - lum : 0) * t + 127) / 255;
++                out |= (v > a ? a : v) << shift;
++            }
++            XPutPixel(pixels, x, y, out);
++        }
++    }
++    Pixmap bg = XCreatePixmap(dpy, DefaultRootWindow(dpy), img->width, img->height, 32);
++    GC gc = XCreateGC(dpy, bg, 0, NULL);
++    XPutImage(dpy, bg, gc, pixels, 0, 0, 0, 0, img->width, img->height);
++    XFreeGC(dpy, gc);
++    XDestroyImage(pixels);
++    if (cursor_win)
++        XDestroyWindow(dpy, cursor_win);
++    /* The background pixmap keeps the anti-aliased theme alpha under Picom. */
++    Colormap cmap = XCreateColormap(dpy, DefaultRootWindow(dpy), visual.visual, AllocNone);
++    XSetWindowAttributes attrs = {.override_redirect = True, .colormap = cmap,
++                                  .border_pixel = 0, .background_pixmap = bg};
++    cursor_win = XCreateWindow(dpy, DefaultRootWindow(dpy), -1000, -1000,
++                               img->width, img->height, 0, 32, InputOutput,
++                               visual.visual, CWOverrideRedirect | CWColormap
++                               | CWBorderPixel | CWBackPixmap, &attrs);
++    XFreeColormap(dpy, cmap);
++    XFreePixmap(dpy, bg);
++    XClassHint hint = {.res_name = "warpd", .res_class = "warpd"};
++    XSetClassHint(dpy, cursor_win, &hint);
++    /* Transparent to pointer events, including clicks and drags. */
++    XserverRegion empty = XFixesCreateRegion(dpy, NULL, 0);
++    XFixesSetWindowShapeRegion(dpy, cursor_win, ShapeInput, 0, 0, empty);
++    XFixesDestroyRegion(dpy, empty);
++    Atom shadow = XInternAtom(dpy, "_COMPTON_SHADOW", False);
++    unsigned long no_shadow = 0;
++    XChangeProperty(dpy, cursor_win, shadow, XA_CARDINAL, 32, PropModeReplace,
++                    (unsigned char *)&no_shadow, 1);
++    hot_x = img->xhot;
++    hot_y = img->yhot;
++    XcursorImageDestroy(img);
++    snprintf(loaded_theme, sizeof loaded_theme, "%s", theme);
++    snprintf(loaded_color, sizeof loaded_color, "%s", color);
++    loaded_size = size;
++}
++
++void x_screen_draw_theme_cursor(screen_t scr, int x, int y)
++{
++    create_theme_cursor();
++    XMoveWindow(dpy, cursor_win, scr->x + x - (int)hot_x, scr->y + y - (int)hot_y);
++    XMapRaised(dpy, cursor_win);
++}

@@ -473,6 +473,12 @@ cmd = "exec \"$HOME/.local/bin/otter-run\" --module yupd"
 unbind_proc = false
 
 [[modules]]
+description = "Очистка системы"
+prefix = "clean"
+cmd = "exec \"$HOME/.local/bin/otter-run\" --module clean"
+unbind_proc = false
+
+[[modules]]
 description = "Снимки системы"
 prefix = "snap"
 cmd = "exec \"$HOME/.local/bin/otter-run\" --module snap"

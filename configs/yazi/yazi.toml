@@ -102,7 +102,8 @@ rules = [
     { url = "*.xhtml", use = "html" },
 	# Folder
 	{ url = "*/", use = [ "edit", "open", "reveal" ] },
-	# Text
+	# Text: open .txt even when MIME detection reports binary or empty data.
+	{ url = "*.{txt,TXT}", use = [ "edit", "reveal" ] },
 	{ mime = "text/*", use = [ "edit", "reveal" ] },
 	# Image
 	{ mime = "image/*", use = [ "image", "reveal" ] },
