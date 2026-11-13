@@ -78,7 +78,7 @@ def scripts():
             result.append([title, rows])
     if os.access(HOME / '.local/bin/warpd', os.X_OK):
         result.append(['WARPD · Мышь с клавиатуры · EN', [
-            ['Win+Z', 'Включить управление указателем'],
+            ['Alt+Z', 'Включить управление указателем'],
             ['Alt+X / Win+Alt+G', 'Метки / сетка выбора области'],
             ['Esc', 'Выйти из режима управления'],
             ['h / j / k / l', 'Влево / вниз / вверх / вправо'],
