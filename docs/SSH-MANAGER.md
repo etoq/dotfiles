@@ -23,3 +23,12 @@ ssh-agent и ProxyJump. Перед редактированием конфигу
 `~/.local/libexec/lazyssh`; оболочки в `~/.local/bin`.
 Автоустановка dotfiles с пакетами также собирает lazyssh при наличии Go.
 Удаление бинарника не удаляет SSH-конфиг и ключи.
+
+## Лабораторный профиль
+
+На 2026-11-13 добавлен malware-lab → userre@10.77.0.10. Шаблон без секретов:
+[malware-lab.conf.example](../configs/ssh/malware-lab.conf.example). Проверка
+ssh -G подтвердила ED25519, ForwardAgent=no, ForwardX11=no и
+ClearAllForwardings=yes; новое подключение через LazySSH проверено пользователем.
+IP получен по DHCP: перед восстановлением проверить актуальный адрес.
+Политика лаборатории и ограничения проверки: [MALWARE-LAB.md](MALWARE-LAB.md).
